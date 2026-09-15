@@ -8,8 +8,8 @@ export const BOARD = {
   ring10: 8.0,
   ring5: 12.0,
   holeRadius: 1.375 / 2,
-  holeDepth: 0.2,
-  holeCaptureRadius: 0.57, // slightly wider slow inward settling region; full clearance required to score
+  holeDepth: 0.24, // about 64% of the disc height; top sits closer to flush
+  holeCaptureRadius: 0.6, // wider slow inward settling region; full clearance required to score
   lineWidth: 1 / 16,
 } as const;
 
@@ -45,6 +45,7 @@ export const TUNE = {
   maxStepMove: 0.2, // inches per substep (CCD guard)
   sleepSpeed: 0.15,
   holeCaptureSpeed: 32, // allow slightly faster accurate entries to settle into the twenty
+  holeSinkDip: 0.03, // modest engagement threshold for a mostly-submerged disc
   holeLipBevel: 0.025, // effective rounded lip contact depth
   holeLipLoss: 0.65, // fraction of outward normal speed lost at full engagement
   holeTiltSpring: 24,

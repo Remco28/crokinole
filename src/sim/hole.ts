@@ -70,7 +70,7 @@ export function interactWithHole(d: Disc, previousRadius: number, dt: number, ai
       const pull = TUNE.gravityZ * Math.min(0.4, m.dip / DISC.radius) * dt;
       d.vx -= d.x / r * pull; d.vy -= d.y / r * pull;
     }
-    if (r <= clearance && m.dip >= 0.025 && speed < TUNE.holeCaptureSpeed && Math.abs(m.tilt) < 0.35) {
+    if (r <= clearance && m.dip >= TUNE.holeSinkDip && speed < TUNE.holeCaptureSpeed && Math.abs(m.tilt) < 0.35) {
       emit?.({ kind: 'sink', speed: Math.max(20, speed), x: d.x, y: d.y, key: `sink:${d.id}` });
       d.state = 'sunk'; d.vx = d.vy = d.vz = 0;
       return;
