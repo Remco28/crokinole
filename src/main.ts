@@ -2,6 +2,7 @@ import { BoardSound } from './audio/sound';
 import { canStartFlick, crossesDisc, releaseVelocity } from './game/flick';
 import { createScene, type BoardView } from './render/scene';
 import { makeDisc, moving, step, type Disc, type PhysicsEvent, type Shot } from './sim/physics';
+import { holeOverlapFraction } from './sim/hole';
 import { completeRound, inspectShot, sideOf, type Mode, type RoundResult } from './game/rules';
 import { assignDitchSlots, beginReview, reviewDuration, type ShotReview } from './game/review';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -52,18 +53,9 @@ function renderHoleDebug() {
   if (!holeDebug) return;
   holeDebugPanel.innerHTML = '<strong>Hole contacts</strong>' + (holeDebugEntries.length ? holeDebugEntries.slice(-8).reverse().map(e => `<div><b>Disc ${e.disc}</b> ${e.kind} · ${e.speed.toFixed(1)} in/s · offset ${e.offset.toFixed(2)}" · over ${Math.round(e.overlap * 100)}% · dip ${e.dip.toFixed(3)}" · tilt ${Math.round(e.tilt * 180 / Math.PI)}° · ${e.capture ? 'capture' : 'no capture'}</div>`).join('') : '<div>Waiting for a disc to touch the hole…</div>');
 }
-function holeOverlap(offset: number) {
-  const a = 0.625, b = 0.6875, d = Math.max(0.0001, offset);
-  if (d >= a + b) return 0;
-  if (d <= Math.abs(b - a)) return 1;
-  const alpha = Math.acos((d * d + a * a - b * b) / (2 * d * a));
-  const beta = Math.acos((d * d + b * b - a * a) / (2 * d * b));
-  const area = a * a * alpha + b * b * beta - 0.5 * Math.sqrt(Math.max(0, (-d + a + b) * (d + a - b) * (d - a + b) * (d + a + b)));
-  return area / (Math.PI * a * a);
-}
 function recordHole(d: Disc, kind: string, speed = Math.hypot(d.vx, d.vy)) {
   const offset = Math.hypot(d.x, d.y);
-  holeDebugEntries.push({ disc: d.id, kind, speed, offset, overlap: holeOverlap(offset), dip: d.hole?.dip ?? 0, tilt: Math.abs(d.hole?.tilt ?? 0), capture: speed < 36 });
+  holeDebugEntries.push({ disc: d.id, kind, speed, offset, overlap: holeOverlapFraction(offset), dip: d.hole?.dip ?? 0, tilt: Math.abs(d.hole?.tilt ?? 0), capture: speed < 36 });
   if (holeDebugEntries.length > 32) holeDebugEntries.shift();
   renderHoleDebug();
 }

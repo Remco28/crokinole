@@ -29,6 +29,15 @@ export function discContactRadius(d: Disc, nx: number, ny: number) {
   const normal = m ? Math.sin(m.tilt) * (nx * Math.cos(m.lean) + ny * Math.sin(m.lean)) : 0;
   return DISC.radius * Math.sqrt(Math.max(0, 1 - normal * normal)) + DISC.height / 2 * Math.abs(normal);
 }
+export function holeOverlapFraction(offset: number) {
+  const a = DISC.radius, b = BOARD.holeRadius, d = Math.max(0.0001, offset);
+  if (d >= a + b) return 0;
+  if (d <= Math.abs(b - a)) return 1;
+  const alpha = Math.acos((d * d + a * a - b * b) / (2 * d * a));
+  const beta = Math.acos((d * d + b * b - a * a) / (2 * d * b));
+  const area = a * a * alpha + b * b * beta - 0.5 * Math.sqrt(Math.max(0, (-d + a + b) * (d + a - b) * (d - a + b) * (d + a + b)));
+  return area / (Math.PI * a * a);
+}
 
 export function settleTilt(d: Disc, dt: number) {
   const m = d.hole;
@@ -73,8 +82,8 @@ export function interactWithHole(d: Disc, previousRadius: number, dt: number, ai
       const pull = TUNE.gravityZ * Math.min(0.4, m.dip / DISC.radius) * weightShift * dt;
       d.vx -= d.x / r * pull; d.vy -= d.y / r * pull;
     }
-    const canDropThrough = r <= clearance || (r <= BOARD.holeDropRadius && m.dip >= TUNE.holeSinkDip);
-    if (canDropThrough && speed < TUNE.holeCaptureSpeed && Math.abs(m.tilt) < 0.35) {
+    const canDropThrough = r <= clearance || (speed > 0.5 && m.dip >= TUNE.holeSinkDip && holeOverlapFraction(r) >= TUNE.holeDropOverlap);
+    if (canDropThrough && speed < TUNE.holeCaptureSpeed && Math.abs(m.tilt) < TUNE.holeMaxSinkTilt) {
       emit?.({ kind: 'sink', speed: Math.max(20, speed), x: d.x, y: d.y, key: `sink:${d.id}` });
       d.state = 'sunk'; d.vx = d.vy = d.vz = 0;
       return;

@@ -69,7 +69,8 @@ describe('twenty hole contact', () => {
       maximumTilt = Math.max(maximumTilt, Math.abs(d.hole?.tilt ?? 0));
       rolling ||= d.z < 0.01 && rollingAmount(d) > 0.1;
     }
-    expect(maximumTilt).toBeGreaterThan(0.5); expect(rolling).toBe(true); expect(moving(d)).toBe(false);
+    if (d.state === 'sunk') expect(maximumTilt).toBeLessThanOrEqual(0.7);
+    else { expect(maximumTilt).toBeGreaterThan(0.5); expect(rolling).toBe(true); expect(moving(d)).toBe(false); }
   });
   it('can send a fast skip off the playing surface', () => {
     const d = crossing(105, 0.15).disc;

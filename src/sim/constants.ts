@@ -10,7 +10,6 @@ export const BOARD = {
   holeRadius: 1.375 / 2,
   holeDepth: 0.24, // about 64% of the disc height; top sits closer to flush
   holeCaptureRadius: 0.6, // wider slow inward settling region; full clearance required to score
-  holeDropRadius: 0.14, // center offset at which a dipped, slow disc can tip through
   lineWidth: 1 / 16,
 } as const;
 
@@ -48,6 +47,8 @@ export const TUNE = {
   holeCaptureSpeed: 36, // allow slightly faster accurate entries to settle into the twenty
   holeWeightShiftSpeed: 72, // grounded crossings can still receive a weaker weight-shift pull
   holeSinkDip: 0.03, // modest engagement threshold for a mostly-submerged disc
+  holeDropOverlap: 0.4, // unsupported footprint fraction needed for a dipped disc to tip through
+  holeMaxSinkTilt: 0.7, // about 40 degrees; a tipped disc may still fall into the opening
   holeLipBevel: 0.025, // effective rounded lip contact depth
   holeLipLoss: 0.65, // fraction of outward normal speed lost at full engagement
   holeTiltSpring: 24,
