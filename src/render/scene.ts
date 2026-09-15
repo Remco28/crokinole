@@ -344,6 +344,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     getYaw: () => yaw,
     isViewMoving: () => Math.abs(yawTarget - yaw) > 0.003 || Math.abs(polarTarget - polar) > 0.003 || Math.abs(zoomTarget - camera.zoom) > 0.003,
     setZoom: (zoom: number) => { zoomTarget = THREE.MathUtils.clamp(zoom, 0.75, 2.5); },
+    setTheme: (theme: 'light' | 'dark') => { scene.background = new THREE.Color(theme === 'light' ? '#f3efe5' : '#171d1c'); },
     setView: (view: BoardView) => {
       // Seated: about 22 inches above the surface, 42 inches from center
       // at the base framing distance. Standing preserves the original overview.

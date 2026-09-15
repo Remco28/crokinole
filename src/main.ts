@@ -8,7 +8,7 @@ const canvas = $<HTMLCanvasElement>('board-canvas');
 const banner = $('turn-banner'), hint = $('hint'), next = $<HTMLButtonElement>('continue');
 const settings = $<HTMLDialogElement>('settings');
 const sound = new BoardSound();
-let volume = 0.65, muted = false, view: BoardView = 'standing', zoom = 1.2;
+let volume = 0.65, muted = false, view: BoardView = 'standing', zoom = 1.2, theme: 'light' | 'dark' = 'light';
 const clampZoom = (value: number) => Math.max(0.75, Math.min(2.5, value));
 try {
   const prefs = JSON.parse(localStorage.getItem('crokinole-table') || '{}');
@@ -16,16 +16,21 @@ try {
   if (typeof prefs.zoom === 'number' && Number.isFinite(prefs.zoom)) zoom = clampZoom(prefs.zoom);
   muted = prefs.muted === true;
   if (prefs.view === 'seated') view = 'seated';
+  if (prefs.theme === 'dark') theme = 'dark';
 } catch { /* Preferences are optional. */ }
+document.body.dataset.theme = theme;
 function tablePreferences() {
   sound.setPreferences(volume, muted);
+  scene?.setTheme(theme);
+  document.body.dataset.theme = theme;
   $('sound-toggle').textContent = muted || volume === 0 ? 'Sound off' : 'Sound on';
   $('sound-toggle').setAttribute('aria-pressed', String(muted));
   $('sound-toggle').setAttribute('aria-label', muted || volume === 0 ? 'Enable sound' : 'Mute sound');
   $<HTMLInputElement>('volume').value = String(Math.round(volume * 100));
   $('volume-value').textContent = `${Math.round(volume * 100)}%`;
+  $<HTMLInputElement>('theme-toggle').checked = theme === 'dark';
   for (const name of ['seated', 'standing']) $(`view-${name}`).setAttribute('aria-pressed', String(view === name));
-  try { localStorage.setItem('crokinole-table', JSON.stringify({ volume, muted, view, zoom })); } catch { /* optional */ }
+  try { localStorage.setItem('crokinole-table', JSON.stringify({ volume, muted, view, zoom, theme })); } catch { /* optional */ }
 }
 async function unlockSound() {
   if (!await sound.unlock()) $('sound-note').textContent = 'Audio could not start. Tap Preview sounds to try again.';
@@ -40,6 +45,9 @@ $('sound-toggle').addEventListener('click', () => {
 });
 $<HTMLInputElement>('volume').addEventListener('input', e => {
   volume = Number((e.target as HTMLInputElement).value) / 100; muted = false; tablePreferences();
+});
+$<HTMLInputElement>('theme-toggle').addEventListener('change', e => {
+  theme = (e.target as HTMLInputElement).checked ? 'dark' : 'light'; tablePreferences();
 });
 $('sound-preview').addEventListener('click', async () => {
   if (muted || volume === 0) { $('sound-note').textContent = 'Enable sound and raise the volume to hear the preview.'; return; }
