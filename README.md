@@ -67,6 +67,11 @@ clatter. The **Sound on/off** button in Settings mutes the table.
 
 ### Center-hole tuning guide
 
+Settings includes a temporary **Hole physics debug** toggle. When enabled, the
+board shows the latest hole engagements and outcomes with each disc's speed,
+center offset, dip, tilt, and capture status. Use it to distinguish a speed
+gate from a center-position or tipping problem before changing constants.
+
 The center-hole behavior can be adjusted in `src/sim/constants.ts` and
 `src/sim/hole.ts`. The physical dimensions are `BOARD.holeRadius` (visible
 hole size) and `DISC.radius` (disc size). The softer gameplay controls are:
