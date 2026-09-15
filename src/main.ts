@@ -25,7 +25,6 @@ function tablePreferences() {
   $<HTMLInputElement>('volume').value = String(Math.round(volume * 100));
   $('volume-value').textContent = `${Math.round(volume * 100)}%`;
   for (const name of ['seated', 'standing']) $(`view-${name}`).setAttribute('aria-pressed', String(view === name));
-  $('zoom-reset').textContent = `${Math.round(zoom * 100)}%`;
   try { localStorage.setItem('crokinole-table', JSON.stringify({ volume, muted, view, zoom })); } catch { /* optional */ }
 }
 async function unlockSound() {
@@ -221,17 +220,6 @@ function setZoom(value: number) {
   zoom = clampZoom(value); scene.setZoom(zoom); tablePreferences();
 }
 $('view-center').addEventListener('click', () => { if (phase === 'pass' && orbitPointer === null && !pinching) scene.centerView(); });
-$('zoom-in').addEventListener('click', () => setZoom(zoom + 0.15));
-$('zoom-out').addEventListener('click', () => setZoom(zoom - 0.15));
-$('zoom-reset').addEventListener('click', () => setZoom(1));
-canvas.addEventListener('wheel', e => {
-  // Browser Ctrl/Cmd zoom remains available for the surrounding interface.
-  if (e.ctrlKey || e.metaKey) return;
-  e.preventDefault();
-  if (pinching) return;
-  const delta = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? canvas.clientHeight : 1);
-  setZoom(zoom * Math.exp(-Math.max(-150, Math.min(150, delta)) * 0.002));
-}, { passive: false });
 canvas.addEventListener('pointerdown', e => {
   if (e.pointerType === 'touch') {
     touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -376,9 +364,6 @@ function tick(now: number) {
   canvas.classList.toggle('is-orbiting', orbitPointer !== null);
   $<HTMLButtonElement>('view-center').disabled = controlsLocked;
   for (const name of ['seated', 'standing']) $<HTMLButtonElement>(`view-${name}`).disabled = controlsLocked;
-  $<HTMLButtonElement>('zoom-in').disabled = controlsLocked || zoom >= 2.5;
-  $<HTMLButtonElement>('zoom-out').disabled = controlsLocked || zoom <= 0.75;
-  $<HTMLButtonElement>('zoom-reset').disabled = controlsLocked;
   assignDitchSlots(discs);
   scene.syncDiscs(discs, review); requestAnimationFrame(tick);
 }

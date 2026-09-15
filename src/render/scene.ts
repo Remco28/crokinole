@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { discHalfHeight } from '../sim/hole';
 import type { Disc } from '../sim/physics';
 import { BOARD, DISC, PEGS, pegPositions } from '../sim/constants';
 import { DITCH_SLOTS, REVIEW_TIMING, type ShotReview } from '../game/review';
@@ -163,7 +162,6 @@ export function createScene(canvas: HTMLCanvasElement) {
   const markerTexture = new THREE.CanvasTexture(markerCanvas);
   markerTexture.colorSpace = THREE.SRGBColorSpace;
   const markers = new Map<number, THREE.Sprite>();
-  const tiltAxis = new THREE.Vector3();
   function syncDiscs(discs: Disc[], review: ShotReview | null = null) {
     const removals = new Map(review?.removed.map(d => [d.id, d]) ?? []);
     const visible = new Set(discs.filter(d => d.state !== 'sunk' || removals.has(d.id)).map(d => d.id));
@@ -174,10 +172,9 @@ export function createScene(canvas: HTMLCanvasElement) {
       let mesh = meshes.get(d.id);
       if (!mesh) { mesh = new THREE.Mesh(discGeo, materials[d.owner].clone()); mesh.castShadow = true; meshes.set(d.id, mesh); scene.add(mesh); }
       const source = removals.get(d.id) ?? d;
-      const tilt = source.hole?.tilt ?? 0, lean = source.hole?.lean ?? 0;
-      mesh.position.set(source.x, discHalfHeight(source) + source.z - (source.hole?.dip ?? 0), source.y);
-      mesh.quaternion.setFromAxisAngle(tiltAxis.set(Math.sin(lean), 0, -Math.cos(lean)), tilt);
-      mesh.rotateY(source.hole?.rollPhase ?? 0); mesh.visible = true;
+      mesh.position.set(source.x, DISC.height / 2 + source.z, source.y);
+      mesh.quaternion.identity();
+      mesh.visible = true;
       let progress = 0;
       if (d.state === 'out') {
         if (mesh.userData.state !== 'out') mesh.userData.outAt = mesh.userData.state === 'board' ? performance.now() : -1000;
