@@ -104,8 +104,8 @@ const eyeIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.2 12s3.
 function hud() {
   const scoreboard = $('scoreboard');
   scoreboard.dataset.expanded = String(scoreboardExpanded);
-  const cards = scores.map((score, i) => `<div class="score ${side(player) === i ? 'active' : ''}" style="--player:${colors[i]}"><span class="dot"></span><div><span class="name">${label(i)}</span><small>${discs.filter(d => side(d.owner) === i && d.state === 'sunk').length} twenties this round</small><small>${mode === 'teams' ? used.filter((_, p) => side(p) === i).reduce((a, b) => a + b, 0) : used[i]}/${mode === 'ffa' ? 6 : 12} played</small></div><div class="match-total"><strong>${score}</strong><small>Match</small></div></div>`).join('');
-  scoreboard.innerHTML = `${cards}<button class="scoreboard-toggle" type="button" aria-expanded="${scoreboardExpanded}" aria-label="${scoreboardExpanded ? 'Show compact scores' : 'Show full scores'}">⌄</button>`;
+  const cards = scores.map((score, i) => `<div class="score ${side(player) === i ? 'active' : ''}" data-score-card role="button" tabindex="0" aria-expanded="${scoreboardExpanded}" aria-label="${scoreboardExpanded ? 'Show compact scores' : 'Show full scores'}" style="--player:${colors[i]}"><span class="dot"></span><div><span class="name">${label(i)}</span><small>${discs.filter(d => side(d.owner) === i && d.state === 'sunk').length} twenties this round</small><small>${mode === 'teams' ? used.filter((_, p) => side(p) === i).reduce((a, b) => a + b, 0) : used[i]}/${mode === 'ffa' ? 6 : 12} played</small></div><div class="match-total"><strong>${score}</strong><small>Match</small></div></div>`).join('');
+  scoreboard.innerHTML = cards;
   $('round-label').textContent = `ROUND ${round} · FIRST TO 100`;
   assignDitchSlots(discs);
   scene.syncDiscs(discs, review);
@@ -117,8 +117,12 @@ function hud() {
   } else summary.dataset.boardFocus = 'false';
 }
 $('scoreboard').addEventListener('click', event => {
-  if (!(event.target as HTMLElement).closest('.scoreboard-toggle')) return;
+  if (!(event.target as HTMLElement).closest('[data-score-card]')) return;
   scoreboardExpanded = !scoreboardExpanded; hud();
+});
+$('scoreboard').addEventListener('keydown', event => {
+  if ((event.key !== 'Enter' && event.key !== ' ') || !(event.target as HTMLElement).closest('[data-score-card]')) return;
+  event.preventDefault(); scoreboardExpanded = !scoreboardExpanded; hud();
 });
 $('round-summary').addEventListener('click', event => {
   if (!(event.target as HTMLElement).closest('.round-board-toggle')) return;
