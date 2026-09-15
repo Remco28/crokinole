@@ -37,3 +37,20 @@ body[data-theme=light]{background:#f3efe5;color:#292b26;color-scheme:light}body[
 .score .match-total{min-width:0;}
 @media(min-width:601px){#scoreboard{grid-template-columns:repeat(4,minmax(130px,1fr));max-width:980px;margin:0 auto}.score{padding:11px 14px;}}
 @media(max-width:600px){#scoreboard{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.score{padding:8px 6px;gap:4px}.score .name{font-size:11px}.score strong{font-size:18px}.score .match-total{margin-left:auto}.score .dot{width:7px;height:7px;flex:0 0 7px}}
+
+/* Score review: compact by default, spacious and focused when opened. */
+#scoreboard .score{cursor:pointer;transition:background .2s ease,border-color .2s ease,transform .2s ease;}
+#scoreboard .score:focus-visible{outline:2px solid #dfc58a;outline-offset:3px;}
+#scoreboard[data-expanded=true]{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;max-width:620px;margin:0 auto;}
+#scoreboard[data-expanded=true] .score{padding:13px 15px;gap:10px;min-height:68px;}
+#scoreboard[data-expanded=true] .score .name{font-size:14px;}
+#scoreboard[data-expanded=true] .score strong{font-size:27px;}
+#scoreboard[data-expanded=true] .score small{display:block;font-size:11px;}
+#scoreboard[data-expanded=true] + main::after{content:"Score review  ·  tap any card to close";position:absolute;inset:0;display:grid;place-items:center;padding-top:110px;background:rgba(18,25,23,.72);backdrop-filter:blur(5px);color:#eee8d7;font-size:12px;letter-spacing:.08em;text-transform:uppercase;z-index:2;pointer-events:none;}
+#scoreboard[data-expanded=true] + main #table-controls{opacity:.35;z-index:3;}
+@media(max-width:600px){#scoreboard[data-expanded=true]{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:0 2px;}
+#scoreboard[data-expanded=true] .score{padding:11px 10px;min-height:72px;gap:7px;}
+#scoreboard[data-expanded=true] .score .name{font-size:12px;}
+#scoreboard[data-expanded=true] .score strong{font-size:23px;}
+#scoreboard[data-expanded=true] .score small{font-size:9px;line-height:1.35;}
+#scoreboard[data-expanded=true] + main::after{padding-top:120px;font-size:10px;letter-spacing:.06em;}}
