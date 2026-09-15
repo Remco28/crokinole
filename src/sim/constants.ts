@@ -45,6 +45,7 @@ export const TUNE = {
   maxStepMove: 0.2, // inches per substep (CCD guard)
   sleepSpeed: 0.15,
   holeCaptureSpeed: 36, // allow slightly faster accurate entries to settle into the twenty
+  holeWeightShiftSpeed: 72, // grounded crossings can still receive a weaker weight-shift pull
   holeSinkDip: 0.03, // modest engagement threshold for a mostly-submerged disc
   holeLipBevel: 0.025, // effective rounded lip contact depth
   holeLipLoss: 0.65, // fraction of outward normal speed lost at full engagement

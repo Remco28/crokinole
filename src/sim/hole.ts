@@ -64,10 +64,13 @@ export function interactWithHole(d: Disc, previousRadius: number, dt: number, ai
     m.fall += TUNE.gravityZ * supportLoss * dt;
     const supportedDepth = Math.max(m.dip, BOARD.holeDepth * Math.min(1, supportLoss * 2));
     m.dip = Math.min(supportedDepth, m.dip + m.fall * dt);
-    // Slow discs tipped into the opening can settle inward. No pull acts outside
-    // the physical hole, or on fast/airborne passes.
-    if (speed < TUNE.holeCaptureSpeed && r > clearance && m.dip > 0.005 && r < BOARD.holeCaptureRadius) {
-      const pull = TUNE.gravityZ * Math.min(0.4, m.dip / DISC.radius) * dt;
+    // The weight shift is strongest for slow discs, but a grounded faster disc
+    // still loses support and receives a weaker inward influence while crossing.
+    if (r > clearance && m.dip > 0.005 && r < BOARD.holeCaptureRadius && speed < TUNE.holeWeightShiftSpeed) {
+      const weightShift = speed <= TUNE.holeCaptureSpeed
+        ? 1
+        : Math.max(0.12, 1 - (speed - TUNE.holeCaptureSpeed) / (TUNE.holeWeightShiftSpeed - TUNE.holeCaptureSpeed));
+      const pull = TUNE.gravityZ * Math.min(0.4, m.dip / DISC.radius) * weightShift * dt;
       d.vx -= d.x / r * pull; d.vy -= d.y / r * pull;
     }
     if (r <= clearance && m.dip >= TUNE.holeSinkDip && speed < TUNE.holeCaptureSpeed && Math.abs(m.tilt) < 0.35) {
