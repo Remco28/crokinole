@@ -1,7 +1,23 @@
 # Discussion notes for the next session
 
-Development is paused. These notes capture concerns and proposals for discussion;
-they do not authorize implementing the proposals yet.
+The user approved these proposals and resumed development on September 15.
+The original discussion is preserved below; this implementation summary supersedes
+its pending decisions.
+
+## Implemented after approval
+
+- Audited round arithmetic with explicit duel, teams, tie, and FFA examples.
+  Fixed scoring boundaries to match the visible line width and beveled disc's
+  bottom footprint. Outer-line discs remain hittable until the shot settles.
+- Added a round breakdown with raw totals and points added to the match.
+- Hold ordinary shots for 1.25 seconds and fouls for 2 seconds, then animate
+  removals for 0.65 seconds. Automatically hand over afterward. Round summaries
+  stay for 6 seconds, with an option to advance sooner.
+- Pulse and fade a contrasting outlined X marker while retaining player colors.
+- Keep out-of-play discs flat in a widened 1.75-inch ditch. Use the nearest
+  free parking spot when another disc occupies the landing area.
+- Shortened exposed pegs to 0.8 inches and added rubber bodies and brass caps.
+- Persist review and completed-round states so reloading does not award twice.
 
 ## 1. Confirm scoring and make it understandable
 

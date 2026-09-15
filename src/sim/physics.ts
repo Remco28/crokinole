@@ -1,7 +1,7 @@
 import { discContactRadius, discHalfHeight, holeMoving, interactWithHole, rollingAmount, settleTilt, type HoleMotion } from './hole';
-import { BOARD, DISC, PEGS, TUNE, pegPositions } from './constants';
+import { BOARD, PEGS, TUNE, pegPositions } from './constants';
 
-export interface Disc { id: number; owner: number; x: number; y: number; vx: number; vy: number; z: number; vz: number; state: 'board' | 'sunk' | 'out'; hole?: HoleMotion }
+export interface Disc { id: number; owner: number; x: number; y: number; vx: number; vy: number; z: number; vz: number; state: 'board' | 'sunk' | 'out'; hole?: HoleMotion; ditchSlot?: number }
 export interface PhysicsEvent { kind: 'disc' | 'peg' | 'sink' | 'ditch' | 'land' | 'lip'; speed: number; x: number; y: number; key: string }
 export interface Shot { touched: Set<number>; opponentContact: boolean; side: number; sideOf: (owner: number) => number }
 export const makeDisc = (id: number, owner: number, x: number, y: number): Disc => ({ id, owner, x, y, vx: 0, vy: 0, z: 0, vz: 0, state: 'board' });
@@ -28,7 +28,9 @@ export function step(discs: Disc[], dt: number, shot: Shot, airborne = true, emi
       const ratio = v > 0 && next > TUNE.sleepSpeed ? next / v : 0;
       d.vx *= ratio; d.vy *= ratio;
       const radius = Math.hypot(d.x, d.y);
-      if (radius > BOARD.playRadius || (next === 0 && radius + DISC.radius >= BOARD.ring5)) { if (radius > BOARD.playRadius) emit?.({ kind: 'ditch', speed: Math.max(12, v), x: d.x, y: d.y, key: `ditch:${d.id}` }); d.state = 'out'; continue; }
+      // Only leaving the playing surface is immediate. Line-touching discs remain
+      // hittable until the whole shot has settled, then rules remove them.
+      if (radius > BOARD.playRadius) { emit?.({ kind: 'ditch', speed: Math.max(12, v), x: d.x, y: d.y, key: `ditch:${d.id}` }); d.state = 'out'; continue; }
       interactWithHole(d, previousRadius, h, airborne, emit);
       if (d.state !== 'board') continue;
       for (const p of pegs) {

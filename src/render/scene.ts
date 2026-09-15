@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { discHalfHeight } from '../sim/hole';
 import type { Disc } from '../sim/physics';
 import { BOARD, DISC, PEGS, pegPositions } from '../sim/constants';
+import { DITCH_SLOTS, REVIEW_TIMING, type ShotReview } from '../game/review';
 
 import { centeredOrbit, dragOrbit, type BoardView } from './orbit';
 export type { BoardView } from './orbit';
@@ -12,7 +13,7 @@ export type { BoardView } from './orbit';
 export function makeDiscGeometry(): THREE.LatheGeometry {
   const R = DISC.radius;
   const H = DISC.height / 2;
-  const er = 1 / 16; // edge round-over radius
+  const er = DISC.edgeRadius;
   const arcSteps = 10;
   // NOTE: bottom-to-top order — LatheGeometry derives face winding from
   // profile direction, and top-down order flips normals inward.
@@ -76,12 +77,12 @@ export function createScene(canvas: HTMLCanvasElement) {
   key.shadow.bias = -0.001;
   scene.add(key);
 
-  // Wooden frame: 26" playing surface, 1" ditch, and a slim 1/4" wall.
+  // Wooden frame: 26" playing surface, 1.75" ditch, and a slim 1/4" wall.
   // The wall rises +0.4"
   // above the play surface, 1.8" total board thickness.
   // flatShading is essential: LatheGeometry smooths normals across the
   // square profile corners, which fakes a curved round-over in lighting.
-  const DITCH_OUT = 14.0;
+  const DITCH_OUT = BOARD.ditchOuterRadius;
   const RAIL_OUT = DITCH_OUT + 0.25;
   const framePts = [
     // The playing-surface cylinder alone owns the exposed inner edge.
@@ -126,32 +127,82 @@ export function createScene(canvas: HTMLCanvasElement) {
   surface.receiveShadow = true;
   scene.add(surface);
 
-  // Pegs
-  const pegMat = new THREE.MeshStandardMaterial({ color: '#d8cfc0', roughness: 0.4 });
-  const pegGeo = new THREE.CylinderGeometry(PEGS.radius, PEGS.radius, PEGS.height, 24);
+  // Exposed rubber sleeves with brass screw heads, rather than full-length
+  // pale cylinders. The mounting thread belongs below the playing surface.
+  const pegMat = new THREE.MeshStandardMaterial({ color: '#62503a', roughness: 0.82 });
+  const brass = new THREE.MeshStandardMaterial({ color: '#c4a66a', metalness: 0.75, roughness: 0.28 });
+  const slotMat = new THREE.MeshStandardMaterial({ color: '#30281c', roughness: 0.7 });
+  const pegGeo = new THREE.CylinderGeometry(PEGS.radius * 0.96, PEGS.radius, PEGS.height - 0.07, 32);
+  const capGeo = new THREE.CylinderGeometry(PEGS.radius * 0.84, PEGS.radius * 0.9, 0.07, 32);
+  const slotGeo = new THREE.BoxGeometry(PEGS.radius * 1.2, 0.006, 0.035);
   for (const p of pegPositions()) {
     const peg = new THREE.Mesh(pegGeo, pegMat);
-    peg.position.set(p.x, PEGS.height / 2, p.y);
+    peg.position.set(p.x, (PEGS.height - 0.07) / 2, p.y);
     peg.castShadow = true;
     scene.add(peg);
+    const cap = new THREE.Mesh(capGeo, brass);
+    cap.position.set(p.x, PEGS.height - 0.035, p.y); cap.castShadow = true; scene.add(cap);
+    const slot = new THREE.Mesh(slotGeo, slotMat);
+    slot.position.set(p.x, PEGS.height + 0.002, p.y); scene.add(slot);
   }
 
   const discGeo = makeDiscGeometry();
-  const meshes = new Map<number, THREE.Mesh>();
+  const meshes = new Map<number, THREE.Mesh<THREE.LatheGeometry, THREE.MeshStandardMaterial>>();
   const colors = ['#dc6853', '#6cabbe', '#e7b95c', '#94ad76'];
   const materials = colors.map(color => new THREE.MeshStandardMaterial({ color, roughness: 0.3 }));
-  function syncDiscs(discs: Disc[]) {
-    const visible = new Set(discs.filter(d => d.state === 'board').map(d => d.id));
-    for (const [id, mesh] of meshes) if (!visible.has(id)) { scene.remove(mesh); meshes.delete(id); }
+  const markerCanvas = document.createElement('canvas'); markerCanvas.width = markerCanvas.height = 256;
+  const markerContext = markerCanvas.getContext('2d')!;
+  for (const [color, width] of [['#161914', 20], ['#fff8de', 8]] as const) {
+    markerContext.strokeStyle = color; markerContext.lineWidth = width; markerContext.lineCap = 'round';
+    markerContext.beginPath(); markerContext.arc(128, 128, 104, 0, Math.PI * 2); markerContext.stroke();
+    markerContext.beginPath(); markerContext.moveTo(106, 106); markerContext.lineTo(150, 150);
+    markerContext.moveTo(150, 106); markerContext.lineTo(106, 150); markerContext.stroke();
+  }
+  const markerTexture = new THREE.CanvasTexture(markerCanvas);
+  markerTexture.colorSpace = THREE.SRGBColorSpace;
+  const markers = new Map<number, THREE.Sprite>();
+  const tiltAxis = new THREE.Vector3();
+  function syncDiscs(discs: Disc[], review: ShotReview | null = null) {
+    const removals = new Map(review?.removed.map(d => [d.id, d]) ?? []);
+    const visible = new Set(discs.filter(d => d.state !== 'sunk' || removals.has(d.id)).map(d => d.id));
+    for (const [id, mesh] of meshes) if (!visible.has(id)) { scene.remove(mesh); mesh.material.dispose(); meshes.delete(id); }
+    for (const [id, marker] of markers) if (!removals.has(id)) { scene.remove(marker); marker.material.dispose(); markers.delete(id); }
     for (const d of discs) {
-      if (d.state !== 'board') continue;
+      if (!visible.has(d.id)) continue;
       let mesh = meshes.get(d.id);
-      if (!mesh) { mesh = new THREE.Mesh(discGeo, materials[d.owner]); mesh.castShadow = true; meshes.set(d.id, mesh); scene.add(mesh); }
-      const tilt = d.hole?.tilt ?? 0, lean = d.hole?.lean ?? 0;
-      const halfHeight = discHalfHeight(d);
-      mesh.position.set(d.x, halfHeight + d.z - (d.hole?.dip ?? 0), d.y);
-      mesh.quaternion.setFromAxisAngle(new THREE.Vector3(Math.sin(lean), 0, -Math.cos(lean)), tilt);
-      mesh.rotateY(d.hole?.rollPhase ?? 0);
+      if (!mesh) { mesh = new THREE.Mesh(discGeo, materials[d.owner].clone()); mesh.castShadow = true; meshes.set(d.id, mesh); scene.add(mesh); }
+      const source = removals.get(d.id) ?? d;
+      const tilt = source.hole?.tilt ?? 0, lean = source.hole?.lean ?? 0;
+      mesh.position.set(source.x, discHalfHeight(source) + source.z - (source.hole?.dip ?? 0), source.y);
+      mesh.quaternion.setFromAxisAngle(tiltAxis.set(Math.sin(lean), 0, -Math.cos(lean)), tilt);
+      mesh.rotateY(source.hole?.rollPhase ?? 0); mesh.visible = true;
+      let progress = 0;
+      if (d.state === 'out') {
+        if (mesh.userData.state !== 'out') mesh.userData.outAt = mesh.userData.state === 'board' ? performance.now() : -1000;
+        progress = review && removals.has(d.id)
+          ? THREE.MathUtils.clamp((review.elapsed - review.hold) / REVIEW_TIMING.removal, 0, 1)
+          : THREE.MathUtils.clamp((performance.now() - mesh.userData.outAt) / 450, 0, 1);
+        const angle = (d.ditchSlot ?? 0) / DITCH_SLOTS * Math.PI * 2;
+        // The gutter accommodates a full flat disc, with a clear margin on both sides.
+        const parkedRadius = (BOARD.playRadius + BOARD.ditchOuterRadius) / 2;
+        const target = new THREE.Vector3(Math.cos(angle) * parkedRadius, -0.395 + DISC.height / 2, Math.sin(angle) * parkedRadius);
+        const targetRotation = new THREE.Quaternion();
+        const t = reducedMotion.matches ? Number(progress >= 1) : progress * progress * (3 - 2 * progress);
+        mesh.position.lerp(target, t);
+        if (!reducedMotion.matches) mesh.position.y += Math.sin(Math.PI * progress) * 0.8;
+        mesh.quaternion.slerp(targetRotation, t);
+        if (source.state === 'sunk' && progress === 0) mesh.visible = false;
+      }
+      if (review && removals.has(d.id)) {
+        let marker = markers.get(d.id);
+        if (!marker) {
+          marker = new THREE.Sprite(new THREE.SpriteMaterial({ map: markerTexture, depthTest: false, depthWrite: false }));
+          marker.scale.set(1.9, 1.9, 1); marker.renderOrder = 5; markers.set(d.id, marker); scene.add(marker);
+        }
+        marker.position.copy(mesh.position); marker.position.y += 0.45;
+        marker.material.opacity = (reducedMotion.matches ? 0.8 : 0.6 + 0.3 * Math.cos(review.elapsed / review.hold * Math.PI * 4)) * (1 - progress);
+      }
+      mesh.userData.state = d.state;
     }
   }
   const raycaster = new THREE.Raycaster();
@@ -232,17 +283,17 @@ export function createScene(canvas: HTMLCanvasElement) {
     }
     const toPx = (inches: number) => (inches / (BOARD.playRadius * 2)) * S;
     const cx = S / 2;
-    // Rings: 15/10/5 + outer line. Lines drawn opaque (skins rule: art under, lines over).
+    // Scoring boundaries share their physical line width with the rules engine.
     ctx.strokeStyle = skin === 'maple' && !art ? '#2b1a08' : '#fff3d7';
     ctx.shadowColor = '#241a10'; ctx.shadowBlur = art ? 5 : 0;
-    ctx.lineWidth = 4;
-    for (const r of [BOARD.ring15, BOARD.ring10, BOARD.ring5, BOARD.playRadius - 0.15]) {
+    ctx.lineWidth = toPx(BOARD.lineWidth);
+    for (const r of [BOARD.ring15, BOARD.ring10, BOARD.ring5]) {
       ctx.beginPath();
       ctx.arc(cx, cx, toPx(r), 0, Math.PI * 2);
       ctx.stroke();
     }
     // Quadrant lines
-    ctx.lineWidth = 3;
+    ctx.lineWidth = toPx(BOARD.lineWidth);
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
       ctx.beginPath();
@@ -265,6 +316,8 @@ export function createScene(canvas: HTMLCanvasElement) {
     camera.updateProjectionMatrix();
   }
   window.addEventListener('resize', resize);
+  const resizeObserver = new ResizeObserver(resize);
+  resizeObserver.observe(canvas);
   resize();
   placeCamera();
 
@@ -320,6 +373,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     dispose: () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
+      resizeObserver.disconnect();
       renderer.dispose();
     },
   };

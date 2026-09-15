@@ -1,5 +1,15 @@
 # Crokinole · Around the board
 
+Shots now pause briefly before automatic handover: 1.25 seconds normally,
+2 seconds for fouls, followed by a visible removal animation. Contrasting
+pulse-and-fade markers retain each disc's player color. Removed discs lie flat
+in the widened ditch, occupying the nearest free spot.
+
+Completed rounds show counts by scoring zone, raw totals, and match points
+awarded for 6 seconds before continuing. Saved reviews and round results resume
+without adding points twice. Scoring uses the beveled disc's bottom footprint
+and the same line width drawn on the board.
+
 A frontend-only, touch-first pass-and-play crokinole game built with TypeScript,
 Vite, and Three.js.
 

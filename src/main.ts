@@ -1,7 +1,8 @@
 import { BoardSound } from './audio/sound';
 import { createScene, type BoardView } from './render/scene';
 import { makeDisc, moving, step, type Disc, type Shot } from './sim/physics';
-import { resolveShot, roundScore, sideOf, type Mode } from './game/rules';
+import { completeRound, inspectShot, sideOf, type Mode, type RoundResult } from './game/rules';
+import { assignDitchSlots, beginReview, reviewDuration, REVIEW_TIMING, type ShotReview } from './game/review';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('board-canvas');
 const banner = $('turn-banner'), hint = $('hint'), next = $<HTMLButtonElement>('continue');
@@ -61,8 +62,9 @@ for (const name of ['seated', 'standing'] as const) $(`view-${name}`).addEventLi
   setBoardView(name);
 });
 let mode: Mode = 'duel', player = 0, round = 1, id = 0;
-let discs: Disc[] = [], scores = [0, 0], used = [0, 0], phase: 'pass' | 'aim' | 'moving' | 'round' | 'won' = 'pass';
-let restoredEnd: 'round' | 'won' | null = null;
+let discs: Disc[] = [], scores = [0, 0], used = [0, 0], phase: 'pass' | 'aim' | 'moving' | 'review' | 'round' | 'won' = 'pass';
+let restoredEnd: 'review' | 'round' | 'won' | null = null;
+let review: ShotReview | null = null, roundResult: RoundResult | null = null, roundElapsed = 0;
 let shot: Shot | null = null, hadOpponent = false, staged: Disc | null = null, readyAt = 0;
 const count = () => mode === 'duel' ? 2 : 4;
 const allowance = () => mode === 'duel' ? 12 : 6;
@@ -70,12 +72,18 @@ const yaw = () => player * Math.PI * 2 / count();
 const side = (owner: number) => sideOf(mode, owner);
 const label = (i: number) => mode === 'teams' ? ['Coral + Gold', 'Blue + Sage'][i] : names[i];
 function save() {
-  try { localStorage.setItem('crokinole-match', JSON.stringify({ mode, player, round, id, discs, scores, used, phase })); } catch { /* Storage is optional. */ }
+  try { localStorage.setItem('crokinole-match', JSON.stringify({ mode, player, round, id, discs, scores, used, phase, review, roundResult })); } catch { /* Storage is optional. */ }
 }
 function hud() {
-  $('scoreboard').innerHTML = scores.map((score, i) => `<div class="score ${side(player) === i ? 'active' : ''}" style="--player:${colors[i]}"><span class="dot"></span><div><span class="name">${label(i)}</span><small>${discs.filter(d => side(d.owner) === i && d.state === 'sunk').length} twenties · ${mode === 'teams' ? used.filter((_, p) => side(p) === i).reduce((a, b) => a + b, 0) : used[i]}/${mode === 'ffa' ? 6 : 12} played</small></div><strong>${score}</strong></div>`).join('');
+  $('scoreboard').innerHTML = scores.map((score, i) => `<div class="score ${side(player) === i ? 'active' : ''}" style="--player:${colors[i]}"><span class="dot"></span><div><span class="name">${label(i)}</span><small>${discs.filter(d => side(d.owner) === i && d.state === 'sunk').length} twenties this round</small><small>${mode === 'teams' ? used.filter((_, p) => side(p) === i).reduce((a, b) => a + b, 0) : used[i]}/${mode === 'ffa' ? 6 : 12} played</small></div><div class="match-total"><strong>${score}</strong><small>Match</small></div></div>`).join('');
   $('round-label').textContent = `ROUND ${round} · FIRST TO 100`;
-  scene.syncDiscs(discs);
+  assignDitchSlots(discs);
+  scene.syncDiscs(discs, review);
+  const summary = $('round-summary');
+  summary.hidden = !roundResult;
+  if (roundResult) {
+    summary.innerHTML = `<h2>Round ${round} · score breakdown</h2><table><thead><tr><th scope="col">Side</th><th scope="col">20s</th><th scope="col">15s</th><th scope="col">10s</th><th scope="col">5s</th><th scope="col">Total</th><th scope="col">Added</th></tr></thead><tbody>${roundResult.sides.map((row, i) => `<tr><th scope="row">${label(i)}</th><td>${row.twenties}</td><td>${row.fifteens}</td><td>${row.tens}</td><td>${row.fives}</td><td>${row.total}</td><td><strong>+${row.awarded}</strong></td></tr>`).join('')}</tbody></table><p>Disc counts × ring value = total. ${mode === 'ffa' ? 'Each player adds their own total.' : 'Only the difference is added to the winning side.'}</p>`;
+  }
 }
 function pass(message = '') {
   phase = 'pass'; staged = null;
@@ -87,7 +95,12 @@ function pass(message = '') {
 function start() {
   mode = $<HTMLSelectElement>('mode').value as Mode;
   player = 0; round = 1; id = 0; discs = []; scores = Array(mode === 'ffa' ? 4 : 2).fill(0); used = Array(count()).fill(0);
+  review = null; roundResult = null; roundElapsed = 0;
   settings.close(); pass();
+}
+function nextRound() {
+  round++; discs = []; used.fill(0); player = (round - 1) % count();
+  roundResult = null; roundElapsed = 0; pass();
 }
 function setBoardView(nextView: BoardView) {
   view = nextView; scene.setView(view); tablePreferences();
@@ -114,7 +127,7 @@ function stage() {
 next.addEventListener('click', () => {
   if (phase === 'aim' && view === 'standing') setBoardView('seated');
   else if (phase === 'pass') stage();
-  else if (phase === 'round') { round++; discs = []; used.fill(0); player = (round - 1) % count(); pass(); }
+  else if (phase === 'round') nextRound();
   else if (phase === 'won') start();
 });
 $('settings-button').addEventListener('click', () => settings.showModal());
@@ -259,22 +272,48 @@ canvas.addEventListener('pointerup', e => {
   banner.textContent = 'Let it slide'; hint.textContent = 'Waiting for the board to settle…'; hud();
 });
 function finishShot() {
-  const valid = resolveShot(discs, shot!, hadOpponent); shot = null;
+  review = beginReview(discs, inspectShot(discs, shot!, hadOpponent)); shot = null;
+  phase = 'review'; next.hidden = true;
+  reviewMessage(); hud(); save();
+}
+function reviewMessage() {
+  if (!review) return;
+  const { verdict, removed } = review;
+  banner.textContent = verdict.valid ? 'Shot complete' : 'Foul';
+  const reason = verdict.reason === 'opponent-missed' ? 'No opponent disc hit.' : verdict.reason === 'inner-ring-missed' ? 'No involved disc finished in the inner ring or twenty hole.' : '';
+  const removal = removed.length ? `${removed.length} disc${removed.length === 1 ? '' : 's'} ${removed.length === 1 ? 'moves' : 'move'} to the ditch.` : 'Take a moment to see where everything landed.';
+  const revoked = verdict.revokedTwenties ? ` ${verdict.revokedTwenties} twenty${verdict.revokedTwenties === 1 ? '' : ' scores'} cancelled.` : '';
+  hint.textContent = `${reason} ${removal}${revoked}`.trim();
+}
+function finishReview() {
+  const valid = review!.verdict.valid;
+  review = null;
   if (used.every(n => n === allowance())) {
-    const gain = roundScore(discs, mode); scores = scores.map((n, i) => n + gain[i]);
-    const high = Math.max(...scores), winners = scores.map((n, i) => n === high ? i : -1).filter(i => i >= 0);
-    phase = high >= 100 && winners.length === 1 ? 'won' : 'round';
-    banner.textContent = phase === 'won' ? `${label(winners[0])} wins!` : 'Round complete';
-    hint.textContent = gain.map((n, i) => `${label(i)} +${n}`).join(' · ');
-    next.textContent = phase === 'won' ? 'Play again' : 'Next round'; next.hidden = false; hud(); save();
-  } else { player = (player + 1) % count(); pass(valid ? 'Nice shot' : 'Foul — discs removed'); }
+    roundResult = completeRound(discs, mode, scores); scores = roundResult.after;
+    phase = roundResult.winner !== null ? 'won' : 'round'; roundElapsed = 0;
+    banner.textContent = roundResult.winner !== null ? `${label(roundResult.winner)} wins!` : 'Round complete';
+    hint.textContent = roundResult.sides.map((row, i) => `${label(i)} +${row.awarded}`).join(' · ');
+    next.textContent = phase === 'won' ? 'Play again' : 'Next round now'; next.hidden = false; hud(); save();
+  } else { player = (player + 1) % count(); pass(valid ? '' : 'Foul resolved'); }
 }
 let last = performance.now(), accumulator = 0;
 function tick(now: number) {
-  accumulator += Math.min((now - last) / 1000, 0.05); last = now;
+  const elapsed = Math.min((now - last) / 1000, 0.25);
+  const dt = Math.min(elapsed, 0.05); last = now;
+  accumulator += dt;
   while (accumulator >= 1 / 120) {
     if (phase === 'moving' && shot) { step(discs, 1 / 120, shot, true, sound.impact); if (!discs.some(moving)) finishShot(); }
     accumulator -= 1 / 120;
+  }
+  if (!document.hidden && !settings.open) {
+    if (phase === 'review' && review) {
+      review.elapsed += elapsed * 1000;
+      if (review.elapsed >= reviewDuration(review)) finishReview();
+    } else if (phase === 'round') {
+      roundElapsed += elapsed * 1000;
+      hint.textContent = `Next round begins in ${Math.max(1, Math.ceil((REVIEW_TIMING.round - roundElapsed) / 1000))}s. Match totals are shown above.`;
+      if (roundElapsed >= REVIEW_TIMING.round) nextRound();
+    }
   }
   next.disabled = phase === 'pass' && (now < readyAt || orbitPointer !== null || pinching);
   sound.setListenerYaw(scene.getYaw());
@@ -286,7 +325,8 @@ function tick(now: number) {
   $<HTMLButtonElement>('zoom-in').disabled = controlsLocked || zoom >= 2.5;
   $<HTMLButtonElement>('zoom-out').disabled = controlsLocked || zoom <= 0.75;
   $<HTMLButtonElement>('zoom-reset').disabled = controlsLocked;
-  scene.syncDiscs(discs); requestAnimationFrame(tick);
+  assignDitchSlots(discs);
+  scene.syncDiscs(discs, review); requestAnimationFrame(tick);
 }
 try {
   const savedSkin = localStorage.getItem('crokinole-skin'); if (savedSkin && ['maple', 'walnut', 'slate'].includes(savedSkin)) { skin.value = savedSkin; scene.setSkin(savedSkin); }
@@ -294,17 +334,22 @@ try {
   const raw = localStorage.getItem('crokinole-match');
   if (raw) {
     const data = JSON.parse(raw);
-    if (['duel', 'teams', 'ffa'].includes(data.mode) && ['pass', 'round', 'won'].includes(data.phase) && Array.isArray(data.discs) && Array.isArray(data.scores) && Array.isArray(data.used)) {
+    if (['duel', 'teams', 'ffa'].includes(data.mode) && ['pass', 'review', 'round', 'won'].includes(data.phase) && Array.isArray(data.discs) && Array.isArray(data.scores) && Array.isArray(data.used)) {
       mode = data.mode; player = data.player; round = data.round; id = data.id; discs = data.discs; scores = data.scores; used = data.used;
       $<HTMLSelectElement>('mode').value = mode;
+      roundResult = data.roundResult ?? null;
+      if (data.phase === 'review' && data.review && Array.isArray(data.review.removed)) { review = data.review; review!.elapsed = 0; restoredEnd = 'review'; }
       if (data.phase === 'round' || data.phase === 'won') restoredEnd = data.phase;
     }
   }
 } catch { /* Start fresh if storage is unavailable. */ }
 if (restoredEnd) {
   phase = restoredEnd; scene.setYawTarget(yaw()); hud();
-  banner.textContent = phase === 'won' ? `${label(scores.indexOf(Math.max(...scores)))} wins!` : 'Round complete';
-  hint.textContent = 'Your table has been restored.';
-  next.textContent = phase === 'won' ? 'Play again' : 'Next round';
+  if (phase === 'review') { next.hidden = true; reviewMessage(); }
+  else {
+    banner.textContent = phase === 'won' ? `${label(scores.indexOf(Math.max(...scores)))} wins!` : 'Round complete';
+    hint.textContent = 'Your table has been restored.';
+    next.textContent = phase === 'won' ? 'Play again' : 'Next round now';
+  }
 } else pass();
 requestAnimationFrame(tick);

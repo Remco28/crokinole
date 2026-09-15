@@ -246,7 +246,19 @@ cylinder and caused the striped edge shown in the user's screenshot. The
 surface cylinder now owns that wall; adjacent circular meshes share 192 segments.
 
 
-### Pre-shot quadrant orbit
+### Approved scoring, pacing, and physical detail follow-up
+
+Audited differential and FFA round arithmetic, added score breakdowns and
+reload-safe result persistence. Matched scoring to drawn lines and bottom disc
+footprints; defer outer-line cleanup until motion settles. Added 1.25-second
+normal reviews, 2-second foul reviews, 0.65-second marked removals, automatic
+handover, and 6-second round summaries. Canvas resizing follows summary layout.
+
+Out-of-play discs remain flat in a widened 1.75-inch ditch, with stable nearest
+free slots to avoid overlap. Pegs now expose 0.8 inches of rubber with brass
+heads. Validated with 43 tests, production build, and browser round arithmetic.
+
+### Pre-shot quadrant orbit details
 
 Mouse/one-finger drag adjusts camera yaw within ±45° of the active player's side
 and elevation within seated (48–68° polar) or standing (20–40° polar) limits.

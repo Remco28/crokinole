@@ -6,9 +6,10 @@ const shot = (): Shot => ({ touched: new Set([1]), opponentContact: false, side:
 describe('scoring and legal shots', () => {
   it('scores line touches in the lower ring', () => {
     expect(points(makeDisc(1, 0, 3, 0))).toBe(15);
-    expect(points(makeDisc(1, 0, 3.375, 0))).toBe(10);
-    expect(points(makeDisc(1, 0, 7.375, 0))).toBe(5);
-    expect(points(makeDisc(1, 0, 11.375, 0))).toBe(0);
+    // The flat bottom radius is 9/16 inch; the line has a 1/32 inch half-width.
+    expect(points(makeDisc(1, 0, 3.40625, 0))).toBe(10);
+    expect(points(makeDisc(1, 0, 7.40625, 0))).toBe(5);
+    expect(points(makeDisc(1, 0, 11.40625, 0))).toBe(0);
   });
   it('requires the shot to reach the inner ring on an open board', () => {
     const d = makeDisc(1, 0, 6, 0); expect(resolveShot([d], shot(), false)).toBe(false); expect(d.state).toBe('out');
