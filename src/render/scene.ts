@@ -312,6 +312,8 @@ export function createScene(canvas: HTMLCanvasElement) {
     const h = canvas.clientHeight || window.innerHeight;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
+    // Shift framing upward without changing the player's zoom or orbit.
+    camera.setViewOffset(w, h, 0, h * 0.05, w, h);
     camDist = 48 / Math.min(1, camera.aspect);
     camera.updateProjectionMatrix();
   }

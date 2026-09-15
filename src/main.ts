@@ -137,7 +137,6 @@ $('round-summary').addEventListener('click', event => {
 });
 function pass(message = '', restoreClock = false) {
   phase = 'pass'; staged = null;
-  scene.setZoom(Math.min(zoom, 1));
   if (!restoreClock) deadline = shotSeconds ? Date.now() + 850 + shotSeconds * 1000 : null;
   scene.setYawTarget(yaw()); readyAt = performance.now() + 850;
   banner.textContent = `${message ? message + ' · ' : ''}Pass to ${names[player]}`;
@@ -177,12 +176,11 @@ function shotInstructions() {
 }
 function stage() {
   if (performance.now() < readyAt || orbitPointer !== null || pinching) return;
-  if (window.matchMedia('(max-width:899px)').matches) scoreboardExpanded = false;
   if (!staged) {
     staged = makeDisc(++id, player, Math.sin(yaw()) * 12, Math.cos(yaw()) * 12);
     discs.push(staged);
   }
-  phase = 'aim'; scene.setZoom(Math.min(zoom, 0.95)); setBoardView('seated');
+  phase = 'aim'; setBoardView('seated');
   hud();
 }
 next.addEventListener('click', () => {

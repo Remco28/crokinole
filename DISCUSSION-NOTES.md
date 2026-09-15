@@ -97,6 +97,9 @@ it need not solve the removal-highlighting problem.
 
 ## Open discussion
 
+- Remove the **Preview sounds** button from Settings before the UI is finalized;
+  it is a testing tool. Keep it for now (user requested a follow-up note).
+
 - Is the scoring concern about a round's final arithmetic, points not appearing
   immediately after shots, or particular discs being judged incorrectly?
 - How much pause feels comfortable, especially for fouls?

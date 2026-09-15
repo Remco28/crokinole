@@ -1,15 +1,15 @@
 # Crokinole · Around the board
 
 Desktop screens use a left control sidebar and a separate board on the right.
-Phones keep the scores and view controls above the board. A small status label
+Phones keep compact scores above the board, with vertical view icons at its upper left. A small status label
 identifies View or Shoot mode; Center is a secondary view action. Sound controls
 live in Settings, with game mode and Start new match at the top.
 
 To shoot, start behind your disc (including outside the rim) and flick through
 it. Contact launches the disc immediately, so you can follow through before
 lifting your finger. Missed swipes do not shoot. Tap the shooting line to place
-the disc. Getting ready fits the board with space below the rim and collapses
-mobile score details to leave room for the gesture.
+the disc. Getting ready preserves your chosen zoom and score layout.
+Framing shifts upward slightly to leave more room below the rim.
 
 Gentle flicks have no minimum-power boost. Surface friction is tuned slightly
 higher (0.12, previously 0.11) for a shorter glide without changing collision
@@ -55,8 +55,8 @@ seats you if needed, preserves a chosen seated angle, and locks the camera and
 zoom for the shot. Shooting and disc placement are available only while seated;
 camera transitions finish before accepting a flick.
 
-Two-finger pinch adjusts zoom while viewing. Each handover fits the board again;
-getting ready leaves additional room for your flick. Pinching cancels a view
+Two-finger pinch adjusts zoom while viewing. Handover and getting ready preserve
+your zoom. Pinching cancels a view
 drag, and zoom is locked once you get ready to shoot.
 
 Use **Settings** for rules, board finishes, image uploads, new matches, and sound
