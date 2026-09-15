@@ -9,7 +9,7 @@ export const BOARD = {
   ring5: 12.0,
   holeRadius: 1.375 / 2,
   holeDepth: 0.2,
-  holeCaptureRadius: 0.55, // slow inward settling region; full clearance required to score
+  holeCaptureRadius: 0.57, // slightly wider slow inward settling region; full clearance required to score
   lineWidth: 1 / 16,
 } as const;
 
