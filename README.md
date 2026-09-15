@@ -11,6 +11,10 @@ lifting your finger. Missed swipes do not shoot. Tap the shooting line to place
 the disc. Getting ready fits the board with space below the rim and collapses
 mobile score details to leave room for the gesture.
 
+Gentle flicks have no minimum-power boost. Surface friction is tuned slightly
+higher (0.12, previously 0.11) for a shorter glide without changing collision
+bounce or adding disc mass.
+
 Tap the painted shooting line to place your disc, including small adjustments
 beside its current position. **Adjust view** returns from aiming to camera controls
 without moving the disc or resetting your clock. The shot clock defaults to
