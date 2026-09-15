@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#1a120b" />
+    <title>Crokinole</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="board-canvas"></canvas>
+      <div id="hud">
+        <div id="hud-top">
+          <span id="game-title">CROKINOLE</span>
+          <span id="turn-banner">Pass-and-play scaffold — Phase 1</span>
+        </div>
+        <div id="hud-bottom">
+          <span id="hint">Touch-drag on canvas to orbit preview. Flick sim lands in Phase 5.</span>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
