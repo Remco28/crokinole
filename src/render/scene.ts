@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { Disc } from '../sim/physics';
 import { BOARD, DISC, PEGS, pegPositions } from '../sim/constants';
 
 // Phase 1: static 3D board preview. No sim, no input yet.
@@ -37,15 +38,15 @@ export function createScene(canvas: HTMLCanvasElement) {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#1a120b');
+  scene.background = new THREE.Color('#171d1c');
 
   const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
   const rig = new THREE.Group();
   scene.add(rig);
   rig.add(camera);
 
-  const camDist = 30;
-  const polar = THREE.MathUtils.degToRad(58); // tilted top-down
+  let camDist = 48;
+  const polar = THREE.MathUtils.degToRad(25); // tilted top-down
   let yaw = 0;
   let yawTarget = 0;
 
@@ -63,7 +64,9 @@ export function createScene(canvas: HTMLCanvasElement) {
   const key = new THREE.DirectionalLight('#ffffff', 1.6);
   key.position.set(8, 18, 6);
   key.castShadow = true;
-  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.mapSize.set(1024, 1024);
+  Object.assign(key.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 0.1, far: 60 });
+  key.shadow.bias = -0.001;
   scene.add(key);
 
   // Wooden frame measured off a real tournament board (30.5" overall):
@@ -124,20 +127,27 @@ export function createScene(canvas: HTMLCanvasElement) {
     scene.add(peg);
   }
 
-  // Demo discs (static preview of team colors)
   const discGeo = makeDiscGeometry();
-  const demoDiscs: THREE.Mesh[] = [];
-  const colors = ['#1c1c1e', '#f2ede2', '#b3312a', '#2456a6'];
-  for (let i = 0; i < 4; i++) {
-    const m = new THREE.Mesh(
-      discGeo,
-      new THREE.MeshStandardMaterial({ color: colors[i], roughness: 0.3 }),
-    );
-    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
-    m.position.set(Math.cos(a) * 10, DISC.height / 2, Math.sin(a) * 10);
-    m.castShadow = true;
-    scene.add(m);
-    demoDiscs.push(m);
+  const meshes = new Map<number, THREE.Mesh>();
+  const colors = ['#dc6853', '#6cabbe', '#e7b95c', '#94ad76'];
+  const materials = colors.map(color => new THREE.MeshStandardMaterial({ color, roughness: 0.3 }));
+  function syncDiscs(discs: Disc[]) {
+    const visible = new Set(discs.filter(d => d.state === 'board').map(d => d.id));
+    for (const [id, mesh] of meshes) if (!visible.has(id)) { scene.remove(mesh); meshes.delete(id); }
+    for (const d of discs) {
+      if (d.state !== 'board') continue;
+      let mesh = meshes.get(d.id);
+      if (!mesh) { mesh = new THREE.Mesh(discGeo, materials[d.owner]); mesh.castShadow = true; meshes.set(d.id, mesh); scene.add(mesh); }
+      mesh.position.set(d.x, DISC.height / 2 + d.z, d.y);
+    }
+  }
+  const raycaster = new THREE.Raycaster();
+  const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -DISC.height / 2);
+  function boardPoint(x: number, y: number) {
+    const rect = canvas.getBoundingClientRect();
+    raycaster.setFromCamera(new THREE.Vector2((x - rect.left) / rect.width * 2 - 1, -(y - rect.top) / rect.height * 2 + 1), camera);
+    const point = raycaster.ray.intersectPlane(plane, new THREE.Vector3());
+    return point ? { x: point.x, y: point.z } : null;
   }
 
   // Center hole (dark inset)
@@ -149,7 +159,7 @@ export function createScene(canvas: HTMLCanvasElement) {
   hole.position.y = 0.005;
   scene.add(hole);
 
-  function makeSurfaceTexture(): THREE.CanvasTexture {
+  function makeSurfaceTexture(skin = 'maple', art?: HTMLImageElement): THREE.CanvasTexture {
     const S = 1024;
     const cv = document.createElement('canvas');
     cv.width = cv.height = S;
@@ -192,10 +202,21 @@ export function createScene(canvas: HTMLCanvasElement) {
       ctx.fillRect(x, y, 1.4, 1.4);
     }
 
+    if (skin !== 'maple') {
+      ctx.fillStyle = skin === 'walnut' ? 'rgba(75,35,18,0.55)' : 'rgba(30,50,59,0.88)';
+      ctx.fillRect(0, 0, S, S);
+    }
+    if (art) {
+      const scale = Math.max(S / art.width, S / art.height);
+      ctx.globalAlpha = 0.7;
+      ctx.drawImage(art, (S - art.width * scale) / 2, (S - art.height * scale) / 2, art.width * scale, art.height * scale);
+      ctx.globalAlpha = 1;
+    }
     const toPx = (inches: number) => (inches / (BOARD.playRadius * 2)) * S;
     const cx = S / 2;
     // Rings: 15/10/5 + outer line. Lines drawn opaque (skins rule: art under, lines over).
-    ctx.strokeStyle = '#2b1a08';
+    ctx.strokeStyle = skin === 'maple' && !art ? '#2b1a08' : '#fff3d7';
+    ctx.shadowColor = '#241a10'; ctx.shadowBlur = art ? 5 : 0;
     ctx.lineWidth = 4;
     for (const r of [BOARD.ring15, BOARD.ring10, BOARD.ring5, BOARD.playRadius - 0.15]) {
       ctx.beginPath();
@@ -222,29 +243,12 @@ export function createScene(canvas: HTMLCanvasElement) {
     const h = canvas.clientHeight || window.innerHeight;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
+    camDist = 48 / Math.min(1, camera.aspect);
     camera.updateProjectionMatrix();
   }
   window.addEventListener('resize', resize);
   resize();
   placeCamera();
-
-  // Drag-to-orbit with grab-the-board feel: the board follows the finger.
-  // (No idle auto-orbit — it fought the user's drag and felt unnatural.)
-  let dragging = false;
-  let lastX = 0;
-  canvas.addEventListener('pointerdown', (e) => {
-    dragging = true;
-    lastX = e.clientX;
-    canvas.setPointerCapture(e.pointerId);
-  });
-  canvas.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
-    yawTarget -= (e.clientX - lastX) * 0.005;
-    lastX = e.clientX;
-  });
-  canvas.addEventListener('pointerup', () => {
-    dragging = false;
-  });
 
   let raf = 0;
   const clock = new THREE.Clock();
@@ -252,17 +256,17 @@ export function createScene(canvas: HTMLCanvasElement) {
     const dt = Math.min(clock.getDelta(), 0.05);
     yaw += (yawTarget - yaw) * Math.min(1, dt * 6);
     placeCamera();
-    // Bob demo discs slightly so shadows read as 3D
-    const t = clock.elapsedTime;
-    demoDiscs.forEach((d, i) => {
-      d.position.y = DISC.height / 2 + Math.sin(t * 1.2 + i) * 0.02;
-    });
     renderer.render(scene, camera);
     raf = requestAnimationFrame(tick);
   }
   tick();
 
   return {
+    syncDiscs,
+    boardPoint,
+    setSkin: (skin: string, art?: HTMLImageElement) => {
+      surfaceTopMat.map?.dispose(); surfaceTopMat.map = makeSurfaceTexture(skin, art); surfaceTopMat.needsUpdate = true;
+    },
     setYawTarget: (radians: number) => {
       yawTarget = radians;
     },

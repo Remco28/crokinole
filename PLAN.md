@@ -178,3 +178,19 @@ clean + `vite preview` smoke.
 1. Airborne v1 = **impact-pops only**, no manual lob gesture.
 2. Aim aid: **brief 150 ms fading ghost** while dragging, disappears on release.
 3. FFA 4P scoring: **cutthroat** (each own score to 100).
+
+## Handoff — playable core, September 2026
+
+Implemented phases 2–6 as a playable first pass, plus responsive HUD, pass flow,
+three procedural finishes, persisted custom image upload, and completed-turn
+persistence. `npm test` covers physics and rules; `npm run build` verifies types
+and production output. See README for controls and remaining polish.
+
+Corrections to the original plan:
+- Inner-ring finish is required on open-board shots only, not after valid opponent contact.
+- Duel/teams use traditional differential scoring to 100; FFA uses individual totals.
+- Discs crossing the playing edge are removed; an outer-edge bounce is not simulated.
+- Production must be served over HTTP(S); plain file:// is unsupported by ES modules.
+
+Still pending: aim ghost, sink animation/particles, real-device tuning, debug
+sliders, haptics, art opacity/contrast controls, and full PWA/offline support.

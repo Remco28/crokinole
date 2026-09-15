@@ -1,26 +1,21 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#1a120b" />
-    <title>Crokinole</title>
-    <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./src/style.css" />
-  </head>
-  <body>
-    <div id="app">
-      <canvas id="board-canvas"></canvas>
-      <div id="hud">
-        <div id="hud-top">
-          <span id="game-title">CROKINOLE</span>
-          <span id="turn-banner">Pass-and-play scaffold — Phase 1</span>
-        </div>
-        <div id="hud-bottom">
-          <span id="hint">Touch-drag on canvas to orbit preview. Flick sim lands in Phase 5.</span>
-        </div>
-      </div>
-    </div>
-    <script type="module" src="./src/main.ts"></script>
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#171d1c" />
+  <title>Crokinole · Around the board</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header><div><span class="eyebrow">AROUND THE BOARD</span><h1>Crokinole<span>✳</span></h1></div><button id="settings-button" aria-label="Open game settings">Settings</button></header>
+    <section id="scoreboard" aria-label="Match scores"></section>
+    <main><canvas id="board-canvas" aria-label="Crokinole board. Flick your disc toward the center."></canvas><div id="table-label">A LITTLE FINESSE. A FRIENDLY RIVALRY.</div></main>
+    <footer><div><span class="eyebrow" id="round-label">ROUND 1 · FIRST TO 100</span><h2 id="turn-banner" aria-live="polite"></h2><p id="hint"></p></div><button id="continue" class="primary">Ready to shoot</button></footer>
+  </div>
+  <dialog id="settings"><form method="dialog"><div class="dialog-top"><h2>Your table</h2><button aria-label="Close settings">✕</button></div><label>Game mode<select id="mode"><option value="duel">Two players</option><option value="teams">Four players · teams</option><option value="ffa">Four players · free-for-all</option></select></label><label>Board finish<select id="skin"><option value="maple">Golden maple</option><option value="walnut">Smoked walnut</option><option value="slate">Midnight slate</option></select></label><label class="upload">Use your own artwork<input id="art" type="file" accept="image/*"></label><p id="settings-note">Changing mode starts a new match.</p><button type="button" id="new-game" class="primary">Start new match</button><details><summary>How to play</summary><p>Flick the disc from your side toward the center. Tap the shooting arc to change its starting position. Short, gentle flicks work best.</p><p>When an opponent has a disc on the board, you must hit it, directly or through another disc. Otherwise, a disc involved in your shot must finish touching or inside the inner ring, or sink a 20.</p><p>Invalid shots remove your involved discs. Rings score 15, 10, and 5; touching a line scores lower. Two players and teams earn the difference each round. Free-for-all players earn their own points. First to 100 wins; ties continue.</p></details></form></dialog>
+  <script type="module" src="./src/main.ts"></script>
+</body>
 </html>
