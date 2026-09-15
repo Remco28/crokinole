@@ -11,7 +11,7 @@
 <body>
   <div id="app">
     <header><div><span class="eyebrow">AROUND THE BOARD</span><h1>Crokinole<span>✳</span></h1></div><button id="settings-button" aria-label="Open game settings">Settings</button></header>
-    <section id="scoreboard" aria-label="Match scores"></section>
+    <section id="match-panel" aria-label="Match scores"><div class="score-heading"><span>Match scores</span><button id="score-details" type="button" aria-expanded="false" aria-controls="scoreboard">Details <span aria-hidden="true">⌄</span></button></div><div id="scoreboard"></div></section>
     <main><div id="table-controls"><div class="view-switch" role="group" aria-label="Board view"><button id="view-seated" aria-pressed="false">Seated</button><button id="view-standing" aria-pressed="true">Standing</button><button id="view-center" aria-label="Center view in your quadrant">Center</button></div><button id="sound-toggle" aria-pressed="false" aria-label="Mute sound">Sound on</button></div><canvas id="board-canvas" aria-label="Crokinole board. Flick your disc toward the center."></canvas></main>
     <section id="round-summary" hidden aria-label="Round score breakdown"></section>
     <footer><div><span class="eyebrow" id="round-label">ROUND 1 · FIRST TO 100</span><h2 id="turn-banner" aria-live="polite"></h2><p id="hint"></p></div><button id="continue" class="primary">Ready to shoot</button></footer>

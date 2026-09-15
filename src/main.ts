@@ -104,7 +104,13 @@ const eyeIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.2 12s3.
 function hud() {
   const scoreboard = $('scoreboard');
   scoreboard.dataset.expanded = String(scoreboardExpanded);
-  scoreboard.innerHTML = scores.map((score, i) => `<div class="score ${side(player) === i ? 'active' : ''}" data-score-card role="button" tabindex="0" aria-expanded="${scoreboardExpanded}" aria-label="${scoreboardExpanded ? 'Close score review' : 'Open score review'}" style="--player:${colors[i]}"><span class="dot"></span><div><span class="name">${label(i)}</span><small>${discs.filter(d => side(d.owner) === i && d.state === 'sunk').length} twenties this round</small><small>${mode === 'teams' ? used.filter((_, p) => side(p) === i).reduce((a, b) => a + b, 0) : used[i]}/${mode === 'ffa' ? 6 : 12} played</small></div><div class="match-total"><strong>${score}</strong><small>Match</small></div></div>`).join('');
+  scoreboard.style.setProperty('--sides', String(scores.length));
+  $('score-details').setAttribute('aria-expanded', String(scoreboardExpanded));
+  scoreboard.innerHTML = scores.map((score, i) => {
+    const twenties = discs.filter(d => side(d.owner) === i && d.state === 'sunk').length;
+    const played = mode === 'teams' ? used.filter((_, p) => side(p) === i).reduce((a, b) => a + b, 0) : used[i];
+    return `<button type="button" class="score ${side(player) === i ? 'active' : ''}" data-score-card="${i}" aria-expanded="${scoreboardExpanded}" aria-label="${label(i)}, ${score} match points${side(player) === i ? ', current turn' : ''}. ${scoreboardExpanded ? 'Hide' : 'Show'} details" style="--player:${colors[i]}"><span class="score-identity"><span class="dot"></span><span class="name">${label(i)}</span></span><span class="match-total"><strong>${score}</strong><small>pts</small></span><span class="score-stats"><small><span>Twenties</span><b>${twenties}</b></small><small><span>Played</span><b>${played} / ${mode === 'ffa' ? 6 : 12}</b></small></span></button>`;
+  }).join('');
   $('round-label').textContent = `ROUND ${round} · FIRST TO 100`;
   assignDitchSlots(discs);
   scene.syncDiscs(discs, review);
@@ -116,12 +122,13 @@ function hud() {
   } else summary.dataset.boardFocus = 'false';
 }
 $('scoreboard').addEventListener('click', event => {
-  if (!(event.target as HTMLElement).closest('[data-score-card]')) return;
+  const card = (event.target as HTMLElement).closest<HTMLElement>('[data-score-card]');
+  if (!card) return;
   scoreboardExpanded = !scoreboardExpanded; hud();
+  document.querySelector<HTMLElement>(`[data-score-card="${card.dataset.scoreCard}"]`)?.focus({ preventScroll: true });
 });
-$('scoreboard').addEventListener('keydown', event => {
-  if ((event.key !== 'Enter' && event.key !== ' ') || !(event.target as HTMLElement).closest('[data-score-card]')) return;
-  event.preventDefault(); scoreboardExpanded = !scoreboardExpanded; hud();
+$('score-details').addEventListener('click', () => {
+  scoreboardExpanded = !scoreboardExpanded; hud();
 });
 $('round-summary').addEventListener('click', event => {
   if (!(event.target as HTMLElement).closest('.round-board-toggle')) return;
