@@ -28,3 +28,12 @@ body[data-theme=light]{background:#f3efe5;color:#292b26;color-scheme:light}body[
 .score .match-total{min-width:0;}
 @media(min-width:601px){#scoreboard{grid-template-columns:repeat(4,minmax(130px,1fr));max-width:980px;margin:0 auto}.score{padding:11px 14px;}}
 @media(max-width:600px){#scoreboard{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.score{padding:8px 6px;gap:4px}.score .name{font-size:11px}.score strong{font-size:18px}.score .match-total{margin-left:auto}.score .dot{width:7px;height:7px;flex:0 0 7px}}
+
+/* Scorecards remain visible and compact; they are not an expandable control. */
+#scoreboard{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;width:100%;}
+.score{min-width:0;max-width:none;padding:10px 12px;gap:8px;cursor:default;overflow:hidden;}
+.score .name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.score strong{font-size:21px;font-variant-numeric:tabular-nums;line-height:1;}
+.score .match-total{min-width:0;}
+@media(min-width:601px){#scoreboard{grid-template-columns:repeat(4,minmax(130px,1fr));max-width:980px;margin:0 auto}.score{padding:11px 14px;}}
+@media(max-width:600px){#scoreboard{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.score{padding:8px 6px;gap:4px}.score .name{font-size:11px}.score strong{font-size:18px}.score .match-total{margin-left:auto}.score .dot{width:7px;height:7px;flex:0 0 7px}}
