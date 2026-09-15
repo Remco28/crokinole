@@ -44,16 +44,26 @@ holeDebugSetting.innerHTML = '<input type="checkbox"> Hole physics debug';
 const holeDebugCheckbox = holeDebugSetting.querySelector('input') as HTMLInputElement;
 holeDebugCheckbox.checked = holeDebug;
 $('skin').parentElement!.after(holeDebugSetting);
-type HoleDebugEntry = { disc: number; kind: string; speed: number; offset: number; dip: number; tilt: number; capture: boolean };
+type HoleDebugEntry = { disc: number; kind: string; speed: number; offset: number; overlap: number; dip: number; tilt: number; capture: boolean };
 const holeDebugEntries: HoleDebugEntry[] = [];
 const holeDebugActive = new Set<number>();
 function renderHoleDebug() {
   holeDebugPanel.hidden = !holeDebug;
   if (!holeDebug) return;
-  holeDebugPanel.innerHTML = '<strong>Hole contacts</strong>' + (holeDebugEntries.length ? holeDebugEntries.slice(-8).reverse().map(e => `<div><b>Disc ${e.disc}</b> ${e.kind} · ${e.speed.toFixed(1)} in/s · offset ${e.offset.toFixed(2)}" · dip ${e.dip.toFixed(3)}" · tilt ${Math.round(e.tilt * 180 / Math.PI)}° · ${e.capture ? 'capture' : 'no capture'}</div>`).join('') : '<div>Waiting for a disc to touch the hole…</div>');
+  holeDebugPanel.innerHTML = '<strong>Hole contacts</strong>' + (holeDebugEntries.length ? holeDebugEntries.slice(-8).reverse().map(e => `<div><b>Disc ${e.disc}</b> ${e.kind} · ${e.speed.toFixed(1)} in/s · offset ${e.offset.toFixed(2)}" · over ${Math.round(e.overlap * 100)}% · dip ${e.dip.toFixed(3)}" · tilt ${Math.round(e.tilt * 180 / Math.PI)}° · ${e.capture ? 'capture' : 'no capture'}</div>`).join('') : '<div>Waiting for a disc to touch the hole…</div>');
+}
+function holeOverlap(offset: number) {
+  const a = 0.625, b = 0.6875, d = Math.max(0.0001, offset);
+  if (d >= a + b) return 0;
+  if (d <= Math.abs(b - a)) return 1;
+  const alpha = Math.acos((d * d + a * a - b * b) / (2 * d * a));
+  const beta = Math.acos((d * d + b * b - a * a) / (2 * d * b));
+  const area = a * a * alpha + b * b * beta - 0.5 * Math.sqrt(Math.max(0, (-d + a + b) * (d + a - b) * (d - a + b) * (d + a + b)));
+  return area / (Math.PI * a * a);
 }
 function recordHole(d: Disc, kind: string, speed = Math.hypot(d.vx, d.vy)) {
-  holeDebugEntries.push({ disc: d.id, kind, speed, offset: Math.hypot(d.x, d.y), dip: d.hole?.dip ?? 0, tilt: Math.abs(d.hole?.tilt ?? 0), capture: speed < 36 });
+  const offset = Math.hypot(d.x, d.y);
+  holeDebugEntries.push({ disc: d.id, kind, speed, offset, overlap: holeOverlap(offset), dip: d.hole?.dip ?? 0, tilt: Math.abs(d.hole?.tilt ?? 0), capture: speed < 36 });
   if (holeDebugEntries.length > 32) holeDebugEntries.shift();
   renderHoleDebug();
 }
@@ -273,8 +283,12 @@ function placeAt(clientX: number, clientY: number) {
   // Placement targets the painted surface, not the elevated flick plane.
   const p = scene.boardPoint(clientX, clientY, 0); if (!p) return;
   const a = Math.atan2(p.x, p.y), delta = Math.atan2(Math.sin(a - yaw()), Math.cos(a - yaw()));
-  if (Math.abs(delta) > Math.PI / 4 - 0.06 || Math.abs(Math.hypot(p.x, p.y) - 12) > 0.9) return;
-  const x = Math.sin(a) * 12, y = Math.cos(a) * 12;
+  // The quadrant borders are legal shooting positions. Accept a small touch
+  // tolerance beyond the painted edge, then clamp onto the exact boundary.
+  if (Math.abs(Math.hypot(p.x, p.y) - 12) > 1.25 || Math.abs(delta) > Math.PI / 4 + 0.08) return;
+  const legalDelta = Math.max(-Math.PI / 4, Math.min(Math.PI / 4, delta));
+  const legalAngle = yaw() + legalDelta;
+  const x = Math.sin(legalAngle) * 12, y = Math.cos(legalAngle) * 12;
   if (!discs.some(d => d !== staged && d.state === 'board' && Math.hypot(d.x - x, d.y - y) < 1.3)) {
     staged.x = x; staged.y = y; hud();
   } else hint.textContent = 'That spot is occupied. Tap a clear spot on your shooting line.';
