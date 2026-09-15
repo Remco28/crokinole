@@ -11,9 +11,8 @@ lifting your finger. Missed swipes do not shoot. Tap the shooting line to place
 the disc. Getting ready preserves your chosen zoom and score layout.
 Framing shifts upward slightly to leave more room below the rim.
 
-Gentle flicks have no minimum-power boost. Surface friction is tuned slightly
-higher (0.12, previously 0.11) for a shorter glide without changing collision
-bounce or adding disc mass.
+Gentle flicks have no minimum-power boost. Surface friction is restored to
+0.11 for the earlier glide, with collision bounce unchanged.
 
 Tap the painted shooting line to place your disc, including small adjustments
 beside its current position. **Adjust view** returns from aiming to camera controls
