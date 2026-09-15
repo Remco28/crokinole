@@ -72,9 +72,11 @@ export function createScene(canvas: HTMLCanvasElement) {
   const key = new THREE.DirectionalLight('#ffffff', 1.6);
   key.position.set(8, 18, 6);
   key.castShadow = true;
-  key.shadow.mapSize.set(1024, 1024);
+  key.shadow.mapSize.set(2048, 2048);
   Object.assign(key.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 0.1, far: 60 });
-  key.shadow.bias = -0.001;
+  // Keep contact shadows attached: the old bias displaced them noticeably
+  // relative to these small, low discs. Higher resolution preserves the bevel.
+  key.shadow.bias = -0.0001;
   scene.add(key);
 
   // Wooden frame: 26" playing surface, 1.75" ditch, and a slim 1/4" wall.
