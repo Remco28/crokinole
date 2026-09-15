@@ -252,7 +252,7 @@ Audited differential and FFA round arithmetic, added score breakdowns and
 reload-safe result persistence. Matched scoring to drawn lines and bottom disc
 footprints; defer outer-line cleanup until motion settles. Added 1.25-second
 normal reviews, 2-second foul reviews, 0.65-second marked removals, automatic
-handover, and 6-second round summaries. Canvas resizing follows summary layout.
+handover, and round summaries dismissed with **Next round**. Canvas resizing follows summary layout.
 
 Out-of-play discs remain flat in a widened 1.75-inch ditch, with stable nearest
 free slots to avoid overlap. Pegs now expose 0.8 inches of rubber with brass

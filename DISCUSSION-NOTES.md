@@ -12,7 +12,7 @@ its pending decisions.
 - Added a round breakdown with raw totals and points added to the match.
 - Hold ordinary shots for 1.25 seconds and fouls for 2 seconds, then animate
   removals for 0.65 seconds. Automatically hand over afterward. Round summaries
-  stay for 6 seconds, with an option to advance sooner.
+  remain visible until **Next round** is clicked (updated after user feedback).
 - Pulse and fade a contrasting outlined X marker while retaining player colors.
 - Keep out-of-play discs flat in a widened 1.75-inch ditch. Use the nearest
   free parking spot when another disc occupies the landing area.

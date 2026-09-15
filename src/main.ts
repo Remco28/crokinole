@@ -2,7 +2,7 @@ import { BoardSound } from './audio/sound';
 import { createScene, type BoardView } from './render/scene';
 import { makeDisc, moving, step, type Disc, type Shot } from './sim/physics';
 import { completeRound, inspectShot, sideOf, type Mode, type RoundResult } from './game/rules';
-import { assignDitchSlots, beginReview, reviewDuration, REVIEW_TIMING, type ShotReview } from './game/review';
+import { assignDitchSlots, beginReview, reviewDuration, type ShotReview } from './game/review';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('board-canvas');
 const banner = $('turn-banner'), hint = $('hint'), next = $<HTMLButtonElement>('continue');
@@ -64,7 +64,7 @@ for (const name of ['seated', 'standing'] as const) $(`view-${name}`).addEventLi
 let mode: Mode = 'duel', player = 0, round = 1, id = 0;
 let discs: Disc[] = [], scores = [0, 0], used = [0, 0], phase: 'pass' | 'aim' | 'moving' | 'review' | 'round' | 'won' = 'pass';
 let restoredEnd: 'review' | 'round' | 'won' | null = null;
-let review: ShotReview | null = null, roundResult: RoundResult | null = null, roundElapsed = 0;
+let review: ShotReview | null = null, roundResult: RoundResult | null = null;
 let shot: Shot | null = null, hadOpponent = false, staged: Disc | null = null, readyAt = 0;
 const count = () => mode === 'duel' ? 2 : 4;
 const allowance = () => mode === 'duel' ? 12 : 6;
@@ -95,12 +95,12 @@ function pass(message = '') {
 function start() {
   mode = $<HTMLSelectElement>('mode').value as Mode;
   player = 0; round = 1; id = 0; discs = []; scores = Array(mode === 'ffa' ? 4 : 2).fill(0); used = Array(count()).fill(0);
-  review = null; roundResult = null; roundElapsed = 0;
+  review = null; roundResult = null;
   settings.close(); pass();
 }
 function nextRound() {
   round++; discs = []; used.fill(0); player = (round - 1) % count();
-  roundResult = null; roundElapsed = 0; pass();
+  roundResult = null; pass();
 }
 function setBoardView(nextView: BoardView) {
   view = nextView; scene.setView(view); tablePreferences();
@@ -290,10 +290,10 @@ function finishReview() {
   review = null;
   if (used.every(n => n === allowance())) {
     roundResult = completeRound(discs, mode, scores); scores = roundResult.after;
-    phase = roundResult.winner !== null ? 'won' : 'round'; roundElapsed = 0;
+    phase = roundResult.winner !== null ? 'won' : 'round';
     banner.textContent = roundResult.winner !== null ? `${label(roundResult.winner)} wins!` : 'Round complete';
     hint.textContent = roundResult.sides.map((row, i) => `${label(i)} +${row.awarded}`).join(' · ');
-    next.textContent = phase === 'won' ? 'Play again' : 'Next round now'; next.hidden = false; hud(); save();
+    next.textContent = phase === 'won' ? 'Play again' : 'Next round'; next.hidden = false; hud(); save();
   } else { player = (player + 1) % count(); pass(valid ? '' : 'Foul resolved'); }
 }
 let last = performance.now(), accumulator = 0;
@@ -309,10 +309,6 @@ function tick(now: number) {
     if (phase === 'review' && review) {
       review.elapsed += elapsed * 1000;
       if (review.elapsed >= reviewDuration(review)) finishReview();
-    } else if (phase === 'round') {
-      roundElapsed += elapsed * 1000;
-      hint.textContent = `Next round begins in ${Math.max(1, Math.ceil((REVIEW_TIMING.round - roundElapsed) / 1000))}s. Match totals are shown above.`;
-      if (roundElapsed >= REVIEW_TIMING.round) nextRound();
     }
   }
   next.disabled = phase === 'pass' && (now < readyAt || orbitPointer !== null || pinching);
@@ -349,7 +345,7 @@ if (restoredEnd) {
   else {
     banner.textContent = phase === 'won' ? `${label(scores.indexOf(Math.max(...scores)))} wins!` : 'Round complete';
     hint.textContent = 'Your table has been restored.';
-    next.textContent = phase === 'won' ? 'Play again' : 'Next round now';
+    next.textContent = phase === 'won' ? 'Play again' : 'Next round';
   }
 } else pass();
 requestAnimationFrame(tick);

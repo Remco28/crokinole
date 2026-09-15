@@ -1,7 +1,7 @@
 import type { Disc } from '../sim/physics';
 import { applyVerdict, type ShotVerdict } from './rules';
 
-export const REVIEW_TIMING = { normal: 1250, foul: 2000, removal: 650, round: 6000 } as const;
+export const REVIEW_TIMING = { normal: 1250, foul: 2000, removal: 650 } as const;
 export interface ShotReview { verdict: ShotVerdict; removed: Disc[]; elapsed: number; hold: number }
 export function beginReview(discs: Disc[], verdict: ShotVerdict): ShotReview {
   const removed = discs.filter(d => verdict.removalIds.includes(d.id)).map(d => ({ ...d, hole: d.hole ? { ...d.hole } : undefined }));

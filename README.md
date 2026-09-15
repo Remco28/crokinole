@@ -6,7 +6,7 @@ pulse-and-fade markers retain each disc's player color. Removed discs lie flat
 in the widened ditch, occupying the nearest free spot.
 
 Completed rounds show counts by scoring zone, raw totals, and match points
-awarded for 6 seconds before continuing. Saved reviews and round results resume
+awarded until the player clicks **Next round**. Saved reviews and round results resume
 without adding points twice. Scoring uses the beveled disc's bottom footprint
 and the same line width drawn on the board.
 
