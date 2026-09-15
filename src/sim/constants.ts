@@ -44,7 +44,7 @@ export const TUNE = {
   landBounce: 0.35,
   maxStepMove: 0.2, // inches per substep (CCD guard)
   sleepSpeed: 0.15,
-  holeCaptureSpeed: 32, // allow slightly faster accurate entries to settle into the twenty
+  holeCaptureSpeed: 36, // allow slightly faster accurate entries to settle into the twenty
   holeSinkDip: 0.03, // modest engagement threshold for a mostly-submerged disc
   holeLipBevel: 0.025, // effective rounded lip contact depth
   holeLipLoss: 0.65, // fraction of outward normal speed lost at full engagement

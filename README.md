@@ -74,7 +74,7 @@ hole size) and `DISC.radius` (disc size). The softer gameplay controls are:
 - `BOARD.holeCaptureRadius`: how far from the center a slow disc receives a
   gentle inward pull. Current value: `0.60` inches.
 - `TUNE.holeCaptureSpeed`: the maximum speed for that pull and for sinking.
-  Current value: `32 in/s` (raised from `28` as a small experiment).
+  Current value: `36 in/s` (raised from `28` in small experiments).
 - `BOARD.holeDepth` and `TUNE.holeSinkDip`: how much the disc must settle into
   the opening before it counts as sunk. Current values are `0.24` and `0.03`.
 - `TUNE.holeLipBevel` and `TUNE.holeLipLoss`: how strongly the lip changes an
