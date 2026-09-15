@@ -8,6 +8,7 @@
 #board-canvas.can-orbit{cursor:grab}#board-canvas.is-orbiting{cursor:grabbing}
 
 .match-total{margin-left:auto;text-align:right}.match-total strong{display:block}.match-total small{text-transform:uppercase;letter-spacing:1px;font-size:9px}
+#shot-clock{font-size:13px;font-variant-numeric:tabular-nums;color:#d8bc80}#shot-clock.urgent{color:#ff9f89;font-weight:700}
 #round-summary{flex-shrink:0;border:1px solid #48504a;border-radius:12px;padding:12px 16px;margin:0 auto 14px;width:min(100%,640px);background:#202925}
 #round-summary[hidden]{display:none}#round-summary h2{font-size:15px;margin:0 0 8px}#round-summary table{width:100%;border-collapse:collapse;font-size:12px;text-align:right}
 #round-summary th:first-child{text-align:left}#round-summary th,#round-summary td{padding:5px 6px}#round-summary thead{color:#abb7ad}#round-summary td:last-child{color:#e4cb93}#round-summary tbody tr{border-top:1px solid #38433c}#round-summary p{font-size:11px;margin:8px 0 0}

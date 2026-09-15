@@ -65,6 +65,24 @@ let mode: Mode = 'duel', player = 0, round = 1, id = 0;
 let discs: Disc[] = [], scores = [0, 0], used = [0, 0], phase: 'pass' | 'aim' | 'moving' | 'review' | 'round' | 'won' = 'pass';
 let restoredEnd: 'review' | 'round' | 'won' | null = null;
 let review: ShotReview | null = null, roundResult: RoundResult | null = null;
+let shotSeconds = 60, deadline: number | null = null;
+try {
+  const saved = Number(localStorage.getItem('crokinole-clock') ?? 60);
+  if ([0, 30, 60].includes(saved)) shotSeconds = saved;
+} catch { /* optional */ }
+const clockLabel = document.createElement('span');
+clockLabel.id = 'shot-clock'; clockLabel.setAttribute('role', 'timer');
+$('round-label').after(clockLabel);
+const clockSetting = document.createElement('label');
+clockSetting.textContent = 'Shot clock (applies next turn)';
+const clockSelect = document.createElement('select'); clockSelect.id = 'shot-clock-setting';
+clockSelect.innerHTML = '<option value="60">60 seconds</option><option value="30">30 seconds</option><option value="0">Off</option>';
+clockSelect.value = String(shotSeconds); clockSetting.append(clockSelect);
+$('mode').parentElement!.after(clockSetting);
+clockSelect.addEventListener('change', () => {
+  shotSeconds = Number(clockSelect.value);
+  try { localStorage.setItem('crokinole-clock', String(shotSeconds)); } catch { /* optional */ }
+});
 let shot: Shot | null = null, hadOpponent = false, staged: Disc | null = null, readyAt = 0;
 const count = () => mode === 'duel' ? 2 : 4;
 const allowance = () => mode === 'duel' ? 12 : 6;
@@ -72,7 +90,7 @@ const yaw = () => player * Math.PI * 2 / count();
 const side = (owner: number) => sideOf(mode, owner);
 const label = (i: number) => mode === 'teams' ? ['Coral + Gold', 'Blue + Sage'][i] : names[i];
 function save() {
-  try { localStorage.setItem('crokinole-match', JSON.stringify({ mode, player, round, id, discs, scores, used, phase, review, roundResult })); } catch { /* Storage is optional. */ }
+  try { localStorage.setItem('crokinole-match', JSON.stringify({ mode, player, round, id, discs: discs.filter(d => d !== staged || phase !== 'aim' && phase !== 'pass'), scores, used, phase: phase === 'aim' ? 'pass' : phase, review, roundResult, deadline })); } catch { /* Storage is optional. */ }
 }
 function hud() {
   $('scoreboard').innerHTML = scores.map((score, i) => `<div class="score ${side(player) === i ? 'active' : ''}" style="--player:${colors[i]}"><span class="dot"></span><div><span class="name">${label(i)}</span><small>${discs.filter(d => side(d.owner) === i && d.state === 'sunk').length} twenties this round</small><small>${mode === 'teams' ? used.filter((_, p) => side(p) === i).reduce((a, b) => a + b, 0) : used[i]}/${mode === 'ffa' ? 6 : 12} played</small></div><div class="match-total"><strong>${score}</strong><small>Match</small></div></div>`).join('');
@@ -85,8 +103,9 @@ function hud() {
     summary.innerHTML = `<h2>Round ${round} · score breakdown</h2><table><thead><tr><th scope="col">Side</th><th scope="col">20s</th><th scope="col">15s</th><th scope="col">10s</th><th scope="col">5s</th><th scope="col">Total</th><th scope="col">Added</th></tr></thead><tbody>${roundResult.sides.map((row, i) => `<tr><th scope="row">${label(i)}</th><td>${row.twenties}</td><td>${row.fifteens}</td><td>${row.tens}</td><td>${row.fives}</td><td>${row.total}</td><td><strong>+${row.awarded}</strong></td></tr>`).join('')}</tbody></table><p>Disc counts × ring value = total. ${mode === 'ffa' ? 'Each player adds their own total.' : 'Only the difference is added to the winning side.'}</p>`;
   }
 }
-function pass(message = '') {
+function pass(message = '', restoreClock = false) {
   phase = 'pass'; staged = null;
+  if (!restoreClock) deadline = shotSeconds ? Date.now() + 850 + shotSeconds * 1000 : null;
   scene.setYawTarget(yaw()); readyAt = performance.now() + 850;
   banner.textContent = `${message ? message + ' · ' : ''}Pass to ${names[player]}`;
   hint.textContent = 'Drag to adjust the view within your quadrant, then tap ready.';
@@ -107,7 +126,8 @@ function setBoardView(nextView: BoardView) {
   if (phase === 'aim') shotInstructions();
 }
 function shotInstructions() {
-  next.hidden = view === 'seated';
+  next.hidden = false;
+  next.textContent = 'Adjust view';
   if (view === 'standing') {
     banner.textContent = `${names[player]}, look over the board`;
     hint.textContent = 'Take a seat when you’re ready to flick.';
@@ -120,12 +140,20 @@ function shotInstructions() {
 }
 function stage() {
   if (performance.now() < readyAt || orbitPointer !== null || pinching) return;
-  staged = makeDisc(++id, player, Math.sin(yaw()) * 12, Math.cos(yaw()) * 12);
-  discs.push(staged); phase = 'aim'; setBoardView('seated');
+  if (!staged) {
+    staged = makeDisc(++id, player, Math.sin(yaw()) * 12, Math.cos(yaw()) * 12);
+    discs.push(staged);
+  }
+  phase = 'aim'; setBoardView('seated');
   hud();
 }
 next.addEventListener('click', () => {
-  if (phase === 'aim' && view === 'standing') setBoardView('seated');
+  if (phase === 'aim') {
+    cancel(); phase = 'pass';
+    banner.textContent = `${names[player]}, adjust your view`;
+    hint.textContent = 'Drag within your quadrant, then tap ready. Your disc stays in place.';
+    next.textContent = 'Ready to shoot'; hud();
+  }
   else if (phase === 'pass') stage();
   else if (phase === 'round') nextRound();
   else if (phase === 'won') start();
@@ -170,6 +198,18 @@ let orbitPointer: number | null = null;
 let orbitLast = { x: 0, y: 0 };
 function cancelOrbit() { orbitPointer = null; }
 let trail: { x: number; y: number; t: number }[] = [];
+let press = { x: 0, y: 0 };
+function placeAt(clientX: number, clientY: number) {
+  if (!staged) return;
+  // Placement targets the painted surface, not the elevated flick plane.
+  const p = scene.boardPoint(clientX, clientY, 0); if (!p) return;
+  const a = Math.atan2(p.x, p.y), delta = Math.atan2(Math.sin(a - yaw()), Math.cos(a - yaw()));
+  if (Math.abs(delta) > Math.PI / 4 - 0.06 || Math.abs(Math.hypot(p.x, p.y) - 12) > 0.9) return;
+  const x = Math.sin(a) * 12, y = Math.cos(a) * 12;
+  if (!discs.some(d => d !== staged && d.state === 'board' && Math.hypot(d.x - x, d.y - y) < 1.3)) {
+    staged.x = x; staged.y = y; hud();
+  } else hint.textContent = 'That spot is occupied. Tap a clear spot on your shooting line.';
+}
 const touches = new Map<number, { x: number; y: number }>();
 let pinching = false, pinchDistance = 0;
 function touchDistance() {
@@ -210,13 +250,10 @@ canvas.addEventListener('pointerdown', e => {
   if (view !== 'seated' || phase !== 'aim' || !staged || pointer !== null || settings.open || scene.isViewMoving()) return;
   const p = scene.boardPoint(e.clientX, e.clientY); if (!p) return;
   if (Math.hypot(p.x - staged.x, p.y - staged.y) > 1.4) {
-    const a = Math.atan2(p.x, p.y), delta = Math.atan2(Math.sin(a - yaw()), Math.cos(a - yaw()));
-    if (Math.abs(delta) < Math.PI / 4 - 0.06 && Math.abs(Math.hypot(p.x, p.y) - 12) < 0.9) {
-      const x = Math.sin(a) * 12, y = Math.cos(a) * 12;
-      if (!discs.some(d => d !== staged && d.state === 'board' && Math.hypot(d.x - x, d.y - y) < 1.3)) { staged.x = x; staged.y = y; hud(); }
-    }
+    placeAt(e.clientX, e.clientY);
     return;
   }
+  press = { x: e.clientX, y: e.clientY };
   pointer = e.pointerId; trail = [{ ...p, t: performance.now() }]; canvas.setPointerCapture(pointer);
 });
 canvas.addEventListener('pointermove', e => {
@@ -258,9 +295,11 @@ canvas.addEventListener('pointerup', e => {
     return;
   }
   if (view !== 'seated' || scene.isViewMoving() || e.pointerId !== pointer || !staged || phase !== 'aim') return;
+  if (deadline !== null && Date.now() >= deadline) { expireShot(); return; }
   const p = scene.boardPoint(e.clientX, e.clientY), t = performance.now();
   const first = trail.find(sample => t - sample.t <= 120);
   cancel(); if (!p || !first) return;
+  if (Math.hypot(e.clientX - press.x, e.clientY - press.y) < 5) { placeAt(e.clientX, e.clientY); return; }
   const seconds = Math.max(0.016, (t - first.t) / 1000);
   let vx = (p.x - first.x) / seconds, vy = (p.y - first.y) / seconds;
   const speed = Math.hypot(vx, vy); if (speed < 3) { hint.textContent = 'Try a quicker flick from your disc.'; return; }
@@ -275,6 +314,19 @@ function finishShot() {
   review = beginReview(discs, inspectShot(discs, shot!, hadOpponent)); shot = null;
   phase = 'review'; next.hidden = true;
   reviewMessage(); hud(); save();
+}
+function expireShot() {
+  cancel(); cancelOrbit(); touches.clear(); pinching = false;
+  if (!staged) {
+    staged = makeDisc(++id, player, Math.sin(yaw()) * 12, Math.cos(yaw()) * 12);
+    discs.push(staged);
+  }
+  used[player]++;
+  review = beginReview(discs, { valid: true, reason: null, foulIds: [], removalIds: [staged.id], revokedTwenties: 0 });
+  deadline = null; phase = 'review'; next.hidden = true;
+  banner.textContent = 'Time expired';
+  hint.textContent = 'Shot forfeited. The unplayed disc moves to the ditch.';
+  hud(); save();
 }
 function reviewMessage() {
   if (!review) return;
@@ -298,6 +350,12 @@ function finishReview() {
 }
 let last = performance.now(), accumulator = 0;
 function tick(now: number) {
+  const awaitingShot = phase === 'pass' || phase === 'aim';
+  if (awaitingShot && deadline !== null && Date.now() >= deadline) expireShot();
+  clockLabel.hidden = !awaitingShot;
+  const remaining = deadline === null ? null : Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+  clockLabel.textContent = remaining === null ? ' · Clock off' : ` · ${remaining}s`;
+  clockLabel.classList.toggle('urgent', remaining !== null && remaining <= 10);
   const elapsed = Math.min((now - last) / 1000, 0.25);
   const dt = Math.min(elapsed, 0.05); last = now;
   accumulator += dt;
@@ -332,6 +390,7 @@ try {
     const data = JSON.parse(raw);
     if (['duel', 'teams', 'ffa'].includes(data.mode) && ['pass', 'review', 'round', 'won'].includes(data.phase) && Array.isArray(data.discs) && Array.isArray(data.scores) && Array.isArray(data.used)) {
       mode = data.mode; player = data.player; round = data.round; id = data.id; discs = data.discs; scores = data.scores; used = data.used;
+      deadline = typeof data.deadline === 'number' && Number.isFinite(data.deadline) ? data.deadline : null;
       $<HTMLSelectElement>('mode').value = mode;
       roundResult = data.roundResult ?? null;
       if (data.phase === 'review' && data.review && Array.isArray(data.review.removed)) { review = data.review; review!.elapsed = 0; restoredEnd = 'review'; }
@@ -347,5 +406,5 @@ if (restoredEnd) {
     hint.textContent = 'Your table has been restored.';
     next.textContent = phase === 'won' ? 'Play again' : 'Next round';
   }
-} else pass();
+} else pass('', deadline !== null);
 requestAnimationFrame(tick);

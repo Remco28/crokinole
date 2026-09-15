@@ -1,5 +1,13 @@
 # Crokinole · Around the board
 
+Tap the painted shooting line to place your disc, including small adjustments
+beside its current position. **Adjust view** returns from aiming to camera controls
+without moving the disc or resetting your clock. The shot clock defaults to
+60 seconds; Settings offers 30 seconds or Off for subsequent turns. It starts
+at handover after the camera transition, includes view adjustment, and continues
+through settings, background tabs, and reloads. Expiry forfeits one shot and
+moves the unplayed disc to the ditch. Shot reviews and round summaries are untimed.
+
 Shots now pause briefly before automatic handover: 1.25 seconds normally,
 2 seconds for fouls, followed by a visible removal animation. Contrasting
 pulse-and-fade markers retain each disc's player color. Removed discs lie flat

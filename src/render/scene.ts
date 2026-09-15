@@ -209,7 +209,8 @@ export function createScene(canvas: HTMLCanvasElement) {
   }
   const raycaster = new THREE.Raycaster();
   const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -DISC.height / 2);
-  function boardPoint(x: number, y: number) {
+  function boardPoint(x: number, y: number, height = DISC.height / 2) {
+    plane.constant = -height;
     const rect = canvas.getBoundingClientRect();
     raycaster.setFromCamera(new THREE.Vector2((x - rect.left) / rect.width * 2 - 1, -(y - rect.top) / rect.height * 2 + 1), camera);
     const point = raycaster.ray.intersectPlane(plane, new THREE.Vector3());
