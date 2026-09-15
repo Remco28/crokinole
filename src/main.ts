@@ -140,8 +140,8 @@ function pass(message = '', restoreClock = false) {
   if (!restoreClock) deadline = shotSeconds ? Date.now() + 850 + shotSeconds * 1000 : null;
   scene.setYawTarget(yaw()); readyAt = performance.now() + 850;
   banner.textContent = `${message ? message + ' · ' : ''}Pass to ${names[player]}`;
-  hint.textContent = view === 'standing' ? 'Look over the board. Sit when ready to shoot.' : 'Adjust your view, then get ready to flick.';
-  next.textContent = view === 'standing' ? 'Sit & get ready' : 'Ready to shoot'; next.hidden = false; hud(); save();
+  hint.textContent = view === 'standing' ? 'Look over the board. Sit when ready to shoot.' : 'Adjust your view, then choose Shooting when ready.';
+  next.textContent = 'Viewing'; next.setAttribute('aria-label', 'Switch to shooting mode'); next.dataset.mode = 'view'; next.hidden = false; hud(); save();
 }
 function start() {
   mode = $<HTMLSelectElement>('mode').value as Mode;
@@ -157,17 +157,16 @@ function setBoardView(nextView: BoardView) {
   view = nextView; scene.setView(view); tablePreferences();
   if (phase === 'aim') shotInstructions();
   else if (phase === 'pass') {
-    hint.textContent = view === 'standing' ? 'Look over the board. Sit when ready to shoot.' : 'Adjust your view, then get ready to flick.';
-    next.textContent = view === 'standing' ? 'Sit & get ready' : 'Ready to shoot';
+    hint.textContent = view === 'standing' ? 'Look over the board. Sit when ready to shoot.' : 'Adjust your view, then choose Shooting when ready.';
   }
 }
 function shotInstructions() {
   next.hidden = false;
-  next.textContent = 'Adjust view';
+  next.textContent = 'Shooting'; next.setAttribute('aria-label', 'Switch to viewing mode'); next.dataset.mode = 'shoot';
   if (view === 'standing') {
     banner.textContent = `${names[player]}, look over the board`;
     hint.textContent = 'Take a seat when you’re ready to flick.';
-    next.textContent = 'Sit down to shoot';
+    next.textContent = 'Viewing'; next.setAttribute('aria-label', 'Switch to shooting mode'); next.dataset.mode = 'view';
   } else {
     banner.textContent = `${names[player]}, your shot`;
     const opponent = discs.some(d => d.state === 'board' && side(d.owner) !== side(player));
@@ -188,7 +187,7 @@ next.addEventListener('click', () => {
     cancel(); phase = 'pass';
     banner.textContent = `${names[player]}, adjust your view`;
     hint.textContent = 'Drag within your quadrant, then tap ready. Your disc stays in place.';
-    next.textContent = 'Ready to shoot'; hud();
+    next.textContent = 'Viewing'; next.setAttribute('aria-label', 'Switch to shooting mode'); next.dataset.mode = 'view'; hud();
   }
   else if (phase === 'pass') stage();
   else if (phase === 'round') nextRound();
