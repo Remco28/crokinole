@@ -65,6 +65,30 @@ clatter. The **Sound on/off** button in Settings mutes the table.
 
 ## Implemented
 
+### Center-hole tuning guide
+
+The center-hole behavior can be adjusted in `src/sim/constants.ts` and
+`src/sim/hole.ts`. The physical dimensions are `BOARD.holeRadius` (visible
+hole size) and `DISC.radius` (disc size). The softer gameplay controls are:
+
+- `BOARD.holeCaptureRadius`: how far from the center a slow disc receives a
+  gentle inward pull. Current value: `0.57` inches.
+- `TUNE.holeCaptureSpeed`: the maximum speed for that pull and for sinking.
+  Current value: `32 in/s` (raised from `28` as a small experiment).
+- `BOARD.holeDepth` and the `m.dip` threshold in `interactWithHole`: how much
+  the disc must settle into the opening before it counts as sunk.
+- `TUNE.holeLipBevel` and `TUNE.holeLipLoss`: how strongly the lip changes an
+  exiting disc's speed.
+- `TUNE.holeTiltSpring` and `holeTiltDamping`: how a tipped disc rocks flat.
+- `TUNE.gravityZ`: how quickly a disc drops into the opening.
+- `TUNE.frictionMu` and `frictionViscous`: how much speed remains when it
+  reaches the hole.
+
+For small difficulty changes, adjust `holeCaptureRadius` first, then
+`holeCaptureSpeed`. Keep the visible dimensions unchanged unless the board's
+physical proportions are being recalibrated. Fast shots should still be able
+to catch the lip and deflect rather than being forced into the hole.
+
 - Two-player, four-player teams (opposite partners), and four-player free-for-all.
 - Fixed-step physics with adaptive collision substeps, friction, pegs, disc
   collisions, impact hops, hole-lip deflection, brief edge rolls, and ditch removal.
