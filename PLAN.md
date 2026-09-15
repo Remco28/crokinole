@@ -198,3 +198,60 @@ sliders, haptics, art opacity/contrast controls, and full PWA/offline support.
 Board geometry correction: outward-facing solid frame walls; pegs offset 22.5°
 to clear each central shooting lane; quadrant dividers span the 8–12 inch
 5-point band.
+
+
+## Seated play and table sound
+
+- Standing preserves the original 25° polar overview; seated uses 62° polar
+  (roughly 22 inches of eye height above the board at the base framing distance).
+- Shooting and placement require the seated view and a settled camera.
+- Web Audio effects follow physics events, with distinct disc/peg/drop materials,
+  speed-dependent dynamics, stereo positioning, and grounded sliding noise.
+- Sound is synthesized, not a measured or recorded reproduction of a real board.
+- View, mute, and volume persist; sound preview is available in Settings.
+- Custom artwork rotates 90° at render time, including previously saved artwork.
+- Rim wall width is now 1/4 inch, retaining its structural height.
+
+
+### Artwork and sound refinement
+
+Custom art receives a further 180° correction (net -90° canvas rotation). Remove
+artwork clears storage and restores the selected finish; pending image loads
+cannot reapply removed artwork. Sliding noise is removed. Impact synthesis now
+uses short noise transients through broad low-Q filters instead of pitched modes
+and a bass tone. Preview compares soft, medium, and firm wooden contacts.
+
+
+### Twenty-hole contact first pass
+
+Implemented local dip/exit-lip response with deterministic radial impulses and
+energy-budgeted hop/tipping. Brief edge rolling dissipates speed and settles;
+collision footprint/height follow tilt. Fine substeps near the hole avoid
+skipping its clearance. A twenty requires the disc center to fit the opening,
+with slow inward settling and a short drop; supported lip hangers stay in play.
+Airborne motion no longer incurs sliding friction. Lip contacts emit a wooden
+clack; the disc sound has slightly fuller, still brief wooden body.
+
+This remains a local approximation requiring real-board play/footage tuning,
+not a full 3D rigid-body or calibrated contact model. No random kicks are used.
+
+
+### Board zoom and playing-surface edge
+
+Added persisted 75–250% projection zoom (default 120%) with buttons, reset,
+mouse wheel, and two-finger pinch. Pinches cancel pending flicks; input waits
+for camera zoom to settle; zoom/view controls lock during a moving shot.
+Removed the frame's duplicate inner wall, which overlapped the playing-surface
+cylinder and caused the striped edge shown in the user's screenshot. The
+surface cylinder now owns that wall; adjacent circular meshes share 192 segments.
+
+
+### Pre-shot quadrant orbit
+
+Mouse/one-finger drag adjusts camera yaw within ±45° of the active player's side
+and elevation within seated (48–68° polar) or standing (20–40° polar) limits.
+Center resets the angle. Each pass centers on the next player via the shortest
+rotation. Ready preserves the seated angle (or seats a standing player), then
+locks angle and zoom until the next pass. Two-finger pinch cancels a view drag;
+release/cancellation cannot turn a camera drag into a shot. Flick input waits
+for yaw as well as elevation/zoom to settle.

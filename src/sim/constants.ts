@@ -7,7 +7,8 @@ export const BOARD = {
   ring10: 8.0,
   ring5: 12.0,
   holeRadius: 1.375 / 2,
-  holeCaptureRadius: 0.55, // tuned so lip passes don't snap in
+  holeDepth: 0.2,
+  holeCaptureRadius: 0.55, // slow inward settling region; full clearance required to score
   lineWidth: 1 / 16,
 } as const;
 
@@ -40,6 +41,12 @@ export const TUNE = {
   landBounce: 0.35,
   maxStepMove: 0.2, // inches per substep (CCD guard)
   sleepSpeed: 0.15,
+  holeCaptureSpeed: 28,
+  holeLipBevel: 0.025, // effective rounded lip contact depth
+  holeLipLoss: 0.65, // fraction of outward normal speed lost at full engagement
+  holeTiltSpring: 24,
+  holeTiltDamping: 7,
+  rollingFrictionRatio: 0.2,
 } as const;
 
 export function pegPositions(): { x: number; y: number }[] {

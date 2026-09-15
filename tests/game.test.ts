@@ -35,7 +35,7 @@ describe('physics', () => {
     }
   });
   it('captures a slow central shot and lets a fast shot pass', () => {
-    const slow = makeDisc(1, 0, 0.2, 0); slow.vx = -5; step([slow], 1 / 120, shot()); expect(slow.state).toBe('sunk');
+    const slow = makeDisc(1, 0, 0.2, 0); slow.vx = -5; for (let i = 0; i < 120 && slow.state === 'board'; i++) step([slow], 1 / 120, shot()); expect(slow.state).toBe('sunk');
     const fast = makeDisc(1, 0, 0.2, 0); fast.vx = 80; step([fast], 1 / 120, shot()); expect(fast.state).toBe('board');
   });
   it('reflects fast peg hits without tunneling', () => {

@@ -1,10 +1,53 @@
-import { createScene } from './render/scene';
+import { BoardSound } from './audio/sound';
+import { createScene, type BoardView } from './render/scene';
 import { makeDisc, moving, step, type Disc, type Shot } from './sim/physics';
 import { resolveShot, roundScore, sideOf, type Mode } from './game/rules';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('board-canvas');
 const banner = $('turn-banner'), hint = $('hint'), next = $<HTMLButtonElement>('continue');
 const settings = $<HTMLDialogElement>('settings');
+const sound = new BoardSound();
+let volume = 0.65, muted = false, view: BoardView = 'standing', zoom = 1.2;
+const clampZoom = (value: number) => Math.max(0.75, Math.min(2.5, value));
+try {
+  const prefs = JSON.parse(localStorage.getItem('crokinole-table') || '{}');
+  if (typeof prefs.volume === 'number' && Number.isFinite(prefs.volume)) volume = Math.max(0, Math.min(1, prefs.volume));
+  if (typeof prefs.zoom === 'number' && Number.isFinite(prefs.zoom)) zoom = clampZoom(prefs.zoom);
+  muted = prefs.muted === true;
+  if (prefs.view === 'seated') view = 'seated';
+} catch { /* Preferences are optional. */ }
+function tablePreferences() {
+  sound.setPreferences(volume, muted);
+  $('sound-toggle').textContent = muted || volume === 0 ? 'Sound off' : 'Sound on';
+  $('sound-toggle').setAttribute('aria-pressed', String(muted));
+  $('sound-toggle').setAttribute('aria-label', muted || volume === 0 ? 'Enable sound' : 'Mute sound');
+  $<HTMLInputElement>('volume').value = String(Math.round(volume * 100));
+  $('volume-value').textContent = `${Math.round(volume * 100)}%`;
+  for (const name of ['seated', 'standing']) $(`view-${name}`).setAttribute('aria-pressed', String(view === name));
+  $('zoom-reset').textContent = `${Math.round(zoom * 100)}%`;
+  try { localStorage.setItem('crokinole-table', JSON.stringify({ volume, muted, view, zoom })); } catch { /* optional */ }
+}
+async function unlockSound() {
+  if (!await sound.unlock()) $('sound-note').textContent = 'Audio could not start. Tap Preview sounds to try again.';
+}
+// Gesture listeners also recover audio after returning from a background tab.
+document.addEventListener('pointerdown', () => { void unlockSound(); }, { passive: true });
+document.addEventListener('keydown', () => { void unlockSound(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) sound.suspend(); });
+$('sound-toggle').addEventListener('click', () => {
+  if (muted || volume === 0) { muted = false; if (volume === 0) volume = 0.65; } else muted = true;
+  tablePreferences();
+});
+$<HTMLInputElement>('volume').addEventListener('input', e => {
+  volume = Number((e.target as HTMLInputElement).value) / 100; muted = false; tablePreferences();
+});
+$('sound-preview').addEventListener('click', async () => {
+  if (muted || volume === 0) { $('sound-note').textContent = 'Enable sound and raise the volume to hear the preview.'; return; }
+  const button = $<HTMLButtonElement>('sound-preview'); button.disabled = true;
+  const ok = await sound.preview();
+  $('sound-note').textContent = ok ? 'Soft / medium / firm wood clicks · peg · twenty · ditch' : 'Audio unavailable. Try another browser or enable audio for this site.';
+  window.setTimeout(() => { button.disabled = false; }, 2500);
+});
 const names = ['Coral', 'Blue', 'Gold', 'Sage'];
 const colors = ['#dc6853', '#6cabbe', '#e7b95c', '#94ad76'];
 let scene: ReturnType<typeof createScene>;
@@ -12,6 +55,11 @@ try { scene = createScene(canvas); } catch {
   banner.textContent = 'This table needs WebGL'; hint.textContent = 'Try a browser with hardware acceleration enabled.'; next.hidden = true;
   throw new Error('WebGL could not initialize');
 }
+scene.setView(view); scene.setZoom(zoom); tablePreferences();
+for (const name of ['seated', 'standing'] as const) $(`view-${name}`).addEventListener('click', () => {
+  if (phase !== 'pass' || pointer !== null || orbitPointer !== null || pinching) return;
+  setBoardView(name);
+});
 let mode: Mode = 'duel', player = 0, round = 1, id = 0;
 let discs: Disc[] = [], scores = [0, 0], used = [0, 0], phase: 'pass' | 'aim' | 'moving' | 'round' | 'won' = 'pass';
 let restoredEnd: 'round' | 'won' | null = null;
@@ -33,7 +81,7 @@ function pass(message = '') {
   phase = 'pass'; staged = null;
   scene.setYawTarget(yaw()); readyAt = performance.now() + 850;
   banner.textContent = `${message ? message + ' · ' : ''}Pass to ${names[player]}`;
-  hint.textContent = 'Take your side of the table, then tap ready.';
+  hint.textContent = 'Drag to adjust the view within your quadrant, then tap ready.';
   next.textContent = 'Ready to shoot'; next.hidden = false; hud(); save();
 }
 function start() {
@@ -41,29 +89,59 @@ function start() {
   player = 0; round = 1; id = 0; discs = []; scores = Array(mode === 'ffa' ? 4 : 2).fill(0); used = Array(count()).fill(0);
   settings.close(); pass();
 }
+function setBoardView(nextView: BoardView) {
+  view = nextView; scene.setView(view); tablePreferences();
+  if (phase === 'aim') shotInstructions();
+}
+function shotInstructions() {
+  next.hidden = view === 'seated';
+  if (view === 'standing') {
+    banner.textContent = `${names[player]}, look over the board`;
+    hint.textContent = 'Take a seat when you’re ready to flick.';
+    next.textContent = 'Sit down to shoot';
+  } else {
+    banner.textContent = `${names[player]}, your shot`;
+    const opponent = discs.some(d => d.state === 'board' && side(d.owner) !== side(player));
+    hint.textContent = opponent ? 'View locked. Flick your disc to hit an opponent’s disc.' : 'View locked. Flick gently toward the center and finish in the inner ring.';
+  }
+}
 function stage() {
-  if (performance.now() < readyAt) return;
+  if (performance.now() < readyAt || orbitPointer !== null || pinching) return;
   staged = makeDisc(++id, player, Math.sin(yaw()) * 12, Math.cos(yaw()) * 12);
-  discs.push(staged); phase = 'aim'; next.hidden = true;
-  banner.textContent = `${names[player]}, your shot`;
-  const opponent = discs.some(d => d.state === 'board' && side(d.owner) !== side(player));
-  hint.textContent = opponent ? 'Flick your disc to hit an opponent’s disc.' : 'Flick gently toward the center. Finish in the inner ring.';
+  discs.push(staged); phase = 'aim'; setBoardView('seated');
   hud();
 }
 next.addEventListener('click', () => {
-  if (phase === 'pass') stage();
+  if (phase === 'aim' && view === 'standing') setBoardView('seated');
+  else if (phase === 'pass') stage();
   else if (phase === 'round') { round++; discs = []; used.fill(0); player = (round - 1) % count(); pass(); }
   else if (phase === 'won') start();
 });
 $('settings-button').addEventListener('click', () => settings.showModal());
 $('new-game').addEventListener('click', start);
 const skin = $<HTMLSelectElement>('skin');
-skin.addEventListener('change', () => { scene.setSkin(skin.value); try { localStorage.setItem('crokinole-skin', skin.value); localStorage.removeItem('crokinole-art'); } catch { /* optional */ } });
+let artworkVersion = 0;
+function removeArtwork() {
+  artworkVersion++;
+  scene.setSkin(skin.value);
+  $<HTMLInputElement>('art').value = '';
+  $<HTMLButtonElement>('remove-art').disabled = true;
+  try { localStorage.removeItem('crokinole-art'); } catch { /* optional */ }
+  $('settings-note').textContent = 'Artwork removed. Your board finish is restored.';
+}
+$('remove-art').addEventListener('click', removeArtwork);
+skin.addEventListener('change', () => {
+  removeArtwork();
+  try { localStorage.setItem('crokinole-skin', skin.value); } catch { /* optional */ }
+});
 $<HTMLInputElement>('art').addEventListener('change', async e => {
   const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return;
   if (!file.type.startsWith('image/') || file.size > 10 * 1024 * 1024) { $('settings-note').textContent = 'Choose an image smaller than 10 MB.'; return; }
+  const version = ++artworkVersion;
+  $<HTMLButtonElement>('remove-art').disabled = false;
   const url = URL.createObjectURL(file), image = new Image();
   image.onload = () => {
+    if (version !== artworkVersion) { URL.revokeObjectURL(url); return; }
     const cv = document.createElement('canvas'); cv.width = cv.height = 1024;
     const ctx = cv.getContext('2d')!; const scale = Math.max(1024 / image.width, 1024 / image.height);
     ctx.drawImage(image, (1024 - image.width * scale) / 2, (1024 - image.height * scale) / 2, image.width * scale, image.height * scale);
@@ -75,9 +153,48 @@ $<HTMLInputElement>('art').addEventListener('change', async e => {
   image.onerror = () => { URL.revokeObjectURL(url); $('settings-note').textContent = 'That image could not be opened.'; }; image.src = url;
 });
 let pointer: number | null = null;
+let orbitPointer: number | null = null;
+let orbitLast = { x: 0, y: 0 };
+function cancelOrbit() { orbitPointer = null; }
 let trail: { x: number; y: number; t: number }[] = [];
+const touches = new Map<number, { x: number; y: number }>();
+let pinching = false, pinchDistance = 0;
+function touchDistance() {
+  const [a, b] = [...touches.values()];
+  return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
+}
+function setZoom(value: number) {
+  if (phase !== 'pass' || pointer !== null || orbitPointer !== null || settings.open) return;
+  zoom = clampZoom(value); scene.setZoom(zoom); tablePreferences();
+}
+$('view-center').addEventListener('click', () => { if (phase === 'pass' && orbitPointer === null && !pinching) scene.centerView(); });
+$('zoom-in').addEventListener('click', () => setZoom(zoom + 0.15));
+$('zoom-out').addEventListener('click', () => setZoom(zoom - 0.15));
+$('zoom-reset').addEventListener('click', () => setZoom(1));
+canvas.addEventListener('wheel', e => {
+  // Browser Ctrl/Cmd zoom remains available for the surrounding interface.
+  if (e.ctrlKey || e.metaKey) return;
+  e.preventDefault();
+  if (pinching) return;
+  const delta = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? canvas.clientHeight : 1);
+  setZoom(zoom * Math.exp(-Math.max(-150, Math.min(150, delta)) * 0.002));
+}, { passive: false });
 canvas.addEventListener('pointerdown', e => {
-  if (phase !== 'aim' || !staged || pointer !== null || settings.open) return;
+  if (e.pointerType === 'touch') {
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    canvas.setPointerCapture(e.pointerId);
+    if (touches.size >= 2) {
+      cancel(); cancelOrbit(); pinching = true; pinchDistance = touchDistance();
+      return;
+    }
+    if (pinching) return;
+  }
+  if (phase === 'pass' && !settings.open && performance.now() >= readyAt && orbitPointer === null && (e.pointerType === 'touch' || e.button === 0)) {
+    orbitPointer = e.pointerId; orbitLast = { x: e.clientX, y: e.clientY };
+    canvas.setPointerCapture(e.pointerId);
+    return;
+  }
+  if (view !== 'seated' || phase !== 'aim' || !staged || pointer !== null || settings.open || scene.isViewMoving()) return;
   const p = scene.boardPoint(e.clientX, e.clientY); if (!p) return;
   if (Math.hypot(p.x - staged.x, p.y - staged.y) > 1.4) {
     const a = Math.atan2(p.x, p.y), delta = Math.atan2(Math.sin(a - yaw()), Math.cos(a - yaw()));
@@ -90,15 +207,44 @@ canvas.addEventListener('pointerdown', e => {
   pointer = e.pointerId; trail = [{ ...p, t: performance.now() }]; canvas.setPointerCapture(pointer);
 });
 canvas.addEventListener('pointermove', e => {
+  if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinching) {
+    const distance = touchDistance();
+    if (pinchDistance > 10 && distance > 10) setZoom(zoom * distance / pinchDistance);
+    pinchDistance = distance;
+    return;
+  }
+  if (e.pointerId === orbitPointer) {
+    if (phase === 'pass' && !settings.open) scene.dragView(
+      (e.clientX - orbitLast.x) / canvas.clientWidth * Math.PI,
+      (e.clientY - orbitLast.y) / canvas.clientHeight,
+    );
+    orbitLast = { x: e.clientX, y: e.clientY };
+    return;
+  }
   if (e.pointerId !== pointer) return;
   const p = scene.boardPoint(e.clientX, e.clientY); if (!p) return;
   const t = performance.now(); trail.push({ ...p, t }); trail = trail.filter(p => t - p.t < 110);
 });
 function cancel() { pointer = null; trail = []; }
-canvas.addEventListener('pointercancel', cancel);
-canvas.addEventListener('lostpointercapture', cancel);
+function endPointer(e: PointerEvent) {
+  touches.delete(e.pointerId);
+  if (touches.size === 0) { pinching = false; pinchDistance = 0; }
+  if (pointer === e.pointerId) cancel();
+  if (orbitPointer === e.pointerId) cancelOrbit();
+}
+canvas.addEventListener('pointercancel', endPointer);
+canvas.addEventListener('lostpointercapture', endPointer);
+window.addEventListener('blur', () => { cancel(); cancelOrbit(); touches.clear(); pinching = false; pinchDistance = 0; });
 canvas.addEventListener('pointerup', e => {
-  if (e.pointerId !== pointer || !staged || phase !== 'aim') return;
+  if (e.pointerId === orbitPointer) { endPointer(e); return; }
+  const wasPinching = pinching;
+  touches.delete(e.pointerId);
+  if (wasPinching) {
+    endPointer(e); cancel();
+    return;
+  }
+  if (view !== 'seated' || scene.isViewMoving() || e.pointerId !== pointer || !staged || phase !== 'aim') return;
   const p = scene.boardPoint(e.clientX, e.clientY), t = performance.now();
   const first = trail.find(sample => t - sample.t <= 120);
   cancel(); if (!p || !first) return;
@@ -108,6 +254,7 @@ canvas.addEventListener('pointerup', e => {
   const power = Math.min(105, speed * 0.8 + 12) / speed; vx *= power; vy *= power;
   hadOpponent = discs.some(d => d.state === 'board' && side(d.owner) !== side(player));
   shot = { touched: new Set([staged.id]), opponentContact: false, side: side(player), sideOf: side };
+  sound.play('flick', Math.hypot(vx, vy), staged.x, staged.y);
   staged.vx = vx; staged.vy = vy; used[player]++; phase = 'moving';
   banner.textContent = 'Let it slide'; hint.textContent = 'Waiting for the board to settle…'; hud();
 });
@@ -126,15 +273,24 @@ let last = performance.now(), accumulator = 0;
 function tick(now: number) {
   accumulator += Math.min((now - last) / 1000, 0.05); last = now;
   while (accumulator >= 1 / 120) {
-    if (phase === 'moving' && shot) { step(discs, 1 / 120, shot); if (!discs.some(moving)) finishShot(); }
+    if (phase === 'moving' && shot) { step(discs, 1 / 120, shot, true, sound.impact); if (!discs.some(moving)) finishShot(); }
     accumulator -= 1 / 120;
   }
-  next.disabled = phase === 'pass' && now < readyAt;
+  next.disabled = phase === 'pass' && (now < readyAt || orbitPointer !== null || pinching);
+  sound.setListenerYaw(scene.getYaw());
+  const controlsLocked = phase !== 'pass' || pointer !== null || orbitPointer !== null || pinching;
+  canvas.classList.toggle('can-orbit', phase === 'pass');
+  canvas.classList.toggle('is-orbiting', orbitPointer !== null);
+  $<HTMLButtonElement>('view-center').disabled = controlsLocked;
+  for (const name of ['seated', 'standing']) $<HTMLButtonElement>(`view-${name}`).disabled = controlsLocked;
+  $<HTMLButtonElement>('zoom-in').disabled = controlsLocked || zoom >= 2.5;
+  $<HTMLButtonElement>('zoom-out').disabled = controlsLocked || zoom <= 0.75;
+  $<HTMLButtonElement>('zoom-reset').disabled = controlsLocked;
   scene.syncDiscs(discs); requestAnimationFrame(tick);
 }
 try {
   const savedSkin = localStorage.getItem('crokinole-skin'); if (savedSkin && ['maple', 'walnut', 'slate'].includes(savedSkin)) { skin.value = savedSkin; scene.setSkin(savedSkin); }
-  const art = localStorage.getItem('crokinole-art'); if (art) { const image = new Image(); image.onload = () => scene.setSkin(skin.value, image); image.src = art; }
+  const art = localStorage.getItem('crokinole-art'); if (art) { const version = ++artworkVersion; const image = new Image(); $<HTMLButtonElement>('remove-art').disabled = false; image.onload = () => { if (version === artworkVersion) scene.setSkin(skin.value, image); }; image.src = art; }
   const raw = localStorage.getItem('crokinole-match');
   if (raw) {
     const data = JSON.parse(raw);

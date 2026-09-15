@@ -1,9 +1,10 @@
 import * as THREE from 'three';
+import { discHalfHeight } from '../sim/hole';
 import type { Disc } from '../sim/physics';
 import { BOARD, DISC, PEGS, pegPositions } from '../sim/constants';
 
-// Phase 1: static 3D board preview. No sim, no input yet.
-// Camera yaw rig exists so Phase 7 rotation just animates `yawTarget`.
+import { centeredOrbit, dragOrbit, type BoardView } from './orbit';
+export type { BoardView } from './orbit';
 
 // Disc cross-section with a real round-over on top/bottom edges
 // (see reference photo: flat faces, softly rounded rim, ~1/16" radius).
@@ -46,9 +47,15 @@ export function createScene(canvas: HTMLCanvasElement) {
   rig.add(camera);
 
   let camDist = 48;
-  const polar = THREE.MathUtils.degToRad(25); // tilted top-down
+  let polar = THREE.MathUtils.degToRad(25);
+  let polarTarget = polar;
+  let zoomTarget = 1;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let yaw = 0;
   let yawTarget = 0;
+  let playerYaw = 0;
+  let orbitView: BoardView = 'standing';
+  let orbitAngle = centeredOrbit(orbitView);
 
   function placeCamera() {
     camera.position.set(
@@ -69,16 +76,17 @@ export function createScene(canvas: HTMLCanvasElement) {
   key.shadow.bias = -0.001;
   scene.add(key);
 
-  // Wooden frame measured off a real tournament board (30.5" overall):
-  // play 26" dia, ditch 1.0" wide, rail band 1.25" wide with top +0.4"
+  // Wooden frame: 26" playing surface, 1" ditch, and a slim 1/4" wall.
+  // The wall rises +0.4"
   // above the play surface, 1.8" total board thickness.
   // flatShading is essential: LatheGeometry smooths normals across the
   // square profile corners, which fakes a curved round-over in lighting.
   const DITCH_OUT = 14.0;
-  const RAIL_OUT = 15.25;
+  const RAIL_OUT = DITCH_OUT + 0.25;
   const framePts = [
-    new THREE.Vector2(13.0, 0.0), // inner edge, flush with play surface
-    new THREE.Vector2(13.0, -0.4), // ditch inner wall
+    // The playing-surface cylinder alone owns the exposed inner edge.
+    // A second wall here overlapped it and caused striped depth artifacts.
+    new THREE.Vector2(13.0, -0.4), // ditch floor meets the playing surface
     new THREE.Vector2(DITCH_OUT, -0.4), // ditch floor
     new THREE.Vector2(DITCH_OUT, 0.4), // rail inner wall
     new THREE.Vector2(RAIL_OUT, 0.4), // rail top
@@ -87,7 +95,7 @@ export function createScene(canvas: HTMLCanvasElement) {
   ];
   // Reverse the profile so the top and outside walls face outward.
   const frame = new THREE.Mesh(
-    new THREE.LatheGeometry([...framePts].reverse(), 128),
+    new THREE.LatheGeometry([...framePts].reverse(), 192),
     new THREE.MeshStandardMaterial({ color: '#4a2a14', roughness: 0.55, flatShading: true }),
   );
   frame.castShadow = true;
@@ -97,7 +105,7 @@ export function createScene(canvas: HTMLCanvasElement) {
   // Ditch floor inlay: light maple ring like a real board (covers the
   // lathe ditch floor; sits 0.005" proud to avoid z-fighting).
   const ditchRing = new THREE.Mesh(
-    new THREE.RingGeometry(13.0, DITCH_OUT, 128),
+    new THREE.RingGeometry(13.0, DITCH_OUT, 192),
     new THREE.MeshStandardMaterial({ color: '#d9b77c', roughness: 0.6 }),
   );
   ditchRing.rotation.x = -Math.PI / 2;
@@ -111,7 +119,7 @@ export function createScene(canvas: HTMLCanvasElement) {
   const surfaceSideMat = new THREE.MeshStandardMaterial({ color: '#8a5a24', roughness: 0.6 });
   const surfaceTopMat = new THREE.MeshStandardMaterial({ map: surfaceTex, roughness: 0.35, metalness: 0.05 });
   const surface = new THREE.Mesh(
-    new THREE.CylinderGeometry(BOARD.playRadius, BOARD.playRadius, 0.4, 96),
+    new THREE.CylinderGeometry(BOARD.playRadius, BOARD.playRadius, 0.4, 192),
     [surfaceSideMat, surfaceTopMat, surfaceSideMat],
   );
   surface.position.y = -0.2;
@@ -139,7 +147,11 @@ export function createScene(canvas: HTMLCanvasElement) {
       if (d.state !== 'board') continue;
       let mesh = meshes.get(d.id);
       if (!mesh) { mesh = new THREE.Mesh(discGeo, materials[d.owner]); mesh.castShadow = true; meshes.set(d.id, mesh); scene.add(mesh); }
-      mesh.position.set(d.x, DISC.height / 2 + d.z, d.y);
+      const tilt = d.hole?.tilt ?? 0, lean = d.hole?.lean ?? 0;
+      const halfHeight = discHalfHeight(d);
+      mesh.position.set(d.x, halfHeight + d.z - (d.hole?.dip ?? 0), d.y);
+      mesh.quaternion.setFromAxisAngle(new THREE.Vector3(Math.sin(lean), 0, -Math.cos(lean)), tilt);
+      mesh.rotateY(d.hole?.rollPhase ?? 0);
     }
   }
   const raycaster = new THREE.Raycaster();
@@ -210,7 +222,12 @@ export function createScene(canvas: HTMLCanvasElement) {
     if (art) {
       const scale = Math.max(S / art.width, S / art.height);
       ctx.globalAlpha = 0.7;
-      ctx.drawImage(art, (S - art.width * scale) / 2, (S - art.height * scale) / 2, art.width * scale, art.height * scale);
+      // Cylinder top UVs turn canvas artwork sideways relative to the players.
+      ctx.save();
+      ctx.translate(S / 2, S / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.drawImage(art, -art.width * scale / 2, -art.height * scale / 2, art.width * scale, art.height * scale);
+      ctx.restore();
       ctx.globalAlpha = 1;
     }
     const toPx = (inches: number) => (inches / (BOARD.playRadius * 2)) * S;
@@ -255,7 +272,13 @@ export function createScene(canvas: HTMLCanvasElement) {
   const clock = new THREE.Clock();
   function tick() {
     const dt = Math.min(clock.getDelta(), 0.05);
-    yaw += (yawTarget - yaw) * Math.min(1, dt * 6);
+    const blend = reducedMotion.matches ? 1 : 1 - Math.exp(-dt * 9);
+    yaw += (yawTarget - yaw) * blend;
+    polar += (polarTarget - polar) * blend;
+    if (Math.abs(camera.zoom - zoomTarget) > 0.0001) {
+      camera.zoom += (zoomTarget - camera.zoom) * blend;
+      camera.updateProjectionMatrix();
+    }
     placeCamera();
     renderer.render(scene, camera);
     raf = requestAnimationFrame(tick);
@@ -265,11 +288,34 @@ export function createScene(canvas: HTMLCanvasElement) {
   return {
     syncDiscs,
     boardPoint,
+    getYaw: () => yaw,
+    isViewMoving: () => Math.abs(yawTarget - yaw) > 0.003 || Math.abs(polarTarget - polar) > 0.003 || Math.abs(zoomTarget - camera.zoom) > 0.003,
+    setZoom: (zoom: number) => { zoomTarget = THREE.MathUtils.clamp(zoom, 0.75, 2.5); },
+    setView: (view: BoardView) => {
+      // Seated: about 22 inches above the surface, 42 inches from center
+      // at the base framing distance. Standing preserves the original overview.
+      if (view !== orbitView) {
+        orbitView = view; orbitAngle.polar = centeredOrbit(view).polar;
+        polarTarget = orbitAngle.polar;
+      }
+    },
     setSkin: (skin: string, art?: HTMLImageElement) => {
       surfaceTopMat.map?.dispose(); surfaceTopMat.map = makeSurfaceTexture(skin, art); surfaceTopMat.needsUpdate = true;
     },
     setYawTarget: (radians: number) => {
-      yawTarget = radians;
+      // Travel to the next player's side by the shortest route, then constrain
+      // subsequent orbit offsets relative to that side, including across 0°.
+      playerYaw = yaw + Math.atan2(Math.sin(radians - yaw), Math.cos(radians - yaw));
+      orbitAngle = centeredOrbit(orbitView);
+      yawTarget = playerYaw; polarTarget = orbitAngle.polar;
+    },
+    dragView: (horizontal: number, vertical: number) => {
+      orbitAngle = dragOrbit(orbitAngle, horizontal, vertical, orbitView);
+      yawTarget = playerYaw + orbitAngle.offset; polarTarget = orbitAngle.polar;
+    },
+    centerView: () => {
+      orbitAngle = centeredOrbit(orbitView);
+      yawTarget = playerYaw; polarTarget = orbitAngle.polar;
     },
     dispose: () => {
       cancelAnimationFrame(raf);
