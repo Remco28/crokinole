@@ -12,8 +12,8 @@ the disc. Getting ready preserves your chosen zoom and score layout.
 Framing shifts upward slightly to leave more room below the rim.
 
 Flick strength uses the original power response (speed × 0.8 + 12, capped at
-105), after rejecting stationary gestures. Surface friction is restored to
-0.11 for the earlier glide, with collision bounce unchanged.
+105), after rejecting stationary gestures. Surface friction is set to 0.115 for
+a slightly shorter glide, with flick power and collision bounce unchanged.
 
 Tap the painted shooting line to place your disc, including small adjustments
 beside its current position. **Adjust view** returns from aiming to camera controls

@@ -32,7 +32,7 @@ export const PEG_COLLISION_RADIUS = PEGS.radius + DISC.radius;
 
 // Tunables (debug panel can tweak live in later phases).
 export const TUNE = {
-  frictionMu: 0.11,
+  frictionMu: 0.115, // slight extra board grip without changing flick power
   frictionViscous: 0.05,
   restitutionDisc: 0.8,
   restitutionPeg: 0.62,
