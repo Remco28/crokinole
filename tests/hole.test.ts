@@ -39,7 +39,10 @@ describe('twenty hole contact', () => {
   it('spends existing shot energy on the hop and tipping', () => {
     for (const speed of [35, 50, 80, 105]) for (const offset of [0, 0.15, 0.35, 0.55]) {
       const { disc: d, events } = crossing(speed, offset);
-      expect(events.filter(e => e.kind === 'lip')).toHaveLength(1);
+      // A slow centered crossing may now tip fully through the experimental
+      // drop-through radius before it reaches the far lip.
+      if (d.state === 'sunk') expect(events.filter(e => e.kind === 'sink')).toHaveLength(1);
+      else expect(events.filter(e => e.kind === 'lip')).toHaveLength(1);
       const inertia = DISC.radius ** 2 / 4 + DISC.height ** 2 / 12;
       const energy = d.vx ** 2 + d.vy ** 2 + d.vz ** 2 + inertia * (d.hole?.tiltSpeed ?? 0) ** 2;
       expect(energy).toBeLessThan(speed ** 2);

@@ -73,6 +73,9 @@ hole size) and `DISC.radius` (disc size). The softer gameplay controls are:
 
 - `BOARD.holeCaptureRadius`: how far from the center a slow disc receives a
   gentle inward pull. Current value: `0.60` inches.
+- `BOARD.holeDropRadius`: the center offset where a dipped, slow disc may tip
+  through after losing support. Current experiment: `0.14` inches. This is
+  separate from the strict `holeRadius - discRadius` clearance.
 - `TUNE.holeCaptureSpeed`: the maximum speed for that pull and for sinking.
   Current value: `36 in/s` (raised from `28` in small experiments).
 - `TUNE.holeWeightShiftSpeed`: the upper speed for a weaker grounded weight-shift

@@ -10,6 +10,7 @@ export const BOARD = {
   holeRadius: 1.375 / 2,
   holeDepth: 0.24, // about 64% of the disc height; top sits closer to flush
   holeCaptureRadius: 0.6, // wider slow inward settling region; full clearance required to score
+  holeDropRadius: 0.14, // center offset at which a dipped, slow disc can tip through
   lineWidth: 1 / 16,
 } as const;
 
