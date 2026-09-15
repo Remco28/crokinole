@@ -85,8 +85,9 @@ export function createScene(canvas: HTMLCanvasElement) {
     new THREE.Vector2(RAIL_OUT, -1.4), // outer wall
     new THREE.Vector2(0.0, -1.4), // underside to center
   ];
+  // Reverse the profile so the top and outside walls face outward.
   const frame = new THREE.Mesh(
-    new THREE.LatheGeometry(framePts, 128),
+    new THREE.LatheGeometry([...framePts].reverse(), 128),
     new THREE.MeshStandardMaterial({ color: '#4a2a14', roughness: 0.55, flatShading: true }),
   );
   frame.castShadow = true;
@@ -228,8 +229,8 @@ export function createScene(canvas: HTMLCanvasElement) {
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
       ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(a) * toPx(BOARD.ring5), cx + Math.sin(a) * toPx(BOARD.ring5));
-      ctx.lineTo(cx + Math.cos(a) * toPx(BOARD.playRadius - 0.15), cx + Math.sin(a) * toPx(BOARD.playRadius - 0.15));
+      ctx.moveTo(cx + Math.cos(a) * toPx(BOARD.ring10), cx + Math.sin(a) * toPx(BOARD.ring10));
+      ctx.lineTo(cx + Math.cos(a) * toPx(BOARD.ring5), cx + Math.sin(a) * toPx(BOARD.ring5));
       ctx.stroke();
     }
     const tex = new THREE.CanvasTexture(cv);

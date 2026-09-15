@@ -36,7 +36,7 @@ Sim units: **1 unit = 1 inch**, board center at (0,0).
 | Scoring rings (radius) | 4" / 8" / 12" | 15pts < 4, 10pts < 8, 5pts < 12 |
 | Center 20-hole dia | 1-3/8" (34.9 mm), ~5mm deep | radius 0.6875 |
 | Disc (tournament) | 1-1/4" dia x 3/8" thick (31.8 x 9.5mm) | radius 0.625, height 0.375 |
-| Pegs x8 | ~1cm dia latex sleeve, 3.6cm tall | radius ~0.197, on 4" circle every 45° |
+| Pegs x8 | ~1cm dia latex sleeve, 3.6cm tall | radius ~0.197, on 4" circle every 45°, offset 22.5° |
 | Disc-peg collision radius | peg r + disc r | ~0.822 |
 | Outer rail / ditch | beyond 13" radius | out if center > 13.0 or touching outer line at rest |
 | Shooting quadrants | 4 quadrants, stage arc between lines in 12–13" band | per player index |
@@ -194,3 +194,7 @@ Corrections to the original plan:
 
 Still pending: aim ghost, sink animation/particles, real-device tuning, debug
 sliders, haptics, art opacity/contrast controls, and full PWA/offline support.
+
+Board geometry correction: outward-facing solid frame walls; pegs offset 22.5°
+to clear each central shooting lane; quadrant dividers span the 8–12 inch
+5-point band.

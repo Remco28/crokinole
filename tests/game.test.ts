@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DISC, PEGS, pegPositions } from '../src/sim/constants';
 import { makeDisc, moving, step, type Shot } from '../src/sim/physics';
 import { points, resolveShot, roundScore } from '../src/game/rules';
 const shot = (): Shot => ({ touched: new Set([1]), opponentContact: false, side: 0, sideOf: n => n });
@@ -26,14 +27,22 @@ describe('scoring and legal shots', () => {
   });
 });
 describe('physics', () => {
+  it('leaves a disc-width shooting lane from all four sides', () => {
+    for (const p of pegPositions()) {
+      expect(Math.hypot(p.x, p.y)).toBeCloseTo(PEGS.ringRadius);
+      expect(Math.abs(p.x)).toBeGreaterThan(PEGS.radius + DISC.radius);
+      expect(Math.abs(p.y)).toBeGreaterThan(PEGS.radius + DISC.radius);
+    }
+  });
   it('captures a slow central shot and lets a fast shot pass', () => {
     const slow = makeDisc(1, 0, 0.2, 0); slow.vx = -5; step([slow], 1 / 120, shot()); expect(slow.state).toBe('sunk');
     const fast = makeDisc(1, 0, 0.2, 0); fast.vx = 80; step([fast], 1 / 120, shot()); expect(fast.state).toBe('board');
   });
   it('reflects fast peg hits without tunneling', () => {
-    const d = makeDisc(1, 0, 6, 0); d.vx = -100;
+    const a = PEGS.angleOffset;
+    const d = makeDisc(1, 0, 6 * Math.cos(a), 6 * Math.sin(a)); d.vx = -100 * Math.cos(a); d.vy = -100 * Math.sin(a);
     for (let i = 0; i < 3; i++) step([d], 1 / 120, shot(), false);
-    expect(d.vx).toBeGreaterThan(0); expect(d.x).toBeGreaterThan(4);
+    expect(d.vx).toBeGreaterThan(0); expect(Math.hypot(d.x, d.y)).toBeGreaterThan(4);
   });
   it('transfers momentum and records opponent contact', () => {
     const a = makeDisc(1, 0, 0, 6), b = makeDisc(2, 1, 1.3, 6); a.vx = 50; const s = shot();

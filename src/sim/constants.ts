@@ -20,6 +20,7 @@ export const PEGS = {
   count: 8,
   radius: 0.5 / 2.54, // ~1cm dia -> inches (~0.197)
   ringRadius: 4.0, // on the 15-circle, every 45deg
+  angleOffset: Math.PI / 8, // leave each player’s center shooting lane open
   height: 3.6 / 2.54, // 3.6cm tall, visual only
 } as const;
 
@@ -44,7 +45,7 @@ export const TUNE = {
 export function pegPositions(): { x: number; y: number }[] {
   const out: { x: number; y: number }[] = [];
   for (let i = 0; i < PEGS.count; i++) {
-    const a = (i / PEGS.count) * Math.PI * 2;
+    const a = (i / PEGS.count) * Math.PI * 2 + PEGS.angleOffset;
     out.push({ x: Math.cos(a) * PEGS.ringRadius, y: Math.sin(a) * PEGS.ringRadius });
   }
   return out;
