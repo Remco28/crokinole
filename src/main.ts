@@ -99,17 +99,31 @@ const label = (i: number) => mode === 'teams' ? ['Coral + Gold', 'Blue + Sage'][
 function save() {
   try { localStorage.setItem('crokinole-match', JSON.stringify({ mode, player, round, id, discs: discs.filter(d => d !== staged || phase !== 'aim' && phase !== 'pass'), scores, used, phase: phase === 'aim' ? 'pass' : phase, review, roundResult, deadline })); } catch { /* Storage is optional. */ }
 }
+let scoreboardExpanded = false, roundBoardFocus = false;
+const eyeIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.2 12s3.6-6 9.8-6 9.8 6 9.8 6-3.6 6-9.8 6-9.8-6-9.8-6Z"></path><circle cx="12" cy="12" r="2.6"></circle></svg>';
 function hud() {
-  $('scoreboard').innerHTML = scores.map((score, i) => `<div class="score ${side(player) === i ? 'active' : ''}" style="--player:${colors[i]}"><span class="dot"></span><div><span class="name">${label(i)}</span><small>${discs.filter(d => side(d.owner) === i && d.state === 'sunk').length} twenties this round</small><small>${mode === 'teams' ? used.filter((_, p) => side(p) === i).reduce((a, b) => a + b, 0) : used[i]}/${mode === 'ffa' ? 6 : 12} played</small></div><div class="match-total"><strong>${score}</strong><small>Match</small></div></div>`).join('');
+  const scoreboard = $('scoreboard');
+  scoreboard.dataset.expanded = String(scoreboardExpanded);
+  const cards = scores.map((score, i) => `<div class="score ${side(player) === i ? 'active' : ''}" style="--player:${colors[i]}"><span class="dot"></span><div><span class="name">${label(i)}</span><small>${discs.filter(d => side(d.owner) === i && d.state === 'sunk').length} twenties this round</small><small>${mode === 'teams' ? used.filter((_, p) => side(p) === i).reduce((a, b) => a + b, 0) : used[i]}/${mode === 'ffa' ? 6 : 12} played</small></div><div class="match-total"><strong>${score}</strong><small>Match</small></div></div>`).join('');
+  scoreboard.innerHTML = `${cards}<button class="scoreboard-toggle" type="button" aria-expanded="${scoreboardExpanded}" aria-label="${scoreboardExpanded ? 'Show compact scores' : 'Show full scores'}">⌄</button>`;
   $('round-label').textContent = `ROUND ${round} · FIRST TO 100`;
   assignDitchSlots(discs);
   scene.syncDiscs(discs, review);
   const summary = $('round-summary');
   summary.hidden = !roundResult;
   if (roundResult) {
-    summary.innerHTML = `<h2>Round ${round} · score breakdown</h2><table><thead><tr><th scope="col">Side</th><th scope="col">20s</th><th scope="col">15s</th><th scope="col">10s</th><th scope="col">5s</th><th scope="col">Total</th><th scope="col">Added</th></tr></thead><tbody>${roundResult.sides.map((row, i) => `<tr><th scope="row">${label(i)}</th><td>${row.twenties}</td><td>${row.fifteens}</td><td>${row.tens}</td><td>${row.fives}</td><td>${row.total}</td><td><strong>+${row.awarded}</strong></td></tr>`).join('')}</tbody></table><p>Disc counts × ring value = total. ${mode === 'ffa' ? 'Each player adds their own total.' : 'Only the difference is added to the winning side.'}</p>`;
-  }
+    summary.dataset.boardFocus = String(roundBoardFocus);
+    summary.innerHTML = `<div class="summary-heading"><h2>Round ${round} · score breakdown</h2><button class="round-board-toggle" type="button" aria-expanded="${!roundBoardFocus}" aria-label="${roundBoardFocus ? 'Show round scores' : 'Show game board'}">${eyeIcon}</button></div><table><thead><tr><th scope="col">Side</th><th scope="col">20s</th><th scope="col">15s</th><th scope="col">10s</th><th scope="col">5s</th><th scope="col">Total</th><th scope="col">Added</th></tr></thead><tbody>${roundResult.sides.map((row, i) => `<tr><th scope="row">${label(i)}</th><td>${row.twenties}</td><td>${row.fifteens}</td><td>${row.tens}</td><td>${row.fives}</td><td>${row.total}</td><td><strong>+${row.awarded}</strong></td></tr>`).join('')}</tbody></table><p>Disc counts × ring value = total. ${mode === 'ffa' ? 'Each player adds their own total.' : 'Only the difference is added to the winning side.'}</p>`;
+  } else summary.dataset.boardFocus = 'false';
 }
+$('scoreboard').addEventListener('click', event => {
+  if (!(event.target as HTMLElement).closest('.scoreboard-toggle')) return;
+  scoreboardExpanded = !scoreboardExpanded; hud();
+});
+$('round-summary').addEventListener('click', event => {
+  if (!(event.target as HTMLElement).closest('.round-board-toggle')) return;
+  roundBoardFocus = !roundBoardFocus; hud();
+});
 function pass(message = '', restoreClock = false) {
   phase = 'pass'; staged = null;
   if (!restoreClock) deadline = shotSeconds ? Date.now() + 850 + shotSeconds * 1000 : null;
