@@ -1,5 +1,16 @@
 # Crokinole · Around the board
 
+Desktop screens use a left control sidebar and a separate board on the right.
+Phones keep the scores and view controls above the board. A small status label
+identifies View or Shoot mode; Center is a secondary view action. Sound controls
+live in Settings, with game mode and Start new match at the top.
+
+To shoot, start behind your disc (including outside the rim) and flick through
+it. Contact launches the disc immediately, so you can follow through before
+lifting your finger. Missed swipes do not shoot. Tap the shooting line to place
+the disc. Getting ready fits the board with space below the rim and collapses
+mobile score details to leave room for the gesture.
+
 Tap the painted shooting line to place your disc, including small adjustments
 beside its current position. **Adjust view** returns from aiming to camera controls
 without moving the disc or resetting your clock. The shot clock defaults to
@@ -35,20 +46,18 @@ your angle within your shooting quadrant (45° either side). Vertical dragging
 adjusts your elevation within the selected seated or standing view. **Center**
 resets the angle. Each turn starts facing the next player's side.
 
-Use **Seated / Standing** above the board before getting ready. **Ready to shoot**
+Use **Seated / Standing** under Board view before getting ready. **Ready to shoot**
 seats you if needed, preserves a chosen seated angle, and locks the camera and
 zoom for the shot. Shooting and disc placement are available only while seated;
 camera transitions finish before accepting a flick.
 
-Zoom with the **− / +** buttons, the mouse wheel over the board, or a two-finger
-pinch. Click the percentage to reset to the full-board framing. Zoom ranges from
-75% to 250%, starts at 120%, and persists across reloads. At high zoom the edges
-can leave the viewport; reset or zoom out to see them again. Pinching cancels a
-view drag, and zoom is locked once you press Ready to shoot.
+Two-finger pinch adjusts zoom while viewing. Each handover fits the board again;
+getting ready leaves additional room for your flick. Pinching cancels a view
+drag, and zoom is locked once you get ready to shoot.
 
 Use **Settings** for rules, board finishes, image uploads, new matches, and sound
 volume. **Preview sounds** plays soft, medium, and firm wood clicks, then a peg knock, twenty, and ditch
-clatter. The **Sound on/off** button above the board mutes the table.
+clatter. The **Sound on/off** button in Settings mutes the table.
 
 ## Implemented
 
