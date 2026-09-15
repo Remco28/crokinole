@@ -1,5 +1,5 @@
 import { BoardSound } from './audio/sound';
-import { canStartFlick, flickContact } from './game/flick';
+import { canStartFlick, crossesDisc, releaseVelocity } from './game/flick';
 import { createScene, type BoardView } from './render/scene';
 import { makeDisc, moving, step, type Disc, type Shot } from './sim/physics';
 import { completeRound, inspectShot, sideOf, type Mode, type RoundResult } from './game/rules';
@@ -236,6 +236,7 @@ function cancelOrbit() { orbitPointer = null; }
 let trail: { x: number; y: number; t: number }[] = [];
 let press = { x: 0, y: 0 };
 let flickEligible = false;
+let discCrossed = false;
 function placeAt(clientX: number, clientY: number) {
   if (!staged) return;
   // Placement targets the painted surface, not the elevated flick plane.
@@ -277,6 +278,7 @@ canvas.addEventListener('pointerdown', e => {
   if (e.pointerType !== 'touch' && e.button !== 0) return;
   const p = scene.boardPoint(e.clientX, e.clientY); if (!p) return;
   flickEligible = canStartFlick(p, staged);
+  discCrossed = false;
   press = { x: e.clientX, y: e.clientY };
   pointer = e.pointerId; trail = [{ ...p, t: performance.now() }]; canvas.setPointerCapture(pointer);
 });
@@ -298,15 +300,19 @@ canvas.addEventListener('pointermove', e => {
   }
   if (e.pointerId !== pointer) return;
   const p = scene.boardPoint(e.clientX, e.clientY); if (!p) return;
-  sampleFlick(p, e.clientX, e.clientY);
+  sampleFlick(p);
 });
-function sampleFlick(p: { x: number; y: number }, clientX: number, clientY: number) {
+function sampleFlick(p: { x: number; y: number }) {
   if (phase !== 'aim' || !staged || settings.open || scene.isViewMoving()) return;
   if (deadline !== null && Date.now() >= deadline) { expireShot(); return; }
   const t = performance.now();
   trail.push({ ...p, t });
-  const velocity = flickEligible && Math.hypot(clientX - press.x, clientY - press.y) >= 5 ? flickContact(trail, staged) : null;
-  trail = trail.filter(sample => t - sample.t < 110);
+  discCrossed ||= flickEligible && crossesDisc(trail, staged);
+  trail = trail.filter(sample => t - sample.t <= 120);
+}
+function releaseFlick() {
+  if (phase !== 'aim' || !staged || !discCrossed) return;
+  const velocity = releaseVelocity(trail, staged);
   if (!velocity) return;
   cancel();
   hadOpponent = discs.some(d => d.state === 'board' && side(d.owner) !== side(player));
@@ -316,7 +322,7 @@ function sampleFlick(p: { x: number; y: number }, clientX: number, clientY: numb
   next.hidden = true;
   banner.textContent = 'Let it slide'; hint.textContent = 'Waiting for the board to settle…'; hud();
 }
-function cancel() { pointer = null; trail = []; flickEligible = false; }
+function cancel() { pointer = null; trail = []; flickEligible = false; discCrossed = false; }
 function endPointer(e: PointerEvent) {
   touches.delete(e.pointerId);
   if (touches.size === 0) { pinching = false; pinchDistance = 0; }
@@ -340,7 +346,7 @@ canvas.addEventListener('pointerup', e => {
     cancel(); placeAt(e.clientX, e.clientY); return;
   }
   const p = scene.boardPoint(e.clientX, e.clientY);
-  if (p) sampleFlick(p, e.clientX, e.clientY);
+  if (p) { sampleFlick(p); releaseFlick(); }
   cancel();
 });
 function finishShot() {

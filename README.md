@@ -6,12 +6,13 @@ identifies View or Shoot mode; Center is a secondary view action. Sound controls
 live in Settings, with game mode and Start new match at the top.
 
 To shoot, start behind your disc (including outside the rim) and flick through
-it. Contact launches the disc immediately, so you can follow through before
-lifting your finger. Missed swipes do not shoot. Tap the shooting line to place
+it. Contact is remembered; lifting your finger launches the disc using the
+last 120 milliseconds of the gesture, including follow-through. Missed swipes do not shoot. Tap the shooting line to place
 the disc. Getting ready preserves your chosen zoom and score layout.
 Framing shifts upward slightly to leave more room below the rim.
 
-Gentle flicks have no minimum-power boost. Surface friction is restored to
+Flick strength uses the original power response (speed × 0.8 + 12, capped at
+105), after rejecting stationary gestures. Surface friction is restored to
 0.11 for the earlier glide, with collision bounce unchanged.
 
 Tap the painted shooting line to place your disc, including small adjustments
