@@ -24,6 +24,14 @@ describe('twenty hole contact', () => {
     expect(result.events.map(e => e.kind)).toEqual(['sink']);
     expect(Math.hypot(result.disc.x, result.disc.y)).toBeLessThanOrEqual(0.0625);
   });
+  it('allows only one disc to claim the center hole', () => {
+    const first = makeDisc(1, 0, -1.5, 0), second = makeDisc(2, 1, -1.5, 0.2);
+    first.vx = 25;
+    for (let i = 0; i < 600 && moving(first); i++) step([first], 1 / 120, shot());
+    second.vx = 25;
+    for (let i = 0; i < 600 && moving(second); i++) step([first, second], 1 / 120, shot());
+    expect([first, second].filter(d => d.state === 'sunk')).toHaveLength(1);
+  });
   it('lets a supported disc rest at the lip without awarding twenty', () => {
     const d = makeDisc(1, 0, 0.6, 0);
     for (let i = 0; i < 120; i++) step([d], 1 / 120, shot());

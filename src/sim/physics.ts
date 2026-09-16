@@ -12,6 +12,9 @@ export function step(discs: Disc[], dt: number, shot: Shot, airborne = true, emi
   const steps = Math.max(1, ...discs.filter(d => d.state === 'board').map(d =>
     Math.ceil(Math.hypot(d.vx, d.vy) * dt / (Math.hypot(d.x, d.y) < 1.6 ? 0.035 : TUNE.maxStepMove))));
   const h = dt / steps;
+  // Crokinole's center hole holds one disc. A sunk disc, or the first disc that
+  // claims the opening during this step, blocks later discs from sinking too.
+  let holeOccupied = discs.some(d => d.state === 'sunk');
   for (let n = 0; n < steps; n++) {
     for (const d of discs) {
       if (d.state !== 'board') continue;
@@ -31,7 +34,8 @@ export function step(discs: Disc[], dt: number, shot: Shot, airborne = true, emi
       // Only leaving the playing surface is immediate. Line-touching discs remain
       // hittable until the whole shot has settled, then rules remove them.
       if (radius > BOARD.playRadius) { emit?.({ kind: 'ditch', speed: Math.max(12, v), x: d.x, y: d.y, key: `ditch:${d.id}` }); d.state = 'out'; continue; }
-      interactWithHole(d, previousRadius, h, airborne, emit);
+      interactWithHole(d, previousRadius, h, airborne, emit, holeOccupied);
+      if ((d as Disc).state === 'sunk') holeOccupied = true;
       if (d.state !== 'board') continue;
       for (const p of pegs) {
         if (d.z > PEGS.height) continue;

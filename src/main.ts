@@ -3,6 +3,7 @@ import { canStartFlick, crossesDisc, releaseVelocity } from './game/flick';
 import { createScene, type BoardView } from './render/scene';
 import { makeDisc, moving, step, type Disc, type PhysicsEvent, type Shot } from './sim/physics';
 import { holeOverlapFraction } from './sim/hole';
+import { TUNE } from './sim/constants';
 import { completeRound, inspectShot, sideOf, type Mode, type RoundResult } from './game/rules';
 import { assignDitchSlots, beginReview, reviewDuration, type ShotReview } from './game/review';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -55,7 +56,7 @@ function renderHoleDebug() {
 }
 function recordHole(d: Disc, kind: string, speed = Math.hypot(d.vx, d.vy)) {
   const offset = Math.hypot(d.x, d.y);
-  holeDebugEntries.push({ disc: d.id, kind, speed, offset, overlap: holeOverlapFraction(offset), dip: d.hole?.dip ?? 0, tilt: Math.abs(d.hole?.tilt ?? 0), capture: speed < 36 });
+  holeDebugEntries.push({ disc: d.id, kind, speed, offset, overlap: holeOverlapFraction(offset), dip: d.hole?.dip ?? 0, tilt: Math.abs(d.hole?.tilt ?? 0), capture: speed < TUNE.holeCaptureSpeed });
   if (holeDebugEntries.length > 32) holeDebugEntries.shift();
   renderHoleDebug();
 }
