@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { discHalfHeight } from '../sim/hole';
 import type { Disc } from '../sim/physics';
 import { BOARD, DISC, PEGS, pegPositions } from '../sim/constants';
 import { DITCH_SLOTS, REVIEW_TIMING, type ShotReview } from '../game/review';
@@ -121,12 +122,24 @@ export function createScene(canvas: HTMLCanvasElement) {
   const surfaceSideMat = new THREE.MeshStandardMaterial({ color: '#8a5a24', roughness: 0.6 });
   const surfaceTopMat = new THREE.MeshStandardMaterial({ map: surfaceTex, roughness: 0.35, metalness: 0.05 });
   const surface = new THREE.Mesh(
-    new THREE.CylinderGeometry(BOARD.playRadius, BOARD.playRadius, 0.4, 192),
-    [surfaceSideMat, surfaceTopMat, surfaceSideMat],
+    new THREE.CylinderGeometry(BOARD.playRadius, BOARD.playRadius, 0.4, 192, 1, true),
+    surfaceSideMat,
   );
   surface.position.y = -0.2;
   surface.receiveShadow = true;
   scene.add(surface);
+  // A real opening: the tabletop occludes the falling disc outside the hole.
+  const topGeo = new THREE.RingGeometry(BOARD.holeRadius, BOARD.playRadius, 192);
+  const topPositions = topGeo.getAttribute('position'), topUV = topGeo.getAttribute('uv');
+  for (let i = 0; i < topPositions.count; i++) topUV.setXY(i,
+    0.5 + topPositions.getX(i) / (2 * BOARD.playRadius),
+    0.5 - topPositions.getY(i) / (2 * BOARD.playRadius));
+  const top = new THREE.Mesh(topGeo, surfaceTopMat);
+  top.rotation.x = -Math.PI / 2; top.receiveShadow = true; scene.add(top);
+  const cavityDepth = -ditchRing.position.y;
+  const holeWall = new THREE.Mesh(new THREE.CylinderGeometry(BOARD.holeRadius, BOARD.holeRadius, cavityDepth, 96, 1, true),
+    new THREE.MeshStandardMaterial({ color: surfaceSideMat.color, roughness: 0.85, side: THREE.BackSide }));
+  holeWall.position.y = -cavityDepth / 2; holeWall.receiveShadow = true; scene.add(holeWall);
 
   // Exposed rubber sleeves with brass screw heads, rather than full-length
   // pale cylinders. The mounting thread belongs below the playing surface.
@@ -164,7 +177,7 @@ export function createScene(canvas: HTMLCanvasElement) {
   const markers = new Map<number, THREE.Sprite>();
   function syncDiscs(discs: Disc[], review: ShotReview | null = null) {
     const removals = new Map(review?.removed.map(d => [d.id, d]) ?? []);
-    const visible = new Set(discs.filter(d => d.state !== 'sunk' || removals.has(d.id)).map(d => d.id));
+    const visible = new Set(discs.filter(d => d.state !== 'sunk' || !d.holeCleared || removals.has(d.id)).map(d => d.id));
     for (const [id, mesh] of meshes) if (!visible.has(id)) { scene.remove(mesh); mesh.material.dispose(); meshes.delete(id); }
     for (const [id, marker] of markers) if (!removals.has(id)) { scene.remove(marker); marker.material.dispose(); markers.delete(id); }
     for (const d of discs) {
@@ -172,9 +185,28 @@ export function createScene(canvas: HTMLCanvasElement) {
       let mesh = meshes.get(d.id);
       if (!mesh) { mesh = new THREE.Mesh(discGeo, materials[d.owner].clone()); mesh.castShadow = true; meshes.set(d.id, mesh); scene.add(mesh); }
       const source = removals.get(d.id) ?? d;
-      mesh.position.set(source.x, DISC.height / 2 + source.z, source.y);
-      mesh.quaternion.identity();
+      const tilt = source.hole?.tilt ?? 0, lean = source.hole?.lean ?? 0;
+      mesh.position.set(source.x, discHalfHeight(source) + source.z - (source.hole?.dip ?? 0), source.y);
+      mesh.quaternion.setFromAxisAngle(new THREE.Vector3(Math.sin(lean), 0, -Math.cos(lean)), tilt);
+      mesh.rotateY(source.hole?.rollPhase ?? 0);
       mesh.visible = true;
+      if (source.state === 'sunk') {
+        if (mesh.userData.sinkAt === undefined) {
+          mesh.userData.sinkAt = performance.now();
+          mesh.userData.sinkStart = mesh.position.clone();
+          // Preserve a visible falling phase when capture happens between frames.
+          mesh.userData.sinkStart.y = Math.max(mesh.position.y, DISC.height / 2 - 0.06);
+        }
+        const t = reducedMotion.matches ? 1 : Math.min(1, (performance.now() - mesh.userData.sinkAt) / 380);
+        const ease = t * t * (3 - 2 * t);
+        const start = mesh.userData.sinkStart as THREE.Vector3;
+        mesh.position.copy(start).lerp(new THREE.Vector3(0, DISC.height / 2 - cavityDepth, 0), ease);
+        const offset = Math.hypot(source.x, source.y);
+        const angle = Math.atan2(-source.y, -source.x);
+        const tip = Math.min(0.38, offset * 0.65) * Math.sin(Math.PI * t);
+        mesh.quaternion.setFromAxisAngle(new THREE.Vector3(Math.sin(angle), 0, -Math.cos(angle)), tilt * (1 - ease) + tip);
+        mesh.rotateY((source.hole?.rollPhase ?? 0) + 0.12 * Math.sin(2 * Math.PI * t) * (1 - t));
+      }
       let progress = 0;
       if (d.state === 'out') {
         if (mesh.userData.state !== 'out') mesh.userData.outAt = mesh.userData.state === 'board' ? performance.now() : -1000;
@@ -190,7 +222,6 @@ export function createScene(canvas: HTMLCanvasElement) {
         mesh.position.lerp(target, t);
         if (!reducedMotion.matches) mesh.position.y += Math.sin(Math.PI * progress) * 0.8;
         mesh.quaternion.slerp(targetRotation, t);
-        if (source.state === 'sunk' && progress === 0) mesh.visible = false;
       }
       if (review && removals.has(d.id)) {
         let marker = markers.get(d.id);
@@ -214,13 +245,14 @@ export function createScene(canvas: HTMLCanvasElement) {
     return point ? { x: point.x, y: point.z } : null;
   }
 
-  // Center hole (dark inset)
+  // Floor of the recessed twenty pocket.
   const hole = new THREE.Mesh(
     new THREE.CircleGeometry(BOARD.holeRadius, 48),
-    new THREE.MeshBasicMaterial({ color: '#000000' }),
+    ditchRing.material,
   );
   hole.rotation.x = -Math.PI / 2;
-  hole.position.y = 0.005;
+  hole.position.y = -cavityDepth;
+  hole.receiveShadow = true;
   scene.add(hole);
 
   function makeSurfaceTexture(skin = 'maple', art?: HTMLImageElement): THREE.CanvasTexture {

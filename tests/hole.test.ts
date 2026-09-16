@@ -31,6 +31,15 @@ describe('twenty hole contact', () => {
     second.vx = 25;
     for (let i = 0; i < 600 && moving(second); i++) step([first, second], 1 / 120, shot());
     expect([first, second].filter(d => d.state === 'sunk')).toHaveLength(1);
+    expect(second.x).toBeLessThan(-DISC.radius * 2);
+    expect(moving(second)).toBe(false);
+    // Collecting the twenty for the next turn must reopen the hole without
+    // deleting the disc's scoring record.
+    first.holeCleared = true;
+    const third = makeDisc(3, 0, -1.5, 0); third.vx = 25;
+    for (let i = 0; i < 600 && moving(third); i++) step([first, third], 1 / 120, shot());
+    expect(third.state).toBe('sunk');
+    expect(first.state).toBe('sunk');
   });
   it('lets a supported disc rest at the lip without awarding twenty', () => {
     const d = makeDisc(1, 0, 0.6, 0);

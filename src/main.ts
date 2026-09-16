@@ -64,7 +64,7 @@ function physicsImpact(event: PhysicsEvent) {
   sound.impact(event);
   if (!holeDebug || (event.kind !== 'sink' && event.kind !== 'lip')) return;
   const match = event.key.match(/:(\d+)/); const d = match ? discs.find(item => item.id === Number(match[1])) : undefined;
-  if (d) recordHole(d, event.kind === 'sink' ? 'SUNK' : 'LIP EXIT', event.speed);
+  if (d) recordHole(d, event.kind === 'sink' ? 'SUNK' : 'LIP EXIT');
 }
 holeDebugCheckbox.addEventListener('change', () => { holeDebug = holeDebugCheckbox.checked; try { localStorage.setItem('crokinole-hole-debug', String(holeDebug)); } catch { /* optional */ } renderHoleDebug(); });
 renderHoleDebug();
@@ -171,6 +171,7 @@ $('round-summary').addEventListener('click', event => {
   roundBoardFocus = !roundBoardFocus; hud();
 });
 function pass(message = '', restoreClock = false) {
+  for (const d of discs) if (d.state === 'sunk') d.holeCleared = true;
   phase = 'pass'; staged = null;
   if (!restoreClock) deadline = shotSeconds ? Date.now() + 850 + shotSeconds * 1000 : null;
   scene.setYawTarget(yaw()); readyAt = performance.now() + 850;

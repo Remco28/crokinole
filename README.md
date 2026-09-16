@@ -67,6 +67,19 @@ clatter. The **Sound on/off** button in Settings mutes the table.
 
 ### Center-hole tuning guide
 
+Successful captures now render a 380 ms tipping drop into a recessed pocket.
+The pocket floor shares the ditch material and height; its wall is the cut edge
+of the playing surface. The disc stays nearly flush in the pocket through shot
+review, then is collected at handover while its twenty remains in the score.
+Reduced motion shows the settled disc immediately. Board discs also display
+their simulated dip, tilt, and edge rolling.
+
+The current-turn twenty physically blocks grounded discs from entering the
+occupied pocket. Collected twenties no longer block later turns. This fixes
+the previous occupancy guard, which accidentally blocked the rest of the round.
+The visual pocket depth follows the modeled board construction (0.395 inches);
+the physics dip limit remains its existing, separately tuned value.
+
 Settings includes a temporary **Hole physics debug** toggle. When enabled, the
 board shows the latest hole engagements and outcomes with each disc's speed,
 center offset, dip, tilt, and capture status. Use it to distinguish a speed

@@ -1,7 +1,7 @@
 import { discContactRadius, discHalfHeight, holeMoving, interactWithHole, rollingAmount, settleTilt, type HoleMotion } from './hole';
-import { BOARD, PEGS, TUNE, pegPositions } from './constants';
+import { BOARD, DISC, PEGS, TUNE, pegPositions } from './constants';
 
-export interface Disc { id: number; owner: number; x: number; y: number; vx: number; vy: number; z: number; vz: number; state: 'board' | 'sunk' | 'out'; hole?: HoleMotion; ditchSlot?: number }
+export interface Disc { id: number; owner: number; x: number; y: number; vx: number; vy: number; z: number; vz: number; state: 'board' | 'sunk' | 'out'; hole?: HoleMotion; ditchSlot?: number; holeCleared?: boolean }
 export interface PhysicsEvent { kind: 'disc' | 'peg' | 'sink' | 'ditch' | 'land' | 'lip'; speed: number; x: number; y: number; key: string }
 export interface Shot { touched: Set<number>; opponentContact: boolean; side: number; sideOf: (owner: number) => number }
 export const makeDisc = (id: number, owner: number, x: number, y: number): Disc => ({ id, owner, x, y, vx: 0, vy: 0, z: 0, vz: 0, state: 'board' });
@@ -14,7 +14,7 @@ export function step(discs: Disc[], dt: number, shot: Shot, airborne = true, emi
   const h = dt / steps;
   // Crokinole's center hole holds one disc. A sunk disc, or the first disc that
   // claims the opening during this step, blocks later discs from sinking too.
-  let holeOccupied = discs.some(d => d.state === 'sunk');
+  let holeOccupied = discs.some(d => d.state === 'sunk' && !d.holeCleared);
   for (let n = 0; n < steps; n++) {
     for (const d of discs) {
       if (d.state !== 'board') continue;
@@ -34,7 +34,21 @@ export function step(discs: Disc[], dt: number, shot: Shot, airborne = true, emi
       // Only leaving the playing surface is immediate. Line-touching discs remain
       // hittable until the whole shot has settled, then rules remove them.
       if (radius > BOARD.playRadius) { emit?.({ kind: 'ditch', speed: Math.max(12, v), x: d.x, y: d.y, key: `ditch:${d.id}` }); d.state = 'out'; continue; }
-      interactWithHole(d, previousRadius, h, airborne, emit, holeOccupied);
+      if (holeOccupied && d.z < DISC.height) {
+        if (d.hole) { d.hole.dip = 0; d.hole.fall = 0; d.hole.engaged = false; }
+        const distance = Math.hypot(d.x, d.y), limit = DISC.radius * 2;
+        if (distance < limit) {
+          const nx = distance ? d.x / distance : 1, ny = distance ? d.y / distance : 0;
+          d.x = nx * limit; d.y = ny * limit;
+          const normal = d.vx * nx + d.vy * ny;
+          if (normal < 0) {
+            d.vx -= (1 + TUNE.restitutionDisc) * normal * nx;
+            d.vy -= (1 + TUNE.restitutionDisc) * normal * ny;
+            emit?.({ kind: 'disc', speed: -normal, x: d.x, y: d.y, key: `hole-block:${d.id}` });
+          }
+        }
+      }
+      if (!holeOccupied) interactWithHole(d, previousRadius, h, airborne, emit);
       if ((d as Disc).state === 'sunk') holeOccupied = true;
       if (d.state !== 'board') continue;
       for (const p of pegs) {
