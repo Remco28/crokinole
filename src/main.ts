@@ -14,13 +14,14 @@ const settings = $<HTMLDialogElement>('settings');
 const pauseDialog = $<HTMLDialogElement>('pause-dialog');
 let paused = false, pausedRemaining: number | null = null;
 const sound = new BoardSound();
-let volume = 0.65, muted = false, view: BoardView = 'standing', zoom = 1.2, theme: 'light' | 'dark' = 'light';
+let volume = 0.65, muted = false, view: BoardView = 'standing', zoom = 1.2, theme: 'light' | 'dark' = 'light', activeDiscHighlight = true;
 const clampZoom = (value: number) => Math.max(0.75, Math.min(2.5, value));
 try {
   const prefs = JSON.parse(localStorage.getItem('crokinole-table') || '{}');
   if (typeof prefs.volume === 'number' && Number.isFinite(prefs.volume)) volume = Math.max(0, Math.min(1, prefs.volume));
   if (typeof prefs.zoom === 'number' && Number.isFinite(prefs.zoom)) zoom = clampZoom(prefs.zoom);
   muted = prefs.muted === true;
+  if (typeof prefs.activeDiscHighlight === 'boolean') activeDiscHighlight = prefs.activeDiscHighlight;
   if (prefs.view === 'seated') view = 'seated';
   if (prefs.theme === 'dark') theme = 'dark';
 } catch { /* Preferences are optional. */ }
@@ -35,9 +36,15 @@ function tablePreferences() {
   $<HTMLInputElement>('volume').value = String(Math.round(volume * 100));
   $('volume-value').textContent = `${Math.round(volume * 100)}%`;
   $<HTMLInputElement>('theme-toggle').checked = theme === 'dark';
+  $<HTMLInputElement>('active-disc-highlight').checked = activeDiscHighlight;
+  scene?.setActiveDiscHighlight(activeDiscHighlight);
   for (const name of ['seated', 'standing']) $(`view-${name}`).setAttribute('aria-pressed', String(view === name));
-  try { localStorage.setItem('crokinole-table', JSON.stringify({ volume, muted, view, zoom, theme })); } catch { /* optional */ }
+  try { localStorage.setItem('crokinole-table', JSON.stringify({ volume, muted, view, zoom, theme, activeDiscHighlight })); } catch { /* optional */ }
 }
+const activeDiscHighlightSetting = document.createElement('label');
+activeDiscHighlightSetting.className = 'theme-setting';
+activeDiscHighlightSetting.innerHTML = '<input id="active-disc-highlight" type="checkbox" checked> Highlight active disc';
+$('theme-toggle').parentElement!.after(activeDiscHighlightSetting);
 async function unlockSound() {
   if (paused) return;
   if (!await sound.unlock()) $('sound-note').textContent = 'Audio could not start. Tap Preview sounds to try again.';
@@ -55,6 +62,9 @@ $<HTMLInputElement>('volume').addEventListener('input', e => {
 });
 $<HTMLInputElement>('theme-toggle').addEventListener('change', e => {
   theme = (e.target as HTMLInputElement).checked ? 'dark' : 'light'; tablePreferences();
+});
+$<HTMLInputElement>('active-disc-highlight').addEventListener('change', e => {
+  activeDiscHighlight = (e.target as HTMLInputElement).checked; tablePreferences();
 });
 $('sound-preview').addEventListener('click', async () => {
   if (muted || volume === 0) { $('sound-note').textContent = 'Enable sound and raise the volume to hear the preview.'; return; }

@@ -166,7 +166,7 @@ export function createScene(canvas: HTMLCanvasElement) {
   const materials = PLAYER_COLORS.map(color => new THREE.MeshStandardMaterial({ color, roughness: 0.3 }));
   let pausedAt: number | null = null, pausedDuration = 0;
   const animationNow = () => (pausedAt ?? performance.now()) - pausedDuration;
-  let activeDisc: number | null = null, highlightAt = 0;
+  let activeDisc: number | null = null, highlightAt = 0, activeHighlightEnabled = true;
   const activeRing = new THREE.Mesh(new THREE.RingGeometry(DISC.radius + 0.07, DISC.radius + 0.13, 64), new THREE.MeshBasicMaterial({ color: '#fff3c4', transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
   activeRing.rotation.x = -Math.PI / 2; activeRing.visible = false; scene.add(activeRing);
   const markerCanvas = document.createElement('canvas'); markerCanvas.width = markerCanvas.height = 256;
@@ -181,7 +181,7 @@ export function createScene(canvas: HTMLCanvasElement) {
   markerTexture.colorSpace = THREE.SRGBColorSpace;
   const markers = new Map<number, THREE.Sprite>();
   function syncDiscs(discs: Disc[], review: ShotReview | null = null) {
-    const active = discs.find(d => d.id === activeDisc && d.state === 'board');
+    const active = activeHighlightEnabled ? discs.find(d => d.id === activeDisc && d.state === 'board') : undefined;
     const age = (animationNow() - highlightAt) / 1000;
     // Two slow, smooth pulses, followed by a quiet persistent outline.
     const pulse = reducedMotion.matches || age >= 2.8 ? 0 : Math.sin(Math.PI * age / 1.4) ** 2;
@@ -389,6 +389,7 @@ export function createScene(canvas: HTMLCanvasElement) {
 
   return {
     highlightDisc: (id: number | null) => { activeDisc = id; highlightAt = animationNow(); },
+    setActiveDiscHighlight: (enabled: boolean) => { activeHighlightEnabled = enabled; if (!enabled) activeRing.visible = false; },
     setPaused: (paused: boolean) => {
       if (paused && pausedAt === null) pausedAt = performance.now();
       else if (!paused && pausedAt !== null) { pausedDuration += performance.now() - pausedAt; pausedAt = null; }

@@ -30,6 +30,8 @@ animations. **Resume game** continues from that point. A paused table stays paus
 after reload, including a shot in flight. Pause before putting the game away.
 The active shooting disc pulses gently twice, then keeps a quiet outline until
 it is played. Reduced-motion preferences replace the pulses with a steady highlight.
+Settings includes a **Highlight active disc** switch, enabled by default, for
+players who prefer a quieter table.
 
 Shots now pause briefly before automatic handover: 1.25 seconds normally,
 2 seconds for fouls, followed by a visible removal animation. Contrasting
