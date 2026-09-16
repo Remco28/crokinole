@@ -87,7 +87,7 @@ hole size) and `DISC.radius` (disc size). The softer gameplay controls are:
 Only one disc can occupy the 20 hole. A disc that claims it blocks later discs
 from sinking until it exits or the shot is resolved.
 - `TUNE.holeCaptureSpeed`: the maximum speed for that pull and for sinking.
-  Current value: `34 in/s` (a small reduction after overlap-based drop-through).
+  Current value: `32 in/s` (a small reduction after overlap-based drop-through).
 - `TUNE.holeWeightShiftSpeed`: the upper speed for a weaker grounded weight-shift
   pull while crossing the opening. Current value: `72 in/s`; this does not by
   itself make a fast disc sink.

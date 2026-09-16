@@ -44,7 +44,7 @@ export const TUNE = {
   landBounce: 0.35,
   maxStepMove: 0.2, // inches per substep (CCD guard)
   sleepSpeed: 0.15,
-  holeCaptureSpeed: 34, // slightly tighter speed gate now that overlap drives drop-through
+  holeCaptureSpeed: 32, // slightly tighter speed gate now that overlap drives drop-through
   holeWeightShiftSpeed: 72, // grounded crossings can still receive a weaker weight-shift pull
   holeSinkDip: 0.03, // modest engagement threshold for a mostly-submerged disc
   holeDropOverlap: 0.48, // unsupported footprint fraction needed for a dipped disc to tip through
