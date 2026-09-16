@@ -9,6 +9,9 @@ import { remainingTime, resumeDeadline } from './game/clock';
 import { readMatch, type Phase, type SavedMatch } from './game/session';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('board-canvas');
+// A long press on the board is a context-menu gesture on desktop and mobile.
+// It interrupts flicks and view drags, so keep the board surface menu-free.
+canvas.addEventListener('contextmenu', event => event.preventDefault());
 const banner = $('turn-banner'), hint = $('hint'), next = $<HTMLButtonElement>('continue');
 const settings = $<HTMLDialogElement>('settings');
 const pauseDialog = $<HTMLDialogElement>('pause-dialog');

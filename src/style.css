@@ -76,7 +76,7 @@ main{display:flex;flex-direction:column;overflow:hidden;border-radius:18px;isola
 #board-mode{font-size:11px;font-weight:600;color:#ecebdf}
 .mode-dot{width:6px;height:6px;border-radius:50%;background:#a5afa7}
 main[data-mode=shoot] .mode-dot{background:#d8bc80;box-shadow:0 0 0 3px #d8bc8022}
-#board-canvas{flex:1;min-height:0;height:0}
+#board-canvas{flex:1;min-height:0;height:0;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
 #flick-guide{font-size:11px;letter-spacing:.2px;text-align:center;color:#a5afa7;min-height:32px;padding:8px;visibility:hidden;pointer-events:none}
 main[data-mode=shoot] #flick-guide{visibility:visible}
 .new-match-settings{border-bottom:1px solid #48504a;padding-bottom:18px;margin-bottom:18px}
