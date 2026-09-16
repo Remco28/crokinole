@@ -209,7 +209,7 @@ to clear each central shooting lane; quadrant dividers span the 8–12 inch
   speed-dependent dynamics, stereo positioning, and grounded sliding noise.
 - Sound is synthesized, not a measured or recorded reproduction of a real board.
 - View, mute, and volume persist; sound preview is available in Settings.
-- Custom artwork rotates 90° at render time, including previously saved artwork.
+- Custom artwork is rendered in the uploaded image's original orientation.
 - Rim wall width is now 1/4 inch, retaining its structural height.
 
 

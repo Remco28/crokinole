@@ -119,10 +119,6 @@ body[data-theme=light] #board-mode{color:#292b26}
 /* Compact chrome and a vertical, monochrome view palette. */
 header h1{margin:0;font-size:25px;line-height:1.2}
 #settings-button{padding:8px 11px;min-height:36px}
-#hole-debug-panel{position:absolute;z-index:4;top:44px;right:10px;width:min(460px,calc(100% - 70px));max-height:30%;overflow:auto;padding:9px 11px;border:1px solid #d8bc80;border-radius:9px;background:#202925e8;color:#e8e3d3;font:11px/1.45 ui-monospace,monospace;pointer-events:none}
-#hole-debug-panel strong{display:block;margin-bottom:3px;color:#d8bc80;font:600 11px 'DM Sans',sans-serif}
-.debug-setting{display:flex;align-items:center;gap:9px;font-size:13px}.debug-setting input{width:auto;margin:0;accent-color:#d8bc80}
-body[data-theme=light] #hole-debug-panel{background:#fffdf7e8;color:#394039;border-color:#9b7c36}
 #continue[data-mode=view]{background:#dfe3df;border-color:#b8c0b8;color:#29332e}
 #continue[data-mode=shoot]{background:#d8bc80;border-color:#d8bc80;color:#25271f}
 body[data-theme=dark] #continue[data-mode=view]{background:#35403a;border-color:#647169;color:#e5e9e3}
@@ -147,5 +143,4 @@ body[data-theme=light] #table-controls #view-center{background:transparent;color
   #scoreboard .score{padding:7px 8px;gap:4px}
   #scoreboard .match-total strong{font-size:23px}
   #table-controls{top:33px;left:0}
-  #hole-debug-panel{top:34px;right:8px;width:calc(100% - 58px);max-height:25%;font-size:9px}
 }

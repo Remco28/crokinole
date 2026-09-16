@@ -305,12 +305,9 @@ export function createScene(canvas: HTMLCanvasElement) {
     if (art) {
       const scale = Math.max(S / art.width, S / art.height);
       ctx.globalAlpha = 0.7;
-      // Cylinder top UVs turn canvas artwork sideways relative to the players.
-      ctx.save();
-      ctx.translate(S / 2, S / 2);
-      ctx.rotate(-Math.PI / 2);
-      ctx.drawImage(art, -art.width * scale / 2, -art.height * scale / 2, art.width * scale, art.height * scale);
-      ctx.restore();
+      // Keep uploaded artwork in its original orientation. The board texture's
+      // UV mapping already presents the canvas upright to the player.
+      ctx.drawImage(art, (S - art.width * scale) / 2, (S - art.height * scale) / 2, art.width * scale, art.height * scale);
       ctx.globalAlpha = 1;
     }
     const toPx = (inches: number) => (inches / (BOARD.playRadius * 2)) * S;

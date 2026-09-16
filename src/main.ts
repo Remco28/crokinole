@@ -1,9 +1,7 @@
 import { BoardSound } from './audio/sound';
 import { canStartFlick, crossesDisc, releaseVelocity } from './game/flick';
 import { createScene, type BoardView } from './render/scene';
-import { makeDisc, moving, step, type Disc, type PhysicsEvent, type Shot } from './sim/physics';
-import { holeOverlapFraction } from './sim/hole';
-import { TUNE } from './sim/constants';
+import { makeDisc, moving, step, type Disc, type Shot } from './sim/physics';
 import { completeRound, inspectShot, sideOf, type Mode, type RoundResult } from './game/rules';
 import { assignDitchSlots, beginReview, reviewDuration, type ShotReview } from './game/review';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -12,8 +10,6 @@ const banner = $('turn-banner'), hint = $('hint'), next = $<HTMLButtonElement>('
 const settings = $<HTMLDialogElement>('settings');
 const sound = new BoardSound();
 let volume = 0.65, muted = false, view: BoardView = 'standing', zoom = 1.2, theme: 'light' | 'dark' = 'light';
-let holeDebug = false;
-try { holeDebug = localStorage.getItem('crokinole-hole-debug') === 'true'; } catch { /* optional */ }
 const clampZoom = (value: number) => Math.max(0.75, Math.min(2.5, value));
 try {
   const prefs = JSON.parse(localStorage.getItem('crokinole-table') || '{}');
@@ -37,37 +33,6 @@ function tablePreferences() {
   for (const name of ['seated', 'standing']) $(`view-${name}`).setAttribute('aria-pressed', String(view === name));
   try { localStorage.setItem('crokinole-table', JSON.stringify({ volume, muted, view, zoom, theme })); } catch { /* optional */ }
 }
-const holeDebugPanel = document.createElement('div');
-holeDebugPanel.id = 'hole-debug-panel'; holeDebugPanel.hidden = !holeDebug; holeDebugPanel.setAttribute('aria-live', 'polite');
-$('board-status').after(holeDebugPanel);
-const holeDebugSetting = document.createElement('label');
-holeDebugSetting.className = 'debug-setting';
-holeDebugSetting.innerHTML = '<input type="checkbox"> Hole physics debug';
-const holeDebugCheckbox = holeDebugSetting.querySelector('input') as HTMLInputElement;
-holeDebugCheckbox.checked = holeDebug;
-$('skin').parentElement!.after(holeDebugSetting);
-type HoleDebugEntry = { disc: number; kind: string; speed: number; offset: number; overlap: number; dip: number; tilt: number; capture: boolean };
-const holeDebugEntries: HoleDebugEntry[] = [];
-const holeDebugActive = new Set<number>();
-function renderHoleDebug() {
-  holeDebugPanel.hidden = !holeDebug;
-  if (!holeDebug) return;
-  holeDebugPanel.innerHTML = '<strong>Hole contacts</strong>' + (holeDebugEntries.length ? holeDebugEntries.slice(-8).reverse().map(e => `<div><b>Disc ${e.disc}</b> ${e.kind} · ${e.speed.toFixed(1)} in/s · offset ${e.offset.toFixed(2)}" · over ${Math.round(e.overlap * 100)}% · dip ${e.dip.toFixed(3)}" · tilt ${Math.round(e.tilt * 180 / Math.PI)}° · ${e.capture ? 'capture' : 'no capture'}</div>`).join('') : '<div>Waiting for a disc to touch the hole…</div>');
-}
-function recordHole(d: Disc, kind: string, speed = Math.hypot(d.vx, d.vy)) {
-  const offset = Math.hypot(d.x, d.y);
-  holeDebugEntries.push({ disc: d.id, kind, speed, offset, overlap: holeOverlapFraction(offset), dip: d.hole?.dip ?? 0, tilt: Math.abs(d.hole?.tilt ?? 0), capture: speed < TUNE.holeCaptureSpeed });
-  if (holeDebugEntries.length > 32) holeDebugEntries.shift();
-  renderHoleDebug();
-}
-function physicsImpact(event: PhysicsEvent) {
-  sound.impact(event);
-  if (!holeDebug || (event.kind !== 'sink' && event.kind !== 'lip')) return;
-  const match = event.key.match(/:(\d+)/); const d = match ? discs.find(item => item.id === Number(match[1])) : undefined;
-  if (d) recordHole(d, event.kind === 'sink' ? 'SUNK' : 'LIP EXIT');
-}
-holeDebugCheckbox.addEventListener('change', () => { holeDebug = holeDebugCheckbox.checked; try { localStorage.setItem('crokinole-hole-debug', String(holeDebug)); } catch { /* optional */ } renderHoleDebug(); });
-renderHoleDebug();
 async function unlockSound() {
   if (!await sound.unlock()) $('sound-note').textContent = 'Audio could not start. Tap Preview sounds to try again.';
 }
@@ -444,11 +409,7 @@ function tick(now: number) {
   accumulator += dt;
   while (accumulator >= 1 / 120) {
     if (phase === 'moving' && shot) {
-      step(discs, 1 / 120, shot, true, physicsImpact);
-      if (holeDebug) for (const d of discs) {
-        if (d.hole?.engaged && !holeDebugActive.has(d.id)) { holeDebugActive.add(d.id); recordHole(d, 'ENTER'); }
-        if (!d.hole?.engaged) holeDebugActive.delete(d.id);
-      }
+      step(discs, 1 / 120, shot, true, sound.impact);
       if (!discs.some(moving)) finishShot();
     }
     accumulator -= 1 / 120;
