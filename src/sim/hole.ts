@@ -60,7 +60,7 @@ export function settleTilt(d: Disc, dt: number) {
   if (Math.abs(m.tilt) < 0.008 && Math.abs(m.tiltSpeed) < 0.04) { m.tilt = 0; m.tiltSpeed = 0; }
 }
 
-export function interactWithHole(d: Disc, previousRadius: number, dt: number, airborne: boolean, emit?: (event: PhysicsEvent) => void, holeOccupied = false) {
+export function interactWithHole(d: Disc, previousRadius: number, dt: number, airborne: boolean, emit?: (event: PhysicsEvent) => void) {
   const m = d.hole ??= makeHoleMotion();
   const r = Math.hypot(d.x, d.y), speed = Math.hypot(d.vx, d.vy);
   const clearance = BOARD.holeRadius - DISC.radius;
@@ -83,7 +83,7 @@ export function interactWithHole(d: Disc, previousRadius: number, dt: number, ai
       d.vx -= d.x / r * pull; d.vy -= d.y / r * pull;
     }
     const canDropThrough = r <= clearance || (speed > 0.5 && m.dip >= TUNE.holeSinkDip && holeOverlapFraction(r) >= TUNE.holeDropOverlap);
-    if (!holeOccupied && canDropThrough && speed < TUNE.holeCaptureSpeed && Math.abs(m.tilt) < TUNE.holeMaxSinkTilt) {
+    if (canDropThrough && speed < TUNE.holeCaptureSpeed && Math.abs(m.tilt) < TUNE.holeMaxSinkTilt) {
       emit?.({ kind: 'sink', speed: Math.max(20, speed), x: d.x, y: d.y, key: `sink:${d.id}` });
       d.state = 'sunk'; d.vx = d.vy = d.vz = 0;
       return;

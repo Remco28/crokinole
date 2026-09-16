@@ -2,8 +2,10 @@
 
 Desktop screens use a left control sidebar and a separate board on the right.
 Phones keep compact scores above the board, with vertical view icons at its upper left. A small status label
-identifies View or Shoot mode; Center is a secondary view action. Sound controls
-live in Settings, with game mode and Start new match at the top.
+matches the mode button: **Looking** or **Place and Shoot**. Tap the button to
+switch between the two. Center is a secondary view action. Sound controls
+live in Settings, with game mode and **Start a new game** at the top.
+Players are named Red, Blue, Yellow, and Green; opposite colors partner in teams.
 
 To shoot, start behind your disc (including outside the rim) and flick through
 it. Contact is remembered; lifting your finger launches the disc using the
@@ -16,12 +18,18 @@ Flick strength uses the original power response (speed × 0.8 + 12, capped at
 a slightly shorter glide, with flick power and collision bounce unchanged.
 
 Tap the painted shooting line to place your disc, including small adjustments
-beside its current position. **Adjust view** returns from aiming to camera controls
+beside its current position. Tap **Place and Shoot** to return to Looking
 without moving the disc or resetting your clock. The shot clock defaults to
 60 seconds; Settings offers 30 seconds or Off for subsequent turns. It starts
 at handover after the camera transition, includes view adjustment, and continues
-through settings, background tabs, and reloads. Expiry forfeits one shot and
+through settings, background tabs, and unpaused reloads. Expiry forfeits one shot and
 moves the unplayed disc to the ditch. Shot reviews and round summaries are untimed.
+
+The pause icon beside Settings freezes the clock, physics, camera, and review
+animations. **Resume game** continues from that point. A paused table stays paused
+after reload, including a shot in flight. Pause before putting the game away.
+The active shooting disc pulses gently twice, then keeps a quiet outline until
+it is played. Reduced-motion preferences replace the pulses with a steady highlight.
 
 Shots now pause briefly before automatic handover: 1.25 seconds normally,
 2 seconds for fouls, followed by a visible removal animation. Contrasting
@@ -32,6 +40,8 @@ Completed rounds show counts by scoring zone, raw totals, and match points
 awarded until the player clicks **Next round**. Saved reviews and round results resume
 without adding points twice. Scoring uses the beveled disc's bottom footprint
 and the same line width drawn on the board.
+After a win, the results remain visible until **Start a new game** is pressed;
+the game never restarts automatically.
 
 A frontend-only, touch-first pass-and-play crokinole game built with TypeScript,
 Vite, and Three.js.
@@ -43,14 +53,14 @@ npm install
 npm run dev
 ```
 
-Open the URL printed by Vite. Tap **Ready to shoot**, then flick the colored disc
+Open the URL printed by Vite. Tap **Looking** to enter **Place and Shoot**, then flick the highlighted disc
 toward the center. Tap elsewhere on your shooting arc to reposition before a shot.
-Before **Ready to shoot**, drag the board with a mouse or one finger to adjust
+While **Looking**, drag the board with a mouse or one finger to adjust
 your angle within your shooting quadrant (45° either side). Vertical dragging
 adjusts your elevation within the selected seated or standing view. **Center**
 resets the angle. Each turn starts facing the next player's side.
 
-Use **Seated / Standing** under Board view before getting ready. **Ready to shoot**
+Use the seated/standing icons while Looking. Entering **Place and Shoot**
 seats you if needed, preserves a chosen seated angle, and locks the camera and
 zoom for the shot. Shooting and disc placement are available only while seated;
 camera transitions finish before accepting a flick.
@@ -124,8 +134,9 @@ to catch the lip and deflect rather than being forced into the hole.
   and hole/ditch clatter. Volume, mute, and view preferences persist.
 - Three procedural board finishes and persisted custom artwork (1024px), with
   a Remove artwork button to restore the selected finish.
-- Match saved after completed shots; reloading during a shot restores the last
-  completed turn. Storage is optional when unavailable.
+- Versioned match saves preserve placement, in-flight shot contact history, pauses,
+  reviews, and round results. Invalid or incompatible saves start a fresh game.
+  Storage is optional when unavailable.
 
 ## Verify and deploy
 
@@ -170,7 +181,8 @@ recordings and listening comparisons would be the next step for greater fidelity
 
 The playable core is in place. The original visual wishlist still includes a
 fading aim ghost, sink particles, richer surface materials, adjustable artwork
-opacity/contrast checks, impact haptics, and a physics debug panel. Physics feel
+opacity/contrast checks and impact haptics. The temporary physics debug UI has
+been retired; tuning values remain documented above. Physics feel
 needs testing on real touch devices. The manifest is a starting point, not an
 offline PWA. External Google Fonts are optional; system fonts are the fallback.
 

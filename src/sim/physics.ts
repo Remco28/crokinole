@@ -34,12 +34,15 @@ export function step(discs: Disc[], dt: number, shot: Shot, airborne = true, emi
       // Only leaving the playing surface is immediate. Line-touching discs remain
       // hittable until the whole shot has settled, then rules remove them.
       if (radius > BOARD.playRadius) { emit?.({ kind: 'ditch', speed: Math.max(12, v), x: d.x, y: d.y, key: `ditch:${d.id}` }); d.state = 'out'; continue; }
-      if (holeOccupied && d.z < DISC.height) {
-        if (d.hole) { d.hole.dip = 0; d.hole.fall = 0; d.hole.engaged = false; }
+      if (holeOccupied && d.z < DISC.height && radius < previousRadius) {
+        // Block inward motion, never relocate a resting lip hanger when another
+        // disc claims the pocket. An already-overlapping disc keeps its prior
+        // radius, so this correction cannot jump it onto an invisible boundary.
         const distance = Math.hypot(d.x, d.y), limit = DISC.radius * 2;
         if (distance < limit) {
           const nx = distance ? d.x / distance : 1, ny = distance ? d.y / distance : 0;
-          d.x = nx * limit; d.y = ny * limit;
+          const contact = Math.min(previousRadius, limit);
+          d.x = nx * contact; d.y = ny * contact;
           const normal = d.vx * nx + d.vy * ny;
           if (normal < 0) {
             d.vx -= (1 + TUNE.restitutionDisc) * normal * nx;

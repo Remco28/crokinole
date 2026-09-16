@@ -4,10 +4,15 @@ import { createScene, type BoardView } from './render/scene';
 import { makeDisc, moving, step, type Disc, type Shot } from './sim/physics';
 import { completeRound, inspectShot, sideOf, type Mode, type RoundResult } from './game/rules';
 import { assignDitchSlots, beginReview, reviewDuration, type ShotReview } from './game/review';
+import { PLAYER_NAMES as names, PLAYER_COLORS as colors } from './game/players';
+import { remainingTime, resumeDeadline } from './game/clock';
+import { readMatch, type Phase, type SavedMatch } from './game/session';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('board-canvas');
 const banner = $('turn-banner'), hint = $('hint'), next = $<HTMLButtonElement>('continue');
 const settings = $<HTMLDialogElement>('settings');
+const pauseDialog = $<HTMLDialogElement>('pause-dialog');
+let paused = false, pausedRemaining: number | null = null;
 const sound = new BoardSound();
 let volume = 0.65, muted = false, view: BoardView = 'standing', zoom = 1.2, theme: 'light' | 'dark' = 'light';
 const clampZoom = (value: number) => Math.max(0.75, Math.min(2.5, value));
@@ -34,6 +39,7 @@ function tablePreferences() {
   try { localStorage.setItem('crokinole-table', JSON.stringify({ volume, muted, view, zoom, theme })); } catch { /* optional */ }
 }
 async function unlockSound() {
+  if (paused) return;
   if (!await sound.unlock()) $('sound-note').textContent = 'Audio could not start. Tap Preview sounds to try again.';
 }
 // Gesture listeners also recover audio after returning from a background tab.
@@ -57,8 +63,6 @@ $('sound-preview').addEventListener('click', async () => {
   $('sound-note').textContent = ok ? 'Soft / medium / firm wood clicks · peg · twenty · ditch' : 'Audio unavailable. Try another browser or enable audio for this site.';
   window.setTimeout(() => { button.disabled = false; }, 2500);
 });
-const names = ['Coral', 'Blue', 'Gold', 'Sage'];
-const colors = ['#dc6853', '#6cabbe', '#e7b95c', '#94ad76'];
 let scene: ReturnType<typeof createScene>;
 try { scene = createScene(canvas); } catch {
   banner.textContent = 'This table needs WebGL'; hint.textContent = 'Try a browser with hardware acceleration enabled.'; next.hidden = true;
@@ -70,8 +74,8 @@ for (const name of ['seated', 'standing'] as const) $(`view-${name}`).addEventLi
   setBoardView(name);
 });
 let mode: Mode = 'duel', player = 0, round = 1, id = 0;
-let discs: Disc[] = [], scores = [0, 0], used = [0, 0], phase: 'pass' | 'aim' | 'moving' | 'review' | 'round' | 'won' = 'pass';
-let restoredEnd: 'review' | 'round' | 'won' | null = null;
+let discs: Disc[] = [], scores = [0, 0], used = [0, 0], phase: Phase = 'pass';
+let restored = false;
 let review: ShotReview | null = null, roundResult: RoundResult | null = null;
 let shotSeconds = 60, deadline: number | null = null;
 try {
@@ -96,10 +100,27 @@ const count = () => mode === 'duel' ? 2 : 4;
 const allowance = () => mode === 'duel' ? 12 : 6;
 const yaw = () => player * Math.PI * 2 / count();
 const side = (owner: number) => sideOf(mode, owner);
-const label = (i: number) => mode === 'teams' ? ['Coral + Gold', 'Blue + Sage'][i] : names[i];
+const label = (i: number) => mode === 'teams' ? [`${names[0]} + ${names[2]}`, `${names[1]} + ${names[3]}`][i] : names[i];
 function save() {
-  try { localStorage.setItem('crokinole-match', JSON.stringify({ mode, player, round, id, discs: discs.filter(d => d !== staged || phase !== 'aim' && phase !== 'pass'), scores, used, phase: phase === 'aim' ? 'pass' : phase, review, roundResult, deadline })); } catch { /* Storage is optional. */ }
+  const snapshot: SavedMatch = { version: 1, mode, player, round, id, discs, scores, used, phase, review, roundResult, deadline, paused, remaining: pausedRemaining, stagedId: staged?.id ?? null, hadOpponent, shot: shot ? { touched: [...shot.touched], opponentContact: shot.opponentContact, side: shot.side } : null };
+  try { localStorage.setItem('crokinole-match', JSON.stringify(snapshot)); } catch { /* Storage is optional. */ }
 }
+function pauseGame() {
+  if (paused || phase === 'won') return;
+  pausedRemaining = remainingTime(deadline, Date.now()); paused = true;
+  cancel(); cancelOrbit(); touches.clear(); pinching = false; pinchDistance = 0;
+  scene.setPaused(true); sound.suspend(); save(); pauseDialog.showModal();
+}
+function resumeGame() {
+  deadline = resumeDeadline(pausedRemaining, Date.now()); paused = false;
+  last = performance.now(); accumulator = 0;
+  scene.setPaused(false); pauseDialog.close(); save();
+  void unlockSound();
+}
+$('pause-button').addEventListener('click', pauseGame);
+$('resume-game').addEventListener('click', resumeGame);
+pauseDialog.addEventListener('cancel', event => { event.preventDefault(); resumeGame(); });
+window.addEventListener('pagehide', save);
 let scoreboardExpanded = false, roundBoardFocus = false;
 const eyeIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.2 12s3.6-6 9.8-6 9.8 6 9.8 6-3.6 6-9.8 6-9.8-6-9.8-6Z"></path><circle cx="12" cy="12" r="2.6"></circle></svg>';
 function hud() {
@@ -136,40 +157,41 @@ $('round-summary').addEventListener('click', event => {
   roundBoardFocus = !roundBoardFocus; hud();
 });
 function pass(message = '', restoreClock = false) {
+  scene.highlightDisc(null);
   for (const d of discs) if (d.state === 'sunk') d.holeCleared = true;
   phase = 'pass'; staged = null;
   if (!restoreClock) deadline = shotSeconds ? Date.now() + 850 + shotSeconds * 1000 : null;
   scene.setYawTarget(yaw()); readyAt = performance.now() + 850;
-  banner.textContent = `${message ? message + ' · ' : ''}Pass to ${names[player]}`;
-  hint.textContent = view === 'standing' ? 'Look over the board. Sit when ready to shoot.' : 'Adjust your view, then choose Shooting when ready.';
-  next.textContent = 'Viewing'; next.setAttribute('aria-label', 'Switch to shooting mode'); next.dataset.mode = 'view'; next.hidden = false; hud(); save();
+  banner.textContent = `${message ? message + ' · ' : ''}It's ${names[player]}'s turn`;
+  hint.textContent = view === 'standing' ? 'Look over the board. Sit when ready to shoot.' : 'Drag to adjust your view. Tap Looking to place and shoot.';
+  next.textContent = 'Looking'; next.setAttribute('aria-label', 'Looking. Switch to Place and Shoot'); next.dataset.mode = 'view'; next.hidden = false; hud(); save();
 }
 function start() {
   mode = $<HTMLSelectElement>('mode').value as Mode;
   player = 0; round = 1; id = 0; discs = []; scores = Array(mode === 'ffa' ? 4 : 2).fill(0); used = Array(count()).fill(0);
-  review = null; roundResult = null;
+  review = null; roundResult = null; shot = null; roundBoardFocus = false;
   settings.close(); pass();
 }
 function nextRound() {
   round++; discs = []; used.fill(0); player = (round - 1) % count();
-  roundResult = null; pass();
+  roundResult = null; roundBoardFocus = false; pass();
 }
 function setBoardView(nextView: BoardView) {
   view = nextView; scene.setView(view); tablePreferences();
   if (phase === 'aim') shotInstructions();
   else if (phase === 'pass') {
-    hint.textContent = view === 'standing' ? 'Look over the board. Sit when ready to shoot.' : 'Adjust your view, then choose Shooting when ready.';
+    hint.textContent = view === 'standing' ? 'Look over the board. Sit when ready to shoot.' : 'Drag to adjust your view. Tap Looking to place and shoot.';
   }
 }
 function shotInstructions() {
   next.hidden = false;
-  next.textContent = 'Shooting'; next.setAttribute('aria-label', 'Switch to viewing mode'); next.dataset.mode = 'shoot';
+  next.textContent = 'Place and Shoot'; next.setAttribute('aria-label', 'Place and Shoot. Switch to Looking'); next.dataset.mode = 'shoot';
   if (view === 'standing') {
     banner.textContent = `${names[player]}, look over the board`;
     hint.textContent = 'Take a seat when you’re ready to flick.';
-    next.textContent = 'Viewing'; next.setAttribute('aria-label', 'Switch to shooting mode'); next.dataset.mode = 'view';
+    next.textContent = 'Looking'; next.setAttribute('aria-label', 'Looking. Switch to Place and Shoot'); next.dataset.mode = 'view';
   } else {
-    banner.textContent = `${names[player]}, your shot`;
+    banner.textContent = `It's ${names[player]}'s turn`;
     const opponent = discs.some(d => d.state === 'board' && side(d.owner) !== side(player));
     hint.textContent = opponent ? 'Flick through your disc to hit an opponent’s disc.' : 'Flick through your disc toward the inner ring.';
   }
@@ -181,14 +203,15 @@ function stage() {
     discs.push(staged);
   }
   phase = 'aim'; setBoardView('seated');
-  hud();
+  scene.highlightDisc(staged.id); hud(); save();
 }
 next.addEventListener('click', () => {
+  if (paused) return;
   if (phase === 'aim') {
     cancel(); phase = 'pass';
-    banner.textContent = `${names[player]}, adjust your view`;
-    hint.textContent = 'Drag within your quadrant, then tap ready. Your disc stays in place.';
-    next.textContent = 'Viewing'; next.setAttribute('aria-label', 'Switch to shooting mode'); next.dataset.mode = 'view'; hud();
+    banner.textContent = `It's ${names[player]}'s turn`;
+    hint.textContent = 'Drag within your quadrant. Tap Looking to place and shoot.';
+    next.textContent = 'Looking'; next.setAttribute('aria-label', 'Looking. Switch to Place and Shoot'); next.dataset.mode = 'view'; hud(); save();
   }
   else if (phase === 'pass') stage();
   else if (phase === 'round') nextRound();
@@ -249,7 +272,7 @@ function placeAt(clientX: number, clientY: number) {
   const legalAngle = yaw() + legalDelta;
   const x = Math.sin(legalAngle) * 12, y = Math.cos(legalAngle) * 12;
   if (!discs.some(d => d !== staged && d.state === 'board' && Math.hypot(d.x - x, d.y - y) < 1.3)) {
-    staged.x = x; staged.y = y; hud();
+    staged.x = x; staged.y = y; hud(); save();
   } else hint.textContent = 'That spot is occupied. Tap a clear spot on your shooting line.';
 }
 const touches = new Map<number, { x: number; y: number }>();
@@ -259,11 +282,12 @@ function touchDistance() {
   return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
 }
 function setZoom(value: number) {
-  if (phase !== 'pass' || pointer !== null || orbitPointer !== null || settings.open) return;
+  if (paused || phase !== 'pass' || pointer !== null || orbitPointer !== null || settings.open) return;
   zoom = clampZoom(value); scene.setZoom(zoom); tablePreferences();
 }
 $('view-center').addEventListener('click', () => { if (phase === 'pass' && orbitPointer === null && !pinching) scene.centerView(); });
 canvas.addEventListener('pointerdown', e => {
+  if (paused) return;
   if (e.pointerType === 'touch') {
     touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
     canvas.setPointerCapture(e.pointerId);
@@ -287,6 +311,7 @@ canvas.addEventListener('pointerdown', e => {
   pointer = e.pointerId; trail = [{ ...p, t: performance.now() }]; canvas.setPointerCapture(pointer);
 });
 canvas.addEventListener('pointermove', e => {
+  if (paused) return;
   if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pinching) {
     const distance = touchDistance();
@@ -324,7 +349,8 @@ function releaseFlick() {
   sound.play('flick', Math.hypot(velocity.x, velocity.y), staged.x, staged.y);
   staged.vx = velocity.x; staged.vy = velocity.y; used[player]++; phase = 'moving';
   next.hidden = true;
-  banner.textContent = 'Let it slide'; hint.textContent = 'Waiting for the board to settle…'; hud();
+  scene.highlightDisc(null);
+  banner.textContent = 'Let it slide'; hint.textContent = 'Waiting for the board to settle…'; hud(); save();
 }
 function cancel() { pointer = null; trail = []; flickEligible = false; discCrossed = false; }
 function endPointer(e: PointerEvent) {
@@ -337,6 +363,7 @@ canvas.addEventListener('pointercancel', endPointer);
 canvas.addEventListener('lostpointercapture', endPointer);
 window.addEventListener('blur', () => { cancel(); cancelOrbit(); touches.clear(); pinching = false; pinchDistance = 0; });
 canvas.addEventListener('pointerup', e => {
+  if (paused) return;
   if (e.pointerId === orbitPointer) { endPointer(e); return; }
   const wasPinching = pinching;
   touches.delete(e.pointerId);
@@ -359,6 +386,7 @@ function finishShot() {
   reviewMessage(); hud(); save();
 }
 function expireShot() {
+  scene.highlightDisc(null);
   cancel(); cancelOrbit(); touches.clear(); pinching = false;
   if (!staged) {
     staged = makeDisc(++id, player, Math.sin(yaw()) * 12, Math.cos(yaw()) * 12);
@@ -388,12 +416,14 @@ function finishReview() {
     phase = roundResult.winner !== null ? 'won' : 'round';
     banner.textContent = roundResult.winner !== null ? `${label(roundResult.winner)} wins!` : 'Round complete';
     hint.textContent = roundResult.sides.map((row, i) => `${label(i)} +${row.awarded}`).join(' · ');
-    next.textContent = phase === 'won' ? 'Play again' : 'Next round'; next.hidden = false; hud(); save();
+    next.textContent = phase === 'won' ? 'Start a new game' : 'Next round'; next.setAttribute('aria-label', next.textContent); next.dataset.mode = 'result'; next.hidden = false; hud(); save();
   } else { player = (player + 1) % count(); pass(valid ? '' : 'Foul resolved'); }
 }
 let last = performance.now(), accumulator = 0;
 function tick(now: number) {
-  const modeLabel = phase === 'aim' ? 'Shoot mode' : phase === 'pass' ? 'View mode' : phase === 'moving' ? 'Shot in motion' : phase === 'review' ? 'Shot review' : 'Round complete';
+  if (paused) { last = now; requestAnimationFrame(tick); return; }
+  $<HTMLButtonElement>('pause-button').disabled = phase === 'won';
+  const modeLabel = phase === 'aim' ? 'Place and Shoot' : phase === 'pass' ? 'Looking' : phase === 'moving' ? 'Shot in motion' : phase === 'review' ? 'Shot review' : phase === 'won' ? 'Game complete' : 'Round complete';
   if ($('board-mode').textContent !== modeLabel) $('board-mode').textContent = modeLabel;
   canvas.parentElement!.dataset.mode = phase === 'aim' ? 'shoot' : 'view';
   const guidance = phase === 'pass' ? (view === 'standing' ? 'Sit when ready to shoot' : 'Drag to look around') : phase === 'aim' ? 'View locked · tap line to place' : '';
@@ -435,24 +465,34 @@ try {
   const art = localStorage.getItem('crokinole-art'); if (art) { const version = ++artworkVersion; const image = new Image(); $<HTMLButtonElement>('remove-art').disabled = false; image.onload = () => { if (version === artworkVersion) scene.setSkin(skin.value, image); }; image.src = art; }
   const raw = localStorage.getItem('crokinole-match');
   if (raw) {
-    const data = JSON.parse(raw);
-    if (['duel', 'teams', 'ffa'].includes(data.mode) && ['pass', 'review', 'round', 'won'].includes(data.phase) && Array.isArray(data.discs) && Array.isArray(data.scores) && Array.isArray(data.used)) {
+    const data = readMatch(raw);
+    if (data) {
       mode = data.mode; player = data.player; round = data.round; id = data.id; discs = data.discs; scores = data.scores; used = data.used;
-      deadline = typeof data.deadline === 'number' && Number.isFinite(data.deadline) ? data.deadline : null;
+      deadline = data.deadline; phase = data.phase; restored = true;
+      paused = data.paused; pausedRemaining = data.remaining;
+      staged = discs.find(d => d.id === data.stagedId) ?? null;
+      hadOpponent = data.hadOpponent;
+      shot = data.shot ? { ...data.shot, touched: new Set(data.shot.touched), sideOf: side } : null;
       $<HTMLSelectElement>('mode').value = mode;
-      roundResult = data.roundResult ?? null;
-      if (data.phase === 'review' && data.review && Array.isArray(data.review.removed)) { review = data.review; review!.elapsed = 0; restoredEnd = 'review'; }
-      if (data.phase === 'round' || data.phase === 'won') restoredEnd = data.phase;
+      roundResult = data.roundResult; review = data.review;
     }
   }
 } catch { /* Start fresh if storage is unavailable. */ }
-if (restoredEnd) {
-  phase = restoredEnd; scene.setYawTarget(yaw()); hud();
+if (restored) {
+  scene.setYawTarget(yaw()); hud();
   if (phase === 'review') { next.hidden = true; reviewMessage(); }
-  else {
+  else if (phase === 'moving') { next.hidden = true; banner.textContent = 'Let it slide'; hint.textContent = 'Waiting for the board to settle…'; }
+  else if (phase === 'round' || phase === 'won') {
     banner.textContent = phase === 'won' ? `${label(scores.indexOf(Math.max(...scores)))} wins!` : 'Round complete';
     hint.textContent = 'Your table has been restored.';
-    next.textContent = phase === 'won' ? 'Play again' : 'Next round';
+    next.textContent = phase === 'won' ? 'Start a new game' : 'Next round'; next.setAttribute('aria-label', next.textContent); next.dataset.mode = 'result';
+  } else if (phase === 'aim') { setBoardView('seated'); scene.highlightDisc(staged!.id); }
+  else {
+    const placed = staged;
+    pass('', true); staged = placed;
+    if (staged) scene.highlightDisc(staged.id);
+    save();
   }
-} else pass('', deadline !== null);
+} else pass();
+if (paused) { scene.setPaused(true); pauseDialog.showModal(); }
 requestAnimationFrame(tick);

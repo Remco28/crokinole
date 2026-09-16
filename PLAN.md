@@ -60,7 +60,7 @@ tunneling for small fast discs and can't do hole-capture / wax-glide cleanly.
   preserved (no full stop unless head-on).
 - **Disc-peg (the hard part):** static circle collision. Relative velocity
   along normal reflected with `e_peg ~ 0.55–0.70` (deader than wood due to
-  latex), tangential damped `* 0.98`. CCD via substeps (max move < 0.2" per
+  latex), tangential velocity preserved. CCD via substeps (max move < 0.2" per
   substep). Slight radius padding (+2%) so pegs feel fair, never "pass-through".
 - **Rail:** outer circle reflect with `e_rail ~ 0.45`, plus ditch test.
   Anything crossing 13" at speed bounces once then drops in ditch; slow

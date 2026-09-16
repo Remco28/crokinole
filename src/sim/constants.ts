@@ -30,17 +30,13 @@ export const PEGS = {
 
 export const PEG_COLLISION_RADIUS = PEGS.radius + DISC.radius;
 
-// Tunables (debug panel can tweak live in later phases).
+// Gameplay tunables; see the center-hole guide in README.md.
 export const TUNE = {
   frictionMu: 0.115, // slight extra board grip without changing flick power
   frictionViscous: 0.05,
   restitutionDisc: 0.8,
   restitutionPeg: 0.62,
-  restitutionRail: 0.45,
-  tangentDampingPeg: 0.98,
   gravityZ: 180.0, // in/s^2 for hop channel
-  popGainMin: 0.05,
-  popGainMax: 0.15,
   landBounce: 0.35,
   maxStepMove: 0.2, // inches per substep (CCD guard)
   sleepSpeed: 0.15,

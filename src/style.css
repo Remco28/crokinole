@@ -117,6 +117,15 @@ body[data-theme=light] #board-mode{color:#292b26}
 }
 
 /* Compact chrome and a vertical, monochrome view palette. */
+.header-actions{display:flex;align-items:center;gap:6px}
+#pause-button{width:36px;height:36px;padding:8px;background:transparent;border-color:transparent;display:grid;place-items:center}
+#pause-button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round}
+#pause-dialog{text-align:center;padding:32px;max-width:360px}
+#pause-dialog .pause-symbol{font-size:28px;color:#cba85f;letter-spacing:4px;margin-bottom:12px}
+#pause-dialog h2{font-size:23px;margin-bottom:12px}
+#pause-dialog .primary{width:100%;margin-top:22px}
+footer>div{min-width:0}
+#continue{flex-shrink:0}
 header h1{margin:0;font-size:25px;line-height:1.2}
 #settings-button{padding:8px 11px;min-height:36px}
 #continue[data-mode=view]{background:#dfe3df;border-color:#b8c0b8;color:#29332e}

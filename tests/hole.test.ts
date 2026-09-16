@@ -13,6 +13,26 @@ function crossing(speed: number, offset: number, dt = 1 / 120) {
   return { disc, events };
 }
 describe('twenty hole contact', () => {
+  it('does not teleport resting discs or lift lip hangers when the pocket is occupied', () => {
+    for (const radius of [0.7, 0.9, 1.1]) {
+      const sunk = makeDisc(1, 0, 0, 0); sunk.state = 'sunk';
+      const resting = makeDisc(2, 1, radius, 0);
+      resting.hole = { ...makeHoleMotion(), dip: 0.02 };
+      step([sunk, resting], 1 / 120, shot());
+      expect(resting.x).toBe(radius); expect(resting.y).toBe(0);
+      expect(resting.hole.dip).toBe(0.02);
+      expect(moving(resting)).toBe(false);
+    }
+  });
+  it('blocks inward motion inside the occupied footprint without a position jump', () => {
+    const sunk = makeDisc(1, 0, 0, 0); sunk.state = 'sunk';
+    const incoming = makeDisc(2, 1, 0.9, 0); incoming.vx = -5;
+    step([sunk, incoming], 1 / 120, shot());
+    // Subsequent adaptive substeps may already move it outward after impact.
+    expect(Math.abs(incoming.x - 0.9)).toBeLessThanOrEqual(5 / 120);
+    expect(incoming.vx).toBeGreaterThan(0);
+    expect(incoming.state).toBe('board');
+  });
   it('keeps a gentle twenty reachable from the actual shooting line', () => {
     const d = makeDisc(1, 0, 0, 12); d.vy = -38;
     for (let i = 0; i < 1200 && moving(d); i++) step([d], 1 / 120, shot());

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { PLAYER_COLORS } from '../game/players';
 import { discHalfHeight } from '../sim/hole';
 import type { Disc } from '../sim/physics';
 import { BOARD, DISC, PEGS, pegPositions } from '../sim/constants';
@@ -162,8 +163,12 @@ export function createScene(canvas: HTMLCanvasElement) {
 
   const discGeo = makeDiscGeometry();
   const meshes = new Map<number, THREE.Mesh<THREE.LatheGeometry, THREE.MeshStandardMaterial>>();
-  const colors = ['#dc6853', '#6cabbe', '#e7b95c', '#94ad76'];
-  const materials = colors.map(color => new THREE.MeshStandardMaterial({ color, roughness: 0.3 }));
+  const materials = PLAYER_COLORS.map(color => new THREE.MeshStandardMaterial({ color, roughness: 0.3 }));
+  let pausedAt: number | null = null, pausedDuration = 0;
+  const animationNow = () => (pausedAt ?? performance.now()) - pausedDuration;
+  let activeDisc: number | null = null, highlightAt = 0;
+  const activeRing = new THREE.Mesh(new THREE.RingGeometry(DISC.radius + 0.07, DISC.radius + 0.13, 64), new THREE.MeshBasicMaterial({ color: '#fff3c4', transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
+  activeRing.rotation.x = -Math.PI / 2; activeRing.visible = false; scene.add(activeRing);
   const markerCanvas = document.createElement('canvas'); markerCanvas.width = markerCanvas.height = 256;
   const markerContext = markerCanvas.getContext('2d')!;
   for (const [color, width] of [['#161914', 20], ['#fff8de', 8]] as const) {
@@ -176,6 +181,16 @@ export function createScene(canvas: HTMLCanvasElement) {
   markerTexture.colorSpace = THREE.SRGBColorSpace;
   const markers = new Map<number, THREE.Sprite>();
   function syncDiscs(discs: Disc[], review: ShotReview | null = null) {
+    const active = discs.find(d => d.id === activeDisc && d.state === 'board');
+    const age = (animationNow() - highlightAt) / 1000;
+    // Two slow, smooth pulses, followed by a quiet persistent outline.
+    const pulse = reducedMotion.matches || age >= 2.8 ? 0 : Math.sin(Math.PI * age / 1.4) ** 2;
+    activeRing.visible = !!active;
+    if (active) {
+      activeRing.position.set(active.x, 0.025, active.y);
+      activeRing.scale.setScalar(1 + pulse * 0.13);
+      activeRing.material.opacity = 0.55 + pulse * 0.35;
+    }
     const removals = new Map(review?.removed.map(d => [d.id, d]) ?? []);
     const visible = new Set(discs.filter(d => d.state !== 'sunk' || !d.holeCleared || removals.has(d.id)).map(d => d.id));
     for (const [id, mesh] of meshes) if (!visible.has(id)) { scene.remove(mesh); mesh.material.dispose(); meshes.delete(id); }
@@ -190,14 +205,16 @@ export function createScene(canvas: HTMLCanvasElement) {
       mesh.quaternion.setFromAxisAngle(new THREE.Vector3(Math.sin(lean), 0, -Math.cos(lean)), tilt);
       mesh.rotateY(source.hole?.rollPhase ?? 0);
       mesh.visible = true;
+      mesh.material.emissive.set(d.id === active?.id ? '#ffe1a0' : '#000000');
+      mesh.material.emissiveIntensity = d.id === active?.id ? 0.12 + pulse * 0.3 : 0;
       if (source.state === 'sunk') {
         if (mesh.userData.sinkAt === undefined) {
-          mesh.userData.sinkAt = performance.now();
+          mesh.userData.sinkAt = animationNow();
           mesh.userData.sinkStart = mesh.position.clone();
           // Preserve a visible falling phase when capture happens between frames.
           mesh.userData.sinkStart.y = Math.max(mesh.position.y, DISC.height / 2 - 0.06);
         }
-        const t = reducedMotion.matches ? 1 : Math.min(1, (performance.now() - mesh.userData.sinkAt) / 380);
+        const t = reducedMotion.matches ? 1 : Math.min(1, (animationNow() - mesh.userData.sinkAt) / 380);
         const ease = t * t * (3 - 2 * t);
         const start = mesh.userData.sinkStart as THREE.Vector3;
         mesh.position.copy(start).lerp(new THREE.Vector3(0, DISC.height / 2 - cavityDepth, 0), ease);
@@ -209,10 +226,10 @@ export function createScene(canvas: HTMLCanvasElement) {
       }
       let progress = 0;
       if (d.state === 'out') {
-        if (mesh.userData.state !== 'out') mesh.userData.outAt = mesh.userData.state === 'board' ? performance.now() : -1000;
+        if (mesh.userData.state !== 'out') mesh.userData.outAt = mesh.userData.state === 'board' ? animationNow() : -1000;
         progress = review && removals.has(d.id)
           ? THREE.MathUtils.clamp((review.elapsed - review.hold) / REVIEW_TIMING.removal, 0, 1)
-          : THREE.MathUtils.clamp((performance.now() - mesh.userData.outAt) / 450, 0, 1);
+          : THREE.MathUtils.clamp((animationNow() - mesh.userData.outAt) / 450, 0, 1);
         const angle = (d.ditchSlot ?? 0) / DITCH_SLOTS * Math.PI * 2;
         // The gutter accommodates a full flat disc, with a clear margin on both sides.
         const parkedRadius = (BOARD.playRadius + BOARD.ditchOuterRadius) / 2;
@@ -356,6 +373,7 @@ export function createScene(canvas: HTMLCanvasElement) {
   const clock = new THREE.Clock();
   function tick() {
     const dt = Math.min(clock.getDelta(), 0.05);
+    if (pausedAt !== null) { raf = requestAnimationFrame(tick); return; }
     const blend = reducedMotion.matches ? 1 : 1 - Math.exp(-dt * 9);
     yaw += (yawTarget - yaw) * blend;
     polar += (polarTarget - polar) * blend;
@@ -370,6 +388,11 @@ export function createScene(canvas: HTMLCanvasElement) {
   tick();
 
   return {
+    highlightDisc: (id: number | null) => { activeDisc = id; highlightAt = animationNow(); },
+    setPaused: (paused: boolean) => {
+      if (paused && pausedAt === null) pausedAt = performance.now();
+      else if (!paused && pausedAt !== null) { pausedDuration += performance.now() - pausedAt; pausedAt = null; }
+    },
     syncDiscs,
     boardPoint,
     getYaw: () => yaw,
