@@ -13,6 +13,7 @@ const canvas = $<HTMLCanvasElement>('board-canvas');
 // It interrupts flicks and view drags, so keep the board surface menu-free.
 canvas.addEventListener('contextmenu', event => event.preventDefault());
 const banner = $('turn-banner'), hint = $('hint'), next = $<HTMLButtonElement>('continue');
+const flickButton = $<HTMLButtonElement>('flick-button');
 const settings = $<HTMLDialogElement>('settings');
 const pauseDialog = $<HTMLDialogElement>('pause-dialog');
 let paused = false, pausedRemaining: number | null = null;
@@ -121,7 +122,7 @@ function save() {
 function pauseGame() {
   if (paused || phase === 'won') return;
   pausedRemaining = remainingTime(deadline, Date.now()); paused = true;
-  cancel(); cancelOrbit(); touches.clear(); pinching = false; pinchDistance = 0;
+  cancel(); cancelOrbit(); placementPointer = null; touches.clear(); pinching = false; pinchDistance = 0;
   scene.setPaused(true); sound.suspend(); save(); pauseDialog.showModal();
 }
 function resumeGame() {
@@ -172,12 +173,21 @@ $('round-summary').addEventListener('click', event => {
 function pass(message = '', restoreClock = false) {
   scene.highlightDisc(null);
   for (const d of discs) if (d.state === 'sunk') d.holeCleared = true;
-  phase = 'pass'; staged = null;
+  phase = 'pass';
+  if (!restoreClock || !staged) {
+    const offsets = [0, ...Array.from({ length: 12 }, (_, i) => (i + 1) * Math.PI / 48).flatMap(a => [a, -a])];
+    const angle = yaw() + (offsets.find(offset => {
+      const x = Math.sin(yaw() + offset) * 12, y = Math.cos(yaw() + offset) * 12;
+      return !discs.some(d => d.state === 'board' && Math.hypot(d.x - x, d.y - y) < 1.3);
+    }) ?? 0);
+    staged = makeDisc(++id, player, Math.sin(angle) * 12, Math.cos(angle) * 12);
+    discs.push(staged);
+  }
   if (!restoreClock) deadline = shotSeconds ? Date.now() + 850 + shotSeconds * 1000 : null;
   scene.setYawTarget(yaw()); readyAt = performance.now() + 850;
   banner.textContent = `${message ? message + ' · ' : ''}It's ${names[player]}'s turn`;
-  hint.textContent = view === 'standing' ? 'Look over the board. Sit when ready to shoot.' : 'Drag to adjust your view. Tap Looking to place and shoot.';
-  next.textContent = 'Looking'; next.setAttribute('aria-label', 'Looking. Switch to Place and Shoot'); next.dataset.mode = 'view'; next.hidden = false; hud(); save();
+  hint.textContent = 'Tap the shooting line to move your disc. Drag elsewhere to look around, then tap Flick.';
+  next.hidden = true; scene.highlightDisc(staged.id); hud(); save();
 }
 function start() {
   mode = $<HTMLSelectElement>('mode').value as Mode;
@@ -191,43 +201,28 @@ function nextRound() {
 }
 function setBoardView(nextView: BoardView) {
   view = nextView; scene.setView(view); tablePreferences();
-  if (phase === 'aim') shotInstructions();
-  else if (phase === 'pass') {
-    hint.textContent = view === 'standing' ? 'Look over the board. Sit when ready to shoot.' : 'Drag to adjust your view. Tap Looking to place and shoot.';
-  }
+  if (phase === 'pass') hint.textContent = 'Tap the shooting line to move your disc. Drag elsewhere to look around, then tap Flick.';
 }
 function shotInstructions() {
-  next.hidden = false;
-  next.textContent = 'Place and Shoot'; next.setAttribute('aria-label', 'Place and Shoot. Switch to Looking'); next.dataset.mode = 'shoot';
-  if (view === 'standing') {
-    banner.textContent = `${names[player]}, look over the board`;
-    hint.textContent = 'Take a seat when you’re ready to flick.';
-    next.textContent = 'Looking'; next.setAttribute('aria-label', 'Looking. Switch to Place and Shoot'); next.dataset.mode = 'view';
-  } else {
-    banner.textContent = `It's ${names[player]}'s turn`;
-    const opponent = discs.some(d => d.state === 'board' && side(d.owner) !== side(player));
-    hint.textContent = opponent ? 'Flick through your disc to hit an opponent’s disc.' : 'Flick through your disc toward the inner ring.';
-  }
+  banner.textContent = `It's ${names[player]}'s turn`;
+  const opponent = discs.some(d => d.state === 'board' && side(d.owner) !== side(player));
+  hint.textContent = opponent ? 'View locked. Flick through your disc to hit an opponent’s disc.' : 'View locked. Flick through your disc toward the inner ring.';
 }
-function stage() {
-  if (performance.now() < readyAt || orbitPointer !== null || pinching) return;
-  if (!staged) {
-    staged = makeDisc(++id, player, Math.sin(yaw()) * 12, Math.cos(yaw()) * 12);
-    discs.push(staged);
-  }
-  phase = 'aim'; setBoardView('seated');
-  scene.highlightDisc(staged.id); hud(); save();
-}
-next.addEventListener('click', () => {
+flickButton.addEventListener('click', () => {
   if (paused) return;
   if (phase === 'aim') {
     cancel(); phase = 'pass';
     banner.textContent = `It's ${names[player]}'s turn`;
-    hint.textContent = 'Drag within your quadrant. Tap Looking to place and shoot.';
-    next.textContent = 'Looking'; next.setAttribute('aria-label', 'Looking. Switch to Place and Shoot'); next.dataset.mode = 'view'; hud(); save();
+    hint.textContent = 'Tap the shooting line to move your disc. Drag elsewhere to look around, then tap Flick.';
+    hud(); save();
   }
-  else if (phase === 'pass') stage();
-  else if (phase === 'round') nextRound();
+  else if (phase === 'pass' && performance.now() >= readyAt && orbitPointer === null && placementPointer === null && !pinching && !scene.isViewMoving()) {
+    phase = 'aim'; shotInstructions(); hud(); save();
+  }
+});
+next.addEventListener('click', () => {
+  if (paused) return;
+  if (phase === 'round') nextRound();
   else if (phase === 'won') start();
 });
 $('settings-button').addEventListener('click', () => settings.showModal());
@@ -268,22 +263,28 @@ $<HTMLInputElement>('art').addEventListener('change', async e => {
 let pointer: number | null = null;
 let orbitPointer: number | null = null;
 let orbitLast = { x: 0, y: 0 };
+let placementPointer: number | null = null;
+let placementPress = { x: 0, y: 0 };
 function cancelOrbit() { orbitPointer = null; }
 let trail: { x: number; y: number; t: number }[] = [];
 let press = { x: 0, y: 0 };
 let flickEligible = false;
 let discCrossed = false;
-function placeAt(clientX: number, clientY: number) {
-  if (!staged) return;
+function linePosition(clientX: number, clientY: number) {
   // Placement targets the painted surface, not the elevated flick plane.
-  const p = scene.boardPoint(clientX, clientY, 0); if (!p) return;
+  const p = scene.boardPoint(clientX, clientY, 0); if (!p) return null;
   const a = Math.atan2(p.x, p.y), delta = Math.atan2(Math.sin(a - yaw()), Math.cos(a - yaw()));
   // The quadrant borders are legal shooting positions. Accept a small touch
   // tolerance beyond the painted edge, then clamp onto the exact boundary.
-  if (Math.abs(Math.hypot(p.x, p.y) - 12) > 1.25 || Math.abs(delta) > Math.PI / 4 + 0.08) return;
+  if (Math.abs(Math.hypot(p.x, p.y) - 12) > 1.25 || Math.abs(delta) > Math.PI / 4 + 0.08) return null;
   const legalDelta = Math.max(-Math.PI / 4, Math.min(Math.PI / 4, delta));
   const legalAngle = yaw() + legalDelta;
-  const x = Math.sin(legalAngle) * 12, y = Math.cos(legalAngle) * 12;
+  return { x: Math.sin(legalAngle) * 12, y: Math.cos(legalAngle) * 12 };
+}
+function placeAt(clientX: number, clientY: number) {
+  if (!staged) return;
+  const position = linePosition(clientX, clientY); if (!position) return;
+  const { x, y } = position;
   if (!discs.some(d => d !== staged && d.state === 'board' && Math.hypot(d.x - x, d.y - y) < 1.3)) {
     staged.x = x; staged.y = y; hud(); save();
   } else hint.textContent = 'That spot is occupied. Tap a clear spot on your shooting line.';
@@ -305,17 +306,21 @@ canvas.addEventListener('pointerdown', e => {
     touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
     canvas.setPointerCapture(e.pointerId);
     if (touches.size >= 2) {
-      cancel(); cancelOrbit(); pinching = true; pinchDistance = touchDistance();
+      cancel(); cancelOrbit(); placementPointer = null; pinching = true; pinchDistance = touchDistance();
       return;
     }
     if (pinching) return;
   }
   if (phase === 'pass' && !settings.open && performance.now() >= readyAt && orbitPointer === null && (e.pointerType === 'touch' || e.button === 0)) {
-    orbitPointer = e.pointerId; orbitLast = { x: e.clientX, y: e.clientY };
+    if (linePosition(e.clientX, e.clientY)) {
+      placementPointer = e.pointerId; placementPress = { x: e.clientX, y: e.clientY };
+    } else {
+      orbitPointer = e.pointerId; orbitLast = { x: e.clientX, y: e.clientY };
+    }
     canvas.setPointerCapture(e.pointerId);
     return;
   }
-  if (view !== 'seated' || phase !== 'aim' || !staged || pointer !== null || settings.open || scene.isViewMoving()) return;
+  if (phase !== 'aim' || !staged || pointer !== null || settings.open || scene.isViewMoving()) return;
   if (e.pointerType !== 'touch' && e.button !== 0) return;
   const p = scene.boardPoint(e.clientX, e.clientY); if (!p) return;
   flickEligible = canStartFlick(p, staged);
@@ -330,6 +335,15 @@ canvas.addEventListener('pointermove', e => {
     const distance = touchDistance();
     if (pinchDistance > 10 && distance > 10) setZoom(zoom * distance / pinchDistance);
     pinchDistance = distance;
+    return;
+  }
+  if (e.pointerId === placementPointer) {
+    if (Math.hypot(e.clientX - placementPress.x, e.clientY - placementPress.y) > 5) {
+      placementPointer = null; orbitPointer = e.pointerId;
+      scene.dragView((e.clientX - placementPress.x) / canvas.clientWidth * Math.PI,
+        (e.clientY - placementPress.y) / canvas.clientHeight);
+      orbitLast = { x: e.clientX, y: e.clientY };
+    }
     return;
   }
   if (e.pointerId === orbitPointer) {
@@ -371,12 +385,18 @@ function endPointer(e: PointerEvent) {
   if (touches.size === 0) { pinching = false; pinchDistance = 0; }
   if (pointer === e.pointerId) cancel();
   if (orbitPointer === e.pointerId) cancelOrbit();
+  if (placementPointer === e.pointerId) placementPointer = null;
 }
 canvas.addEventListener('pointercancel', endPointer);
 canvas.addEventListener('lostpointercapture', endPointer);
-window.addEventListener('blur', () => { cancel(); cancelOrbit(); touches.clear(); pinching = false; pinchDistance = 0; });
+window.addEventListener('blur', () => { cancel(); cancelOrbit(); placementPointer = null; touches.clear(); pinching = false; pinchDistance = 0; });
 canvas.addEventListener('pointerup', e => {
   if (paused) return;
+  if (e.pointerId === placementPointer) {
+    placementPointer = null; touches.delete(e.pointerId);
+    if (phase === 'pass' && !pinching && !scene.isViewMoving()) placeAt(e.clientX, e.clientY);
+    return;
+  }
   if (e.pointerId === orbitPointer) { endPointer(e); return; }
   const wasPinching = pinching;
   touches.delete(e.pointerId);
@@ -384,10 +404,10 @@ canvas.addEventListener('pointerup', e => {
     endPointer(e); cancel();
     return;
   }
-  if (view !== 'seated' || scene.isViewMoving() || e.pointerId !== pointer || !staged || phase !== 'aim') return;
+  if (scene.isViewMoving() || e.pointerId !== pointer || !staged || phase !== 'aim') return;
   if (deadline !== null && Date.now() >= deadline) { expireShot(); return; }
   if (Math.hypot(e.clientX - press.x, e.clientY - press.y) < 5) {
-    cancel(); placeAt(e.clientX, e.clientY); return;
+    cancel(); return;
   }
   const p = scene.boardPoint(e.clientX, e.clientY);
   if (p) { sampleFlick(p); releaseFlick(); }
@@ -400,7 +420,7 @@ function finishShot() {
 }
 function expireShot() {
   scene.highlightDisc(null);
-  cancel(); cancelOrbit(); touches.clear(); pinching = false;
+  cancel(); cancelOrbit(); placementPointer = null; touches.clear(); pinching = false;
   if (!staged) {
     staged = makeDisc(++id, player, Math.sin(yaw()) * 12, Math.cos(yaw()) * 12);
     discs.push(staged);
@@ -436,11 +456,15 @@ let last = performance.now(), accumulator = 0;
 function tick(now: number) {
   if (paused) { last = now; requestAnimationFrame(tick); return; }
   $<HTMLButtonElement>('pause-button').disabled = phase === 'won';
-  const modeLabel = phase === 'aim' ? 'Place and Shoot' : phase === 'pass' ? 'Looking' : phase === 'moving' ? 'Shot in motion' : phase === 'review' ? 'Shot review' : phase === 'won' ? 'Game complete' : 'Round complete';
+  const modeLabel = phase === 'aim' ? 'Ready to flick' : phase === 'pass' ? 'Place your disc' : phase === 'moving' ? 'Shot in motion' : phase === 'review' ? 'Shot review' : phase === 'won' ? 'Game complete' : 'Round complete';
   if ($('board-mode').textContent !== modeLabel) $('board-mode').textContent = modeLabel;
   canvas.parentElement!.dataset.mode = phase === 'aim' ? 'shoot' : 'view';
-  const guidance = phase === 'pass' ? (view === 'standing' ? 'Sit when ready to shoot' : 'Drag to look around') : phase === 'aim' ? 'View locked · tap line to place' : '';
+  const guidance = phase === 'pass' ? 'Tap the shooting line · drag to look around' : phase === 'aim' ? 'View locked · flick through your disc' : '';
   if ($('board-guidance').textContent !== guidance) $('board-guidance').textContent = guidance;
+  flickButton.hidden = phase !== 'pass' && phase !== 'aim';
+  flickButton.disabled = phase === 'pass' && (now < readyAt || orbitPointer !== null || placementPointer !== null || pinching || scene.isViewMoving());
+  flickButton.setAttribute('aria-pressed', String(phase === 'aim'));
+  flickButton.setAttribute('aria-label', phase === 'aim' ? 'Unlock view and move disc' : 'Lock view to flick');
   const awaitingShot = phase === 'pass' || phase === 'aim';
   if (awaitingShot && deadline !== null && Date.now() >= deadline) expireShot();
   clockLabel.hidden = !awaitingShot;
@@ -463,9 +487,8 @@ function tick(now: number) {
       if (review.elapsed >= reviewDuration(review)) finishReview();
     }
   }
-  next.disabled = phase === 'pass' && (now < readyAt || orbitPointer !== null || pinching);
   sound.setListenerYaw(scene.getYaw());
-  const controlsLocked = phase !== 'pass' || pointer !== null || orbitPointer !== null || pinching;
+  const controlsLocked = phase !== 'pass' || pointer !== null || orbitPointer !== null || placementPointer !== null || pinching;
   canvas.classList.toggle('can-orbit', phase === 'pass');
   canvas.classList.toggle('is-orbiting', orbitPointer !== null);
   $<HTMLButtonElement>('view-center').disabled = controlsLocked;
@@ -499,12 +522,9 @@ if (restored) {
     banner.textContent = phase === 'won' ? `${label(scores.indexOf(Math.max(...scores)))} wins!` : 'Round complete';
     hint.textContent = 'Your table has been restored.';
     next.textContent = phase === 'won' ? 'Start a new game' : 'Next round'; next.setAttribute('aria-label', next.textContent); next.dataset.mode = 'result';
-  } else if (phase === 'aim') { setBoardView('seated'); scene.highlightDisc(staged!.id); }
+  } else if (phase === 'aim') { shotInstructions(); scene.highlightDisc(staged!.id); }
   else {
-    const placed = staged;
-    pass('', true); staged = placed;
-    if (staged) scene.highlightDisc(staged.id);
-    save();
+    pass('', true);
   }
 } else pass();
 if (paused) { scene.setPaused(true); pauseDialog.showModal(); }
