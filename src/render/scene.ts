@@ -167,8 +167,11 @@ export function createScene(canvas: HTMLCanvasElement) {
   let pausedAt: number | null = null, pausedDuration = 0;
   const animationNow = () => (pausedAt ?? performance.now()) - pausedDuration;
   let activeDisc: number | null = null, highlightAt = 0, activeHighlightEnabled = true;
-  const activeRing = new THREE.Mesh(new THREE.RingGeometry(DISC.radius + 0.07, DISC.radius + 0.13, 64), new THREE.MeshBasicMaterial({ color: '#fff3c4', transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
-  activeRing.rotation.x = -Math.PI / 2; activeRing.visible = false; scene.add(activeRing);
+  const activeRing = new THREE.Group();
+  const ringBorder = new THREE.Mesh(new THREE.RingGeometry(DISC.radius + 0.06, DISC.radius + 0.23, 64), new THREE.MeshBasicMaterial({ color: '#24190e', transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
+  const ringLight = new THREE.Mesh(new THREE.RingGeometry(DISC.radius + 0.09, DISC.radius + 0.19, 64), new THREE.MeshBasicMaterial({ color: '#fff4c9', transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide }));
+  ringBorder.rotation.x = ringLight.rotation.x = -Math.PI / 2;
+  activeRing.add(ringBorder, ringLight); activeRing.visible = false; scene.add(activeRing);
   const markerCanvas = document.createElement('canvas'); markerCanvas.width = markerCanvas.height = 256;
   const markerContext = markerCanvas.getContext('2d')!;
   for (const [color, width] of [['#161914', 20], ['#fff8de', 8]] as const) {
@@ -183,13 +186,15 @@ export function createScene(canvas: HTMLCanvasElement) {
   function syncDiscs(discs: Disc[], review: ShotReview | null = null) {
     const active = activeHighlightEnabled ? discs.find(d => d.id === activeDisc && d.state === 'board') : undefined;
     const age = (animationNow() - highlightAt) / 1000;
-    // Two slow, smooth pulses, followed by a quiet persistent outline.
-    const pulse = reducedMotion.matches || age >= 2.8 ? 0 : Math.sin(Math.PI * age / 1.4) ** 2;
+    // The camera turns during handover. Blink twice once the new disc is in view.
+    const blinkAge = age - 0.8;
+    const pulse = reducedMotion.matches || blinkAge < 0 || blinkAge >= 0.8 ? 0 : Math.sin(Math.PI * (blinkAge % 0.4) / 0.4) ** 4;
     activeRing.visible = !!active;
     if (active) {
       activeRing.position.set(active.x, 0.025, active.y);
-      activeRing.scale.setScalar(1 + pulse * 0.13);
-      activeRing.material.opacity = 0.55 + pulse * 0.35;
+      activeRing.scale.setScalar(1 + pulse * 0.16);
+      ringBorder.material.opacity = 0.55 + pulse * 0.35;
+      ringLight.material.opacity = 0.75 + pulse * 0.25;
     }
     const removals = new Map(review?.removed.map(d => [d.id, d]) ?? []);
     const visible = new Set(discs.filter(d => d.state !== 'sunk' || !d.holeCleared || removals.has(d.id)).map(d => d.id));
@@ -206,7 +211,7 @@ export function createScene(canvas: HTMLCanvasElement) {
       mesh.rotateY(source.hole?.rollPhase ?? 0);
       mesh.visible = true;
       mesh.material.emissive.set(d.id === active?.id ? '#ffe1a0' : '#000000');
-      mesh.material.emissiveIntensity = d.id === active?.id ? 0.12 + pulse * 0.3 : 0;
+      mesh.material.emissiveIntensity = d.id === active?.id ? 0.12 + pulse * 1.15 : 0;
       if (source.state === 'sunk') {
         if (mesh.userData.sinkAt === undefined) {
           mesh.userData.sinkAt = animationNow();

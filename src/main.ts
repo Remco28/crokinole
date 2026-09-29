@@ -46,7 +46,7 @@ function tablePreferences() {
 }
 const activeDiscHighlightSetting = document.createElement('label');
 activeDiscHighlightSetting.className = 'theme-setting';
-activeDiscHighlightSetting.innerHTML = '<input id="active-disc-highlight" type="checkbox" checked> Highlight active disc';
+activeDiscHighlightSetting.innerHTML = '<input id="active-disc-highlight" type="checkbox" checked><span>Blink active disc<small>Two quick flashes each turn, then a thin outline. Turn off for a natural board.</small></span>';
 $('theme-toggle').parentElement!.after(activeDiscHighlightSetting);
 async function unlockSound() {
   if (paused) return;

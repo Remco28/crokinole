@@ -24,10 +24,10 @@ moves the unplayed disc to the ditch. Shot reviews and round summaries are untim
 The pause icon beside Settings freezes the clock, physics, camera, and review
 animations. **Resume game** continues from that point. A paused table stays paused
 after reload, including a shot in flight. Pause before putting the game away.
-The active shooting disc pulses gently twice, then keeps a quiet outline until
-it is played. Reduced-motion preferences replace the pulses with a steady highlight.
-Settings includes a **Highlight active disc** switch, enabled by default, for
-players who prefer a quieter table.
+The active shooting disc blinks twice after the camera settles, then keeps a thin
+outline until it is played. **Blink active disc** in Settings is on by default; turn
+it off for an unmarked board. Reduced-motion preferences show the steady outline
+without blinking.
 
 Shots now pause briefly before automatic handover: 1.25 seconds normally,
 2 seconds for fouls, followed by a visible removal animation. Contrasting
