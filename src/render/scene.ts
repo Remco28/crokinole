@@ -150,7 +150,22 @@ export function createScene(canvas: HTMLCanvasElement) {
   const pegGeo = new THREE.CylinderGeometry(PEGS.radius * 0.96, PEGS.radius, PEGS.height - 0.07, 32);
   const capGeo = new THREE.CylinderGeometry(PEGS.radius * 0.84, PEGS.radius * 0.9, 0.07, 32);
   const slotGeo = new THREE.BoxGeometry(PEGS.radius * 1.2, 0.006, 0.035);
+  // A small two-tone mounting collar stays legible over arbitrary artwork.
+  // Flat geometry uses normal depth testing, so discs naturally cover it.
+  const artworkPegCollars = new THREE.Group();
+  artworkPegCollars.visible = false;
+  scene.add(artworkPegCollars);
+  const collarDarkGeo = new THREE.RingGeometry(PEGS.radius, PEGS.radius + 0.10, 48);
+  const collarLightGeo = new THREE.RingGeometry(PEGS.radius, PEGS.radius + 0.065, 48);
+  const collarDarkMat = new THREE.MeshBasicMaterial({ color: '#30281c' });
+  const collarLightMat = new THREE.MeshBasicMaterial({ color: '#fff3d7' });
   for (const p of pegPositions()) {
+    const darkCollar = new THREE.Mesh(collarDarkGeo, collarDarkMat);
+    const lightCollar = new THREE.Mesh(collarLightGeo, collarLightMat);
+    darkCollar.rotation.x = lightCollar.rotation.x = -Math.PI / 2;
+    darkCollar.position.set(p.x, 0.008, p.y);
+    lightCollar.position.set(p.x, 0.012, p.y);
+    artworkPegCollars.add(darkCollar, lightCollar);
     const peg = new THREE.Mesh(pegGeo, pegMat);
     peg.position.set(p.x, (PEGS.height - 0.07) / 2, p.y);
     peg.castShadow = true;
@@ -414,6 +429,7 @@ export function createScene(canvas: HTMLCanvasElement) {
       }
     },
     setSkin: (skin: string, art?: HTMLImageElement) => {
+      artworkPegCollars.visible = !!art;
       surfaceTopMat.map?.dispose(); surfaceTopMat.map = makeSurfaceTexture(skin, art); surfaceTopMat.needsUpdate = true;
     },
     setYawTarget: (radians: number) => {

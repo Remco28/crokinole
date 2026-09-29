@@ -203,3 +203,5 @@ dismissal and reopening, final-board inspection, and starting a new game. Set
 `CHROME_BIN` to your Chrome or Chromium executable if needed. Node 22 or later
 is required. `npm test` runs the unit suite; `npm run build` checks TypeScript and
 builds the production app.
+
+Custom board artwork also enables small cream-and-dark collars at the peg bases for visibility over light, dark, or detailed images. Built-in board finishes retain their original pegs.
