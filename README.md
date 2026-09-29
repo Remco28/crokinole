@@ -1,13 +1,13 @@
 # Crokinole · Around the board
 
 Desktop screens use a left control sidebar and a separate board on the right.
-Phones keep compact scores above the board, with vertical view icons at its upper left and a circular **Flick** button at its upper right. Each turn starts with a highlighted disc on the shooting line. Tap the line to move it, or drag elsewhere to adjust the view. Tap **Flick** to lock the view for shooting; tap it again to unlock the view and reposition the disc. Center is a secondary view action. Sound controls
+Phones keep compact scores above the board, with vertical view icons at its upper left. Each turn starts with a highlighted disc on the shooting line. Tap the line to move it, drag elsewhere to adjust the view, or flick through the disc to shoot. Center is a secondary view action. Sound controls
 live in Settings, with game mode and **Start a new game** at the top.
 Players are named Red, Blue, Yellow, and Green; opposite colors partner in teams.
 
 To shoot, start behind your disc (including outside the rim) and flick through
 it. Contact is remembered; lifting your finger launches the disc using the
-last 120 milliseconds of the gesture, including follow-through. Missed swipes do not shoot. Getting ready preserves your chosen zoom and score layout.
+last 120 milliseconds of the gesture, including follow-through. Missed swipes do not shoot. A shot gesture holds the view steady until you lift your finger. Your chosen zoom and score layout persist.
 Framing shifts upward slightly to leave more room below the rim.
 
 Flick strength uses the original power response (speed × 0.8 + 12, capped at
@@ -15,7 +15,7 @@ Flick strength uses the original power response (speed × 0.8 + 12, capped at
 a slightly shorter glide, with flick power and collision bounce unchanged.
 
 Tap the painted shooting line to move your disc, including small adjustments
-beside its current position. Toggling **Flick** keeps the disc and shot clock in place. The shot clock defaults to
+beside its current position. The shot clock defaults to
 60 seconds; Settings offers 30 seconds or Off for subsequent turns. It starts
 at handover after the camera transition, includes view adjustment, and continues
 through settings, background tabs, and unpaused reloads. Expiry forfeits one shot and
@@ -51,16 +51,15 @@ npm install
 npm run dev
 ```
 
-Open the URL printed by Vite. Tap anywhere on your shooting arc to reposition the highlighted disc, then tap **Flick** and shoot toward the center. While the view is unlocked, drag elsewhere on the board with a mouse or one finger to adjust
+Open the URL printed by Vite. Tap anywhere on your shooting arc to reposition the highlighted disc. Start behind it and flick through it to shoot toward the center. Drag elsewhere on the board with a mouse or one finger to adjust
 your angle within your shooting quadrant (45° either side). Vertical dragging
 adjusts your elevation within the selected seated or standing view. **Center**
 resets the angle. Each turn starts facing the next player's side.
 
-Use the seated/standing icons while the view is unlocked. **Flick** locks the current camera angle and zoom for the shot. Camera transitions finish before accepting a flick.
+Use the seated/standing icons to choose your view. A shot gesture holds the camera angle and zoom steady until release. Camera transitions finish before accepting a flick.
 
-Two-finger pinch adjusts zoom while viewing. Handover and getting ready preserve
-your zoom. Pinching cancels a view
-drag, and zoom is locked while **Flick** is active.
+Two-finger pinch adjusts zoom. Handover preserves your zoom. Pinching cancels a view
+drag or shot attempt.
 
 Use **Settings** for rules, board finishes, image uploads, new matches, and sound
 volume. **Preview sounds** plays soft, medium, and firm wood clicks, then a peg knock, twenty, and ditch

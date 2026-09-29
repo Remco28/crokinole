@@ -2,7 +2,7 @@ import type { Disc } from '../sim/physics';
 import type { Mode, RoundResult } from './rules';
 import type { ShotReview } from './review';
 
-export type Phase = 'pass' | 'aim' | 'moving' | 'review' | 'round' | 'won';
+export type Phase = 'pass' | 'moving' | 'review' | 'round' | 'won';
 export interface SavedMatch {
   version: 1;
   mode: Mode; player: number; round: number; id: number;
@@ -59,6 +59,6 @@ export function readMatch(raw: string): SavedMatch | null {
     if (d.phase === 'aim' && !d.discs.some(v => v.id === d.stagedId && v.state === 'board')) return null;
     if (d.paused !== undefined && typeof d.paused !== 'boolean') return null;
     if (d.paused && d.remaining !== null && (!finite(d.remaining) || d.remaining < 0)) return null;
-    return { ...d, version: 1, deadline: d.deadline ?? null, paused: d.paused ?? false, remaining: d.remaining ?? null, stagedId: d.stagedId ?? null, hadOpponent: d.hadOpponent ?? false, shot: d.shot ?? null, review: d.phase === 'review' ? d.review : null, roundResult: ['round', 'won'].includes(String(d.phase)) ? d.roundResult : null } as SavedMatch;
+    return { ...d, version: 1, phase: d.phase === 'aim' ? 'pass' : d.phase, deadline: d.deadline ?? null, paused: d.paused ?? false, remaining: d.remaining ?? null, stagedId: d.stagedId ?? null, hadOpponent: d.hadOpponent ?? false, shot: d.shot ?? null, review: d.phase === 'review' ? d.review : null, roundResult: ['round', 'won'].includes(String(d.phase)) ? d.roundResult : null } as SavedMatch;
   } catch { return null; }
 }

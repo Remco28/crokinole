@@ -75,10 +75,10 @@ main{display:flex;flex-direction:column;overflow:hidden;border-radius:18px;isola
 #board-status{display:flex;align-items:center;flex-wrap:wrap;gap:8px;flex-shrink:0;padding:12px 14px;font-size:11px;min-height:40px;color:#abb7ad;pointer-events:none}
 #board-mode{font-size:11px;font-weight:600;color:#ecebdf}
 .mode-dot{width:6px;height:6px;border-radius:50%;background:#a5afa7}
-main[data-mode=shoot] .mode-dot{background:#d8bc80;box-shadow:0 0 0 3px #d8bc8022}
+main[data-mode=play] .mode-dot{background:#d8bc80;box-shadow:0 0 0 3px #d8bc8022}
 #board-canvas{flex:1;min-height:0;height:0;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
 #flick-guide{font-size:11px;letter-spacing:.2px;text-align:center;color:#a5afa7;min-height:32px;padding:8px;visibility:hidden;pointer-events:none}
-main[data-mode=shoot] #flick-guide{visibility:visible}
+main[data-mode=play] #flick-guide{visibility:visible}
 .new-match-settings{border-bottom:1px solid #48504a;padding-bottom:18px;margin-bottom:18px}
 .new-match-settings label{margin-top:0}.new-match-settings .primary{width:100%}
 #settings .sound-settings #sound-toggle{margin:0 0 12px}
@@ -128,14 +128,6 @@ footer>div{min-width:0}
 #continue{flex-shrink:0}
 header h1{margin:0;font-size:25px;line-height:1.2}
 #settings-button{padding:8px 11px;min-height:36px}
-#continue[data-mode=view]{background:#dfe3df;border-color:#b8c0b8;color:#29332e}
-#continue[data-mode=shoot]{background:#d8bc80;border-color:#d8bc80;color:#25271f}
-body[data-theme=dark] #continue[data-mode=view]{background:#35403a;border-color:#647169;color:#e5e9e3}
-#flick-button{position:absolute;top:45px;right:8px;z-index:2;width:46px;height:46px;padding:0;border-radius:50%;border:2px solid #d8bc80;background:#252e2b;color:#ecebdf;font-size:12px;font-weight:700;box-shadow:0 3px 12px #0006}
-#flick-button[aria-pressed=true]{background:#d8bc80;color:#25271f}
-#flick-button[hidden]{display:none}
-body[data-theme=light] #flick-button{background:#fffdf7;border-color:#a68038;color:#292b26;box-shadow:0 3px 12px #292b2633}
-body[data-theme=light] #flick-button[aria-pressed=true]{background:#cba85f}
 .score-heading{min-height:32px}#score-details{min-height:32px}
 #scoreboard .score{padding:8px 10px;gap:4px}
 #scoreboard .match-total strong{font-size:24px}
@@ -157,5 +149,4 @@ body[data-theme=light] #table-controls #view-center{background:transparent;color
   #scoreboard .score{padding:7px 8px;gap:4px}
   #scoreboard .match-total strong{font-size:23px}
   #table-controls{top:33px;left:0}
-  #flick-button{top:33px;right:0}
 }

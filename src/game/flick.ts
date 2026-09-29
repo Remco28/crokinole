@@ -22,12 +22,26 @@ export function releaseVelocity(samples: FlickSample[], disc: Point): Point | nu
   const seconds = Math.max(0.016, (end.t - first.t) / 1000);
   const vx = (end.x - first.x) / seconds, vy = (end.y - first.y) / seconds;
   const speed = Math.hypot(vx, vy);
-  if (speed < 3 || vx * disc.x + vy * disc.y >= 0) return null;
+  if (speed < 8 || vx * disc.x + vy * disc.y >= 0) return null;
   const power = Math.min(105, speed * 0.8 + 12) / speed;
   return { x: vx * power, y: vy * power };
 }
 
 export function canStartFlick(p: Point, disc: Point) {
   const dx = p.x - disc.x, dy = p.y - disc.y;
-  return Math.hypot(dx, dy) <= 20 && dx * disc.x + dy * disc.y >= -DISC.radius * 12;
+  const radius = Math.hypot(disc.x, disc.y);
+  const outward = (dx * disc.x + dy * disc.y) / radius;
+  const sideways = Math.abs(dx * disc.y - dy * disc.x) / radius;
+  return outward >= -DISC.radius * 0.3 && outward <= 8 && sideways <= DISC.radius * 2.4;
+}
+
+// A shot candidate can become a normal view drag once it clearly moves away
+// from the disc. Keep the camera fixed for an inward approach through the disc.
+export function shouldRotateInstead(start: Point, current: Point, disc: Point) {
+  const radius = Math.hypot(disc.x, disc.y);
+  const dx = current.x - start.x, dy = current.y - start.y;
+  if (Math.hypot(dx, dy) < DISC.radius * 0.7) return false;
+  const outward = (dx * disc.x + dy * disc.y) / radius;
+  const sideways = Math.abs((current.x - disc.x) * disc.y - (current.y - disc.y) * disc.x) / radius;
+  return outward > DISC.radius * 0.7 || sideways > DISC.radius * 2.5;
 }
