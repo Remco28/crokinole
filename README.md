@@ -39,7 +39,10 @@ awarded until the player clicks **Next round**. Saved reviews and round results 
 without adding points twice. Scoring uses the beveled disc's bottom footprint
 and the same line width drawn on the board.
 After a win, the results remain visible until **Start a new game** is pressed;
-the game never restarts automatically.
+the game never restarts automatically. A winner panel appears over the board with the
+final match score and round count. **Inspect board** dismisses it and lets you rotate,
+zoom, or change views while every final piece stays in place. **Show winner** reopens
+the panel; your dismissal survives a reload.
 
 A frontend-only, touch-first pass-and-play crokinole game built with TypeScript,
 Vite, and Three.js.
@@ -61,8 +64,13 @@ Use the seated/standing icons to choose your view. A shot gesture holds the came
 Two-finger pinch adjusts zoom. Handover preserves your zoom. Pinching cancels a view
 drag or shot attempt.
 
-Use **Settings** for rules, board finishes, image uploads, new matches, and sound
-volume. **Preview sounds** plays soft, medium, and firm wood clicks, then a peg knock, twenty, and ditch
+Use **Settings** for rules, board finishes, saved artwork, new matches, and sound
+volume. The artwork gallery holds four images in this browser. Tap an empty slot to
+upload, tap a preview to use it, or choose **Replace** or **Delete** for that slot.
+**Use board finish** returns to maple, walnut, or slate while keeping your images.
+Images are cropped to a square and resized to 1024 pixels, then saved in IndexedDB.
+Your previously uploaded image is moved into the first slot automatically. Images
+stay local to this browser and are removed if you clear its site data. **Preview sounds** plays soft, medium, and firm wood clicks, then a peg knock, twenty, and ditch
 clatter. The **Sound on/off** button in Settings mutes the table.
 
 ## Implemented
@@ -184,3 +192,14 @@ there are no opponent discs in play. See the
 This game uses traditional differential scoring to 100 for duel/teams and the
 planned individual point totals for free-for-all, rather than tournament round
 match points.
+
+## Browser verification
+
+`npm run test:browser` runs the artwork and winner flows in a fresh headless Chrome
+profile with a local Vite server. It checks migration of the old image, four slots,
+replacement without exceeding the limit, preserving images when a save fails,
+deletion, selection and reloads, final-shot scoring, winner messages for each mode,
+dismissal and reopening, final-board inspection, and starting a new game. Set
+`CHROME_BIN` to your Chrome or Chromium executable if needed. Node 22 or later
+is required. `npm test` runs the unit suite; `npm run build` checks TypeScript and
+builds the production app.

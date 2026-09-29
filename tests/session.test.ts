@@ -33,6 +33,15 @@ describe('saved table and pause', () => {
     const s = { ...snapshot(), phase: 'aim' };
     expect(readMatch(JSON.stringify(s))).toMatchObject({ phase: 'pass', stagedId: 1, deadline: 60000, remaining: 32000 });
   });
+  it('keeps the final table and winner dismissal across reload', () => {
+    const s = snapshot();
+    Object.assign(s, { phase: 'won', paused: false, winnerDismissed: true, scores: [104, 78], roundResult: { before: [89, 78], after: [104, 78], winner: 0, sides: Array.from({ length: 2 }, () => ({ twenties: 0, fifteens: 0, tens: 0, fives: 0, total: 0, awarded: 0 })) } });
+    const restored = readMatch(JSON.stringify(s))!;
+    expect(restored.winnerDismissed).toBe(true);
+    expect(restored.discs).toEqual(s.discs);
+    expect(restored.scores).toEqual([104, 78]);
+    expect(readMatch(JSON.stringify({ ...s, winnerDismissed: 'yes' }))).toBeNull();
+  });
   it('rejects saves that can crash scoring, rendering, or shot resolution', () => {
     for (const change of [ { version: 2 }, { scores: [0] }, { used: [13, 0] }, { player: 4 }, { discs: [makeDisc(1, 3, 0, 12)] }, { phase: 'moving', shot: null }, { phase: 'review', review: {} }, { phase: 'won', roundResult: null }, { stagedId: 7 } ]) {
       expect(readMatch(JSON.stringify({ ...snapshot(), ...change }))).toBeNull();

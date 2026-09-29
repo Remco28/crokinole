@@ -5,6 +5,7 @@ import type { ShotReview } from './review';
 export type Phase = 'pass' | 'moving' | 'review' | 'round' | 'won';
 export interface SavedMatch {
   version: 1;
+  winnerDismissed?: boolean;
   mode: Mode; player: number; round: number; id: number;
   discs: Disc[]; scores: number[]; used: number[]; phase: Phase;
   review: ShotReview | null; roundResult: RoundResult | null;
@@ -57,6 +58,7 @@ export function readMatch(raw: string): SavedMatch | null {
     }
     if (d.stagedId != null && !d.discs.some(v => v.id === d.stagedId && v.owner === d.player)) return null;
     if (d.phase === 'aim' && !d.discs.some(v => v.id === d.stagedId && v.state === 'board')) return null;
+    if (d.winnerDismissed !== undefined && typeof d.winnerDismissed !== 'boolean') return null;
     if (d.paused !== undefined && typeof d.paused !== 'boolean') return null;
     if (d.paused && d.remaining !== null && (!finite(d.remaining) || d.remaining < 0)) return null;
     return { ...d, version: 1, phase: d.phase === 'aim' ? 'pass' : d.phase, deadline: d.deadline ?? null, paused: d.paused ?? false, remaining: d.remaining ?? null, stagedId: d.stagedId ?? null, hadOpponent: d.hadOpponent ?? false, shot: d.shot ?? null, review: d.phase === 'review' ? d.review : null, roundResult: ['round', 'won'].includes(String(d.phase)) ? d.roundResult : null } as SavedMatch;

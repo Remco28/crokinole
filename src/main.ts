@@ -1,3 +1,4 @@
+import { setupBoardArtwork } from './board-artwork';
 import { BoardSound } from './audio/sound';
 import { canStartFlick, crossesDisc, releaseVelocity, shouldRotateInstead } from './game/flick';
 import { createScene, type BoardView } from './render/scene';
@@ -83,12 +84,13 @@ try { scene = createScene(canvas); } catch {
 }
 scene.setView(view); scene.setZoom(zoom); tablePreferences();
 for (const name of ['seated', 'standing'] as const) $(`view-${name}`).addEventListener('click', () => {
-  if (phase !== 'pass' || pointer !== null || orbitPointer !== null || pinching) return;
+  if (!canInspectBoard() || pointer !== null || orbitPointer !== null || pinching) return;
   setBoardView(name);
 });
 let mode: Mode = 'duel', player = 0, round = 1, id = 0;
 let discs: Disc[] = [], scores = [0, 0], used = [0, 0], phase: Phase = 'pass';
-let restored = false;
+let restored = false, winnerDismissed = false;
+const canInspectBoard = () => phase === 'pass' || phase === 'round' || (phase === 'won' && winnerDismissed);
 let review: ShotReview | null = null, roundResult: RoundResult | null = null;
 let shotSeconds = 60, deadline: number | null = null;
 try {
@@ -115,7 +117,7 @@ const yaw = () => player * Math.PI * 2 / count();
 const side = (owner: number) => sideOf(mode, owner);
 const label = (i: number) => mode === 'teams' ? [`${names[0]} + ${names[2]}`, `${names[1]} + ${names[3]}`][i] : names[i];
 function save() {
-  const snapshot: SavedMatch = { version: 1, mode, player, round, id, discs, scores, used, phase, review, roundResult, deadline, paused, remaining: pausedRemaining, stagedId: staged?.id ?? null, hadOpponent, shot: shot ? { touched: [...shot.touched], opponentContact: shot.opponentContact, side: shot.side } : null };
+  const snapshot: SavedMatch = { version: 1, mode, player, round, id, discs, scores, used, phase, review, roundResult, winnerDismissed, deadline, paused, remaining: pausedRemaining, stagedId: staged?.id ?? null, hadOpponent, shot: shot ? { touched: [...shot.touched], opponentContact: shot.opponentContact, side: shot.side } : null };
   try { localStorage.setItem('crokinole-match', JSON.stringify(snapshot)); } catch { /* Storage is optional. */ }
 }
 function pauseGame() {
@@ -155,6 +157,7 @@ function hud() {
     summary.dataset.boardFocus = String(roundBoardFocus);
     summary.innerHTML = `<div class="summary-heading"><h2>Round ${round} · score breakdown</h2><button class="round-board-toggle" type="button" aria-expanded="${!roundBoardFocus}" aria-label="${roundBoardFocus ? 'Show round scores' : 'Show game board'}">${eyeIcon}</button></div><table><thead><tr><th scope="col">Side</th><th scope="col">20s</th><th scope="col">15s</th><th scope="col">10s</th><th scope="col">5s</th><th scope="col">Total</th><th scope="col">Added</th></tr></thead><tbody>${roundResult.sides.map((row, i) => `<tr><th scope="row">${label(i)}</th><td>${row.twenties}</td><td>${row.fifteens}</td><td>${row.tens}</td><td>${row.fives}</td><td>${row.total}</td><td><strong>+${row.awarded}</strong></td></tr>`).join('')}</tbody></table><p>Disc counts × ring value = total. ${mode === 'ffa' ? 'Each player adds their own total.' : 'Only the difference is added to the winning side.'}</p>`;
   } else summary.dataset.boardFocus = 'false';
+  winnerPresentation();
 }
 $('scoreboard').addEventListener('click', event => {
   const card = (event.target as HTMLElement).closest<HTMLElement>('[data-score-card]');
@@ -191,7 +194,7 @@ function pass(message = '', restoreClock = false) {
 function start() {
   mode = $<HTMLSelectElement>('mode').value as Mode;
   player = 0; round = 1; id = 0; discs = []; scores = Array(mode === 'ffa' ? 4 : 2).fill(0); used = Array(count()).fill(0);
-  review = null; roundResult = null; shot = null; roundBoardFocus = false;
+  review = null; roundResult = null; shot = null; roundBoardFocus = false; winnerDismissed = false;
   settings.close(); pass();
 }
 function nextRound() {
@@ -207,41 +210,29 @@ next.addEventListener('click', () => {
   if (phase === 'round') nextRound();
   else if (phase === 'won') start();
 });
+
+function winnerPresentation() {
+  const won = phase === 'won' && roundResult?.winner != null;
+  $('winner-overlay').hidden = !won || winnerDismissed;
+  $('show-winner').hidden = !won || !winnerDismissed;
+  if (!won) return;
+  const winner = roundResult!.winner!;
+  const title = `${label(winner)} ${mode === 'teams' ? 'Win' : 'Wins'}!`;
+  $('winner-title').textContent = title;
+  $('winner-overlay').style.setProperty('--winner-color', colors[winner]);
+  $('winner-result').textContent = `${scores.join('–')} · ${round} round${round === 1 ? '' : 's'}`;
+}
+$('inspect-board').addEventListener('click', () => {
+  winnerDismissed = true; roundBoardFocus = true; hud(); save();
+  requestAnimationFrame(() => $('view-center').focus({ preventScroll: true }));
+});
+$('show-winner').addEventListener('click', () => {
+  winnerDismissed = false; hud(); save(); $('inspect-board').focus({ preventScroll: true });
+});
+$('winner-new-game').addEventListener('click', start);
 $('settings-button').addEventListener('click', () => settings.showModal());
 $('new-game').addEventListener('click', start);
 const skin = $<HTMLSelectElement>('skin');
-let artworkVersion = 0;
-function removeArtwork() {
-  artworkVersion++;
-  scene.setSkin(skin.value);
-  $<HTMLInputElement>('art').value = '';
-  $<HTMLButtonElement>('remove-art').disabled = true;
-  try { localStorage.removeItem('crokinole-art'); } catch { /* optional */ }
-  $('settings-note').textContent = 'Artwork removed. Your board finish is restored.';
-}
-$('remove-art').addEventListener('click', removeArtwork);
-skin.addEventListener('change', () => {
-  removeArtwork();
-  try { localStorage.setItem('crokinole-skin', skin.value); } catch { /* optional */ }
-});
-$<HTMLInputElement>('art').addEventListener('change', async e => {
-  const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return;
-  if (!file.type.startsWith('image/') || file.size > 10 * 1024 * 1024) { $('settings-note').textContent = 'Choose an image smaller than 10 MB.'; return; }
-  const version = ++artworkVersion;
-  $<HTMLButtonElement>('remove-art').disabled = false;
-  const url = URL.createObjectURL(file), image = new Image();
-  image.onload = () => {
-    if (version !== artworkVersion) { URL.revokeObjectURL(url); return; }
-    const cv = document.createElement('canvas'); cv.width = cv.height = 1024;
-    const ctx = cv.getContext('2d')!; const scale = Math.max(1024 / image.width, 1024 / image.height);
-    ctx.drawImage(image, (1024 - image.width * scale) / 2, (1024 - image.height * scale) / 2, image.width * scale, image.height * scale);
-    const data = cv.toDataURL('image/jpeg', 0.85);
-    scene.setSkin(skin.value, image); URL.revokeObjectURL(url);
-    try { localStorage.setItem('crokinole-art', data); } catch { /* Image still works for this session. */ }
-    $('settings-note').textContent = 'Artwork applied to this table.';
-  };
-  image.onerror = () => { URL.revokeObjectURL(url); $('settings-note').textContent = 'That image could not be opened.'; }; image.src = url;
-});
 let pointer: number | null = null;
 let orbitPointer: number | null = null;
 let orbitLast = { x: 0, y: 0 };
@@ -278,10 +269,10 @@ function touchDistance() {
   return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
 }
 function setZoom(value: number) {
-  if (paused || phase !== 'pass' || pointer !== null || orbitPointer !== null || settings.open) return;
+  if (paused || !canInspectBoard() || pointer !== null || orbitPointer !== null || settings.open) return;
   zoom = clampZoom(value); scene.setZoom(zoom); tablePreferences();
 }
-$('view-center').addEventListener('click', () => { if (phase === 'pass' && orbitPointer === null && !pinching) scene.centerView(); });
+$('view-center').addEventListener('click', () => { if (canInspectBoard() && orbitPointer === null && !pinching) scene.centerView(); });
 canvas.addEventListener('pointerdown', e => {
   if (paused) return;
   if (e.pointerType === 'touch') {
@@ -293,13 +284,13 @@ canvas.addEventListener('pointerdown', e => {
     }
     if (pinching) return;
   }
-  if (phase === 'pass' && !settings.open && performance.now() >= readyAt && orbitPointer === null && pointer === null && (e.pointerType === 'touch' || e.button === 0)) {
+  if (canInspectBoard() && !settings.open && (phase !== 'pass' || performance.now() >= readyAt) && orbitPointer === null && pointer === null && (e.pointerType === 'touch' || e.button === 0)) {
     const p = scene.boardPoint(e.clientX, e.clientY);
-    if (staged && p && !scene.isViewMoving() && canStartFlick(p, staged)) {
+    if (phase === 'pass' && staged && p && !scene.isViewMoving() && canStartFlick(p, staged)) {
       pointer = e.pointerId; press = { x: e.clientX, y: e.clientY }; flickStart = p;
       discCrossed = false;
       trail = [{ ...p, t: performance.now() }];
-    } else if (linePosition(e.clientX, e.clientY)) {
+    } else if (phase === 'pass' && linePosition(e.clientX, e.clientY)) {
       placementPointer = e.pointerId; placementPress = { x: e.clientX, y: e.clientY };
     } else {
       orbitPointer = e.pointerId; orbitLast = { x: e.clientX, y: e.clientY };
@@ -327,7 +318,7 @@ canvas.addEventListener('pointermove', e => {
     return;
   }
   if (e.pointerId === orbitPointer) {
-    if (phase === 'pass' && !settings.open) scene.dragView(
+    if (canInspectBoard() && !settings.open) scene.dragView(
       (e.clientX - orbitLast.x) / canvas.clientWidth * Math.PI,
       (e.clientY - orbitLast.y) / canvas.clientHeight,
     );
@@ -432,10 +423,11 @@ function finishReview() {
   review = null;
   if (used.every(n => n === allowance())) {
     roundResult = completeRound(discs, mode, scores); scores = roundResult.after;
-    phase = roundResult.winner !== null ? 'won' : 'round';
+    phase = roundResult.winner !== null ? 'won' : 'round'; winnerDismissed = false;
     banner.textContent = roundResult.winner !== null ? `${label(roundResult.winner)} wins!` : 'Round complete';
     hint.textContent = roundResult.sides.map((row, i) => `${label(i)} +${row.awarded}`).join(' · ');
     next.textContent = phase === 'won' ? 'Start a new game' : 'Next round'; next.setAttribute('aria-label', next.textContent); next.dataset.mode = 'result'; next.hidden = false; hud(); save();
+    if (phase === 'won') $('inspect-board').focus({ preventScroll: true });
   } else { player = (player + 1) % count(); pass(valid ? '' : 'Foul resolved'); }
 }
 let last = performance.now(), accumulator = 0;
@@ -470,8 +462,8 @@ function tick(now: number) {
     }
   }
   sound.setListenerYaw(scene.getYaw());
-  const controlsLocked = phase !== 'pass' || pointer !== null || orbitPointer !== null || placementPointer !== null || pinching;
-  canvas.classList.toggle('can-orbit', phase === 'pass');
+  const controlsLocked = !canInspectBoard() || pointer !== null || orbitPointer !== null || placementPointer !== null || pinching;
+  canvas.classList.toggle('can-orbit', canInspectBoard());
   canvas.classList.toggle('is-orbiting', orbitPointer !== null);
   $<HTMLButtonElement>('view-center').disabled = controlsLocked;
   for (const name of ['seated', 'standing']) $<HTMLButtonElement>(`view-${name}`).disabled = controlsLocked;
@@ -480,7 +472,6 @@ function tick(now: number) {
 }
 try {
   const savedSkin = localStorage.getItem('crokinole-skin'); if (savedSkin && ['maple', 'walnut', 'slate'].includes(savedSkin)) { skin.value = savedSkin; scene.setSkin(savedSkin); }
-  const art = localStorage.getItem('crokinole-art'); if (art) { const version = ++artworkVersion; const image = new Image(); $<HTMLButtonElement>('remove-art').disabled = false; image.onload = () => { if (version === artworkVersion) scene.setSkin(skin.value, image); }; image.src = art; }
   const raw = localStorage.getItem('crokinole-match');
   if (raw) {
     const data = readMatch(raw);
@@ -492,10 +483,11 @@ try {
       hadOpponent = data.hadOpponent;
       shot = data.shot ? { ...data.shot, touched: new Set(data.shot.touched), sideOf: side } : null;
       $<HTMLSelectElement>('mode').value = mode;
-      roundResult = data.roundResult; review = data.review;
+      roundResult = data.roundResult; review = data.review; winnerDismissed = data.winnerDismissed === true;
     }
   }
 } catch { /* Start fresh if storage is unavailable. */ }
+setupBoardArtwork(scene, skin);
 if (restored) {
   scene.setYawTarget(yaw()); hud();
   if (phase === 'review') { next.hidden = true; reviewMessage(); }
@@ -508,5 +500,6 @@ if (restored) {
     pass('', true);
   }
 } else pass();
+winnerPresentation();
 if (paused) { scene.setPaused(true); pauseDialog.showModal(); }
 requestAnimationFrame(tick);
