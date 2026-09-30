@@ -2,9 +2,13 @@ import type { Disc } from '../sim/physics';
 import type { Mode, RoundResult } from './rules';
 import type { ShotReview } from './review';
 
+// Keep the pre-spin match untouched so switching back to either stable tag
+// restores that table rather than feeding new physics state to the old reader.
+export const MATCH_STORAGE_KEY = 'crokinole-match-spin-v2';
+
 export type Phase = 'pass' | 'moving' | 'review' | 'round' | 'won';
 export interface SavedMatch {
-  version: 1;
+  version: 2;
   winnerDismissed?: boolean;
   mode: Mode; player: number; round: number; id: number;
   discs: Disc[]; scores: number[]; used: number[]; phase: Phase;
@@ -23,7 +27,8 @@ const numbers = (v: unknown, length: number) => Array.isArray(v) && v.length ===
 export function readMatch(raw: string): SavedMatch | null {
   try {
     const d = JSON.parse(raw);
-    if (!record(d) || (d.version !== undefined && d.version !== 1)) return null;
+    if (!record(d) || (d.version !== undefined && d.version !== 1 && d.version !== 2)) return null;
+    const legacy = d.version !== 2;
     if (!['duel', 'teams', 'ffa'].includes(String(d.mode))) return null;
     const players = d.mode === 'duel' ? 2 : 4, sides = d.mode === 'ffa' ? 4 : 2;
     if (!natural(d.player) || d.player >= players || !natural(d.round) || d.round < 1 || !natural(d.id)) return null;
@@ -32,6 +37,11 @@ export function readMatch(raw: string): SavedMatch | null {
     const validDisc = (v: unknown): v is Disc => {
       if (!record(v) || !natural(v.id) || !natural(v.owner) || v.owner >= players) return false;
       if (!['x', 'y', 'vx', 'vy', 'z', 'vz'].every(k => finite(v[k])) || !['board', 'out', 'sunk'].includes(String(v.state))) return false;
+      if (legacy) {
+        if (v.spin === undefined) v.spin = 0;
+        if (v.angle === undefined) v.angle = 0;
+      }
+      if (!finite(v.spin) || !finite(v.angle)) return false;
       if (v.hole !== undefined && (!record(v.hole) || typeof v.hole.engaged !== 'boolean' || !['dip', 'fall', 'tilt', 'tiltSpeed', 'lean', 'rollPhase'].every(k => finite((v.hole as Record<string, unknown>)[k])))) return false;
       return (v.ditchSlot === undefined || (natural(v.ditchSlot) && v.ditchSlot < 60)) && (v.holeCleared === undefined || typeof v.holeCleared === 'boolean');
     };
@@ -61,6 +71,6 @@ export function readMatch(raw: string): SavedMatch | null {
     if (d.winnerDismissed !== undefined && typeof d.winnerDismissed !== 'boolean') return null;
     if (d.paused !== undefined && typeof d.paused !== 'boolean') return null;
     if (d.paused && d.remaining !== null && (!finite(d.remaining) || d.remaining < 0)) return null;
-    return { ...d, version: 1, phase: d.phase === 'aim' ? 'pass' : d.phase, deadline: d.deadline ?? null, paused: d.paused ?? false, remaining: d.remaining ?? null, stagedId: d.stagedId ?? null, hadOpponent: d.hadOpponent ?? false, shot: d.shot ?? null, review: d.phase === 'review' ? d.review : null, roundResult: ['round', 'won'].includes(String(d.phase)) ? d.roundResult : null } as SavedMatch;
+    return { ...d, version: 2, phase: d.phase === 'aim' ? 'pass' : d.phase, deadline: d.deadline ?? null, paused: d.paused ?? false, remaining: d.remaining ?? null, stagedId: d.stagedId ?? null, hadOpponent: d.hadOpponent ?? false, shot: d.shot ?? null, review: d.phase === 'review' ? d.review : null, roundResult: ['round', 'won'].includes(String(d.phase)) ? d.roundResult : null } as SavedMatch;
   } catch { return null; }
 }

@@ -49,10 +49,10 @@ try {
   async function reload() { await evaluate('window.__oldDocument=true'); await call('Page.reload', { ignoreCache: true }); await until('!window.__oldDocument && !!document.getElementById("artwork-gallery") && document.querySelectorAll(".artwork-preview").length === 4 && !document.getElementById("use-finish").disabled'); }
   await call('Page.enable');
   async function restoreMatch(match) {
-    const { identifier } = await call('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.setItem('crokinole-match', ${JSON.stringify(JSON.stringify(match))})` });
+    const { identifier } = await call('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.setItem('crokinole-match-spin-v2', ${JSON.stringify(JSON.stringify(match))})` });
     try { await reload(); } finally { await call('Page.removeScriptToEvaluateOnNewDocument', { identifier }); }
   }
-  const state = () => evaluate('JSON.parse(localStorage.getItem("crokinole-match"))');
+  const state = () => evaluate('JSON.parse(localStorage.getItem("crokinole-match-spin-v2"))');
   const library = () => evaluate('import("/src/storage/artwork.ts").then(m => m.loadArtworkLibrary())');
   await until('document.querySelectorAll(".artwork-preview").length === 4 && !document.getElementById("use-finish").disabled');
   const png = await evaluate('(() => { const c=document.createElement("canvas"); c.width=c.height=32; const x=c.getContext("2d"); x.fillStyle="#845f92"; x.fillRect(0,0,32,32); return c.toDataURL("image/png"); })()');
@@ -105,7 +105,7 @@ try {
   // Restore a final shot review, then let the actual game complete the round.
   const finalShot = await evaluate(`(async () => {
     const { makeDisc } = await import('/src/sim/physics.ts');
-    const s=JSON.parse(localStorage.getItem('crokinole-match'));
+    const s=JSON.parse(localStorage.getItem('crokinole-match-spin-v2'));
     const red=makeDisc(1,0,0,0); red.state='sunk'; red.holeCleared=true;
     const blue=makeDisc(2,1,0,10);
     Object.assign(s,{mode:'duel',player:0,round:5,id:2,discs:[red,blue],scores:[89,78],used:[12,12],phase:'review',paused:false,remaining:null,deadline:null,stagedId:null,roundResult:null,winnerDismissed:false,shot:null,review:{elapsed:2000,hold:1250,removed:[],verdict:{valid:true,reason:null,foulIds:[],removalIds:[],revokedTwenties:0}}});

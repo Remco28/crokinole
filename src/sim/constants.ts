@@ -40,6 +40,10 @@ export const TUNE = {
   landBounce: 0.35,
   maxStepMove: 0.2, // inches per substep (CCD guard)
   sleepSpeed: 0.15,
+  sleepSpin: 0.04, // rad/s; finite axial rest below imperceptible rim speed
+  contactFrictionDisc: 0.18, // wood rims: Coulomb bound on tangential impulse
+  contactFrictionPeg: 0.28, // rubber posts have more tangential grip
+  contactFrictionLip: 0.12, // conservative wood lip contact; no free-flight curl
   holeCaptureSpeed: 32, // slightly tighter speed gate now that overlap drives drop-through
   holeWeightShiftSpeed: 72, // grounded crossings can still receive a weaker weight-shift pull
   holeSinkDip: 0.03, // modest engagement threshold for a mostly-submerged disc

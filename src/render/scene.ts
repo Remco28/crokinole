@@ -179,6 +179,10 @@ export function createScene(canvas: HTMLCanvasElement) {
   const discGeo = makeDiscGeometry();
   const meshes = new Map<number, THREE.Mesh<THREE.LatheGeometry, THREE.MeshStandardMaterial>>();
   const materials = PLAYER_COLORS.map(color => new THREE.MeshStandardMaterial({ color, roughness: 0.3 }));
+  // A small inlaid dash makes axial rotation readable without changing ownership
+  // colors or introducing a separate spin HUD, even on a phone-sized board.
+  const inlayGeo = new THREE.BoxGeometry(0.22, 0.006, 0.045);
+  const inlayMaterial = new THREE.MeshStandardMaterial({ color: '#fff1d6', roughness: 0.8 });
   let pausedAt: number | null = null, pausedDuration = 0;
   const animationNow = () => (pausedAt ?? performance.now()) - pausedDuration;
   let activeDisc: number | null = null, highlightAt = 0, activeHighlightEnabled = true;
@@ -218,12 +222,18 @@ export function createScene(canvas: HTMLCanvasElement) {
     for (const d of discs) {
       if (!visible.has(d.id)) continue;
       let mesh = meshes.get(d.id);
-      if (!mesh) { mesh = new THREE.Mesh(discGeo, materials[d.owner].clone()); mesh.castShadow = true; meshes.set(d.id, mesh); scene.add(mesh); }
+      if (!mesh) {
+        mesh = new THREE.Mesh(discGeo, materials[d.owner].clone()); mesh.castShadow = true;
+        const inlay = new THREE.Mesh(inlayGeo, inlayMaterial);
+        inlay.position.set(DISC.radius * 0.58, DISC.height / 2 + 0.003, 0);
+        mesh.add(inlay); meshes.set(d.id, mesh); scene.add(mesh);
+      }
       const source = removals.get(d.id) ?? d;
       const tilt = source.hole?.tilt ?? 0, lean = source.hole?.lean ?? 0;
       mesh.position.set(source.x, discHalfHeight(source) + source.z - (source.hole?.dip ?? 0), source.y);
       mesh.quaternion.setFromAxisAngle(new THREE.Vector3(Math.sin(lean), 0, -Math.cos(lean)), tilt);
-      mesh.rotateY(source.hole?.rollPhase ?? 0);
+      // Simulation CCW in (x,y) maps to negative yaw in Three's (x,z) plane.
+      mesh.rotateY((source.hole?.rollPhase ?? 0) - source.angle);
       mesh.visible = true;
       mesh.material.emissive.set(d.id === active?.id ? '#ffe1a0' : '#000000');
       mesh.material.emissiveIntensity = d.id === active?.id ? 0.12 + pulse * 1.15 : 0;
@@ -242,7 +252,7 @@ export function createScene(canvas: HTMLCanvasElement) {
         const angle = Math.atan2(-source.y, -source.x);
         const tip = Math.min(0.38, offset * 0.65) * Math.sin(Math.PI * t);
         mesh.quaternion.setFromAxisAngle(new THREE.Vector3(Math.sin(angle), 0, -Math.cos(angle)), tilt * (1 - ease) + tip);
-        mesh.rotateY((source.hole?.rollPhase ?? 0) + 0.12 * Math.sin(2 * Math.PI * t) * (1 - t));
+        mesh.rotateY((source.hole?.rollPhase ?? 0) - source.angle + 0.12 * Math.sin(2 * Math.PI * t) * (1 - t));
       }
       let progress = 0;
       if (d.state === 'out') {
@@ -254,7 +264,7 @@ export function createScene(canvas: HTMLCanvasElement) {
         // The gutter accommodates a full flat disc, with a clear margin on both sides.
         const parkedRadius = (BOARD.playRadius + BOARD.ditchOuterRadius) / 2;
         const target = new THREE.Vector3(Math.cos(angle) * parkedRadius, -0.395 + DISC.height / 2, Math.sin(angle) * parkedRadius);
-        const targetRotation = new THREE.Quaternion();
+        const targetRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -source.angle);
         const t = reducedMotion.matches ? Number(progress >= 1) : progress * progress * (3 - 2 * progress);
         mesh.position.lerp(target, t);
         if (!reducedMotion.matches) mesh.position.y += Math.sin(Math.PI * progress) * 0.8;

@@ -12,7 +12,14 @@ Framing shifts upward slightly to leave more room below the rim.
 
 Flick strength uses the original power response (speed × 0.8 + 12, capped at
 105), after rejecting stationary gestures. Surface friction is set to 0.120 for
-a modestly shorter glide (previously 0.115), with flick power and collision bounce unchanged.
+a modestly shorter glide (previously 0.115), with the power ceiling and normal collision bounce unchanged.
+
+The spin preview adds forgiving axial rotation: centered flicks stay neutral,
+while deliberate side contact imparts bounded spin. Disc/peg/lip contacts can
+generate and change it; board friction slows it until rest. A small cream disc
+inlay makes rotation visible. No random misses or artificial curling are added.
+See [physics versions and rollback](PHYSICS-VERSIONS.md) for stable checkpoints,
+save compatibility, tuning details, and the unpublished playtest branch.
 
 Tap the painted shooting line to move your disc, including small adjustments
 beside its current position. The shot clock defaults to
@@ -124,8 +131,9 @@ physical proportions are being recalibrated. Fast shots should still be able
 to catch the lip and deflect rather than being forced into the hole.
 
 - Two-player, four-player teams (opposite partners), and four-player free-for-all.
-- Fixed-step physics with adaptive collision substeps, friction, pegs, disc
-  collisions, impact hops, hole-lip deflection, brief edge rolls, and ditch removal.
+- Fixed-step physics with adaptive collision substeps, sliding/rotational friction,
+  spin-aware disc/peg/lip contacts, energy-bounded impact hops, hole-lip deflection,
+  brief edge rolls, and ditch removal.
 - Opponent-contact and open-board shot validation, foul removal, line-aware
   scoring, rounds and matches to 100, including tied-match continuation.
 - Rotating player views, mouse/touch flicks, responsive scores and pass screen.
@@ -134,8 +142,9 @@ to catch the lip and deflect rather than being forced into the hole.
   and hole/ditch clatter. Volume, mute, and view preferences persist.
 - Three procedural board finishes and persisted custom artwork (1024px), with
   a Remove artwork button to restore the selected finish.
-- Versioned match saves preserve placement, in-flight shot contact history, pauses,
-  reviews, and round results. Invalid or incompatible saves start a fresh game.
+- Versioned match saves preserve placement, axial rotation, in-flight shot contact
+  history, pauses, reviews, and round results. The spin preview uses a separate save
+  key and leaves the pre-spin table intact for rollback. Invalid or incompatible saves start a fresh game.
   Storage is optional when unavailable.
 
 ## Verify and deploy
@@ -195,13 +204,15 @@ match points.
 
 ## Browser verification
 
-`npm run test:browser` runs the artwork and winner flows in a fresh headless Chrome
+`npm run test:browser` runs artwork, winner, and spin-control flows in fresh headless Chrome
 profile with a local Vite server. It checks migration of the old image, four slots,
 replacement without exceeding the limit, preserving images when a save fails,
 deletion, selection and reloads, final-shot scoring, winner messages for each mode,
 dismissal and reopening, final-board inspection, and starting a new game. Set
 `CHROME_BIN` to your Chrome or Chromium executable if needed. Node 22 or later
-is required. `npm test` runs the unit suite; `npm run build` checks TypeScript and
+is required. Spin checks cover native mouse/touch flicks, mobile neutral contact,
+legacy-save preservation, and paused rotation across reload. `npm test` runs the
+unit suite; `npm run build` checks TypeScript and
 builds the production app.
 
 Custom board artwork also enables small cream-and-dark collars at the peg bases for visibility over light, dark, or detailed images. Built-in board finishes retain their original pegs.

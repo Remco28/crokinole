@@ -1,11 +1,14 @@
 import { discContactRadius, discHalfHeight, holeMoving, interactWithHole, rollingAmount, settleTilt, type HoleMotion } from './hole';
 import { BOARD, DISC, PEGS, TUNE, pegPositions } from './constants';
+import { contactFriction, contactHop, integrateSpin } from './spin';
 
-export interface Disc { id: number; owner: number; x: number; y: number; vx: number; vy: number; z: number; vz: number; state: 'board' | 'sunk' | 'out'; hole?: HoleMotion; ditchSlot?: number; holeCleared?: boolean }
+export interface Disc { id: number; owner: number; x: number; y: number; vx: number; vy: number; z: number; vz: number; spin: number; angle: number; state: 'board' | 'sunk' | 'out'; hole?: HoleMotion; ditchSlot?: number; holeCleared?: boolean }
 export interface PhysicsEvent { kind: 'disc' | 'peg' | 'sink' | 'ditch' | 'land' | 'lip'; speed: number; x: number; y: number; key: string }
 export interface Shot { touched: Set<number>; opponentContact: boolean; side: number; sideOf: (owner: number) => number }
-export const makeDisc = (id: number, owner: number, x: number, y: number): Disc => ({ id, owner, x, y, vx: 0, vy: 0, z: 0, vz: 0, state: 'board' });
-export const moving = (d: Disc) => d.state === 'board' && (Math.hypot(d.vx, d.vy) > 0 || d.z > 0 || d.vz !== 0 || holeMoving(d));
+export const makeDisc = (id: number, owner: number, x: number, y: number): Disc => ({ id, owner, x, y, vx: 0, vy: 0, z: 0, vz: 0, spin: 0, angle: 0, state: 'board' });
+// Only integrateSpin may sleep axial motion: even a tiny collision-created spin
+// gets one settling update before turn handover, leaving exactly zero behind.
+export const moving = (d: Disc) => d.state === 'board' && (Math.hypot(d.vx, d.vy) > 0 || d.spin !== 0 || d.z > 0 || d.vz !== 0 || holeMoving(d));
 const pegs = pegPositions();
 export function step(discs: Disc[], dt: number, shot: Shot, airborne = true, emit?: (event: PhysicsEvent) => void) {
   // Resolve the narrow twenty clearance and lip dwell time more finely than pegs.
@@ -17,7 +20,7 @@ export function step(discs: Disc[], dt: number, shot: Shot, airborne = true, emi
   let holeOccupied = discs.some(d => d.state === 'sunk' && !d.holeCleared);
   for (let n = 0; n < steps; n++) {
     for (const d of discs) {
-      if (d.state !== 'board') continue;
+      if (d.state !== 'board') { d.spin = 0; continue; }
       const previousRadius = Math.hypot(d.x, d.y);
       settleTilt(d, h);
       d.x += d.vx * h; d.y += d.vy * h;
@@ -27,13 +30,14 @@ export function step(discs: Disc[], dt: number, shot: Shot, airborne = true, emi
       }
       const v = Math.hypot(d.vx, d.vy);
       const friction = d.z > 0.01 ? 0 : 1 - rollingAmount(d) * (1 - TUNE.rollingFrictionRatio);
+      integrateSpin(d, h, friction);
       const next = Math.max(0, v - (TUNE.frictionMu * 386 + TUNE.frictionViscous * v) * friction * h);
       const ratio = v > 0 && next > TUNE.sleepSpeed ? next / v : 0;
       d.vx *= ratio; d.vy *= ratio;
       const radius = Math.hypot(d.x, d.y);
       // Only leaving the playing surface is immediate. Line-touching discs remain
       // hittable until the whole shot has settled, then rules remove them.
-      if (radius > BOARD.playRadius) { emit?.({ kind: 'ditch', speed: Math.max(12, v), x: d.x, y: d.y, key: `ditch:${d.id}` }); d.state = 'out'; continue; }
+      if (radius > BOARD.playRadius) { emit?.({ kind: 'ditch', speed: Math.max(12, v), x: d.x, y: d.y, key: `ditch:${d.id}` }); d.state = 'out'; d.spin = 0; continue; }
       if (holeOccupied && d.z < DISC.height && radius < previousRadius) {
         // Block inward motion, never relocate a resting lip hanger when another
         // disc claims the pocket. An already-overlapping disc keeps its prior
@@ -45,8 +49,10 @@ export function step(discs: Disc[], dt: number, shot: Shot, airborne = true, emi
           d.x = nx * contact; d.y = ny * contact;
           const normal = d.vx * nx + d.vy * ny;
           if (normal < 0) {
+            const impulse = -(1 + TUNE.restitutionDisc) * normal;
             d.vx -= (1 + TUNE.restitutionDisc) * normal * nx;
             d.vy -= (1 + TUNE.restitutionDisc) * normal * ny;
+            contactFriction(d, undefined, -nx, -ny, discContactRadius(d, nx, ny), 0, impulse, TUNE.contactFrictionDisc);
             emit?.({ kind: 'disc', speed: -normal, x: d.x, y: d.y, key: `hole-block:${d.id}` });
           }
         }
@@ -66,7 +72,10 @@ export function step(discs: Disc[], dt: number, shot: Shot, airborne = true, emi
           emit?.({ kind: 'peg', speed: -normal, x: p.x, y: p.y, key: `peg:${d.id}:${p.x}:${p.y}` });
           d.vx -= (1 + TUNE.restitutionPeg) * normal * nx;
           d.vy -= (1 + TUNE.restitutionPeg) * normal * ny;
-          if (airborne) d.vz = Math.max(d.vz, -normal * 0.1);
+          contactFriction(d, undefined, -nx, -ny, discContactRadius(d, nx, ny), 0,
+            -(1 + TUNE.restitutionPeg) * normal, TUNE.contactFrictionPeg);
+          if (airborne) contactHop([d], [Math.max(d.vz, -normal * 0.1)],
+            0.5 * (1 - TUNE.restitutionPeg ** 2) * normal ** 2);
         }
       }
     }
@@ -75,7 +84,8 @@ export function step(discs: Disc[], dt: number, shot: Shot, airborne = true, emi
       if (a.state !== 'board' || b.state !== 'board' || a.z > b.z + discHalfHeight(b) * 2 || b.z > a.z + discHalfHeight(a) * 2) continue;
       const dx = b.x - a.x, dy = b.y - a.y, dist = Math.hypot(dx, dy);
       const nx = dist ? dx / dist : 1, ny = dist ? dy / dist : 0;
-      const contactRadius = discContactRadius(a, nx, ny) + discContactRadius(b, nx, ny);
+      const radiusA = discContactRadius(a, nx, ny), radiusB = discContactRadius(b, nx, ny);
+      const contactRadius = radiusA + radiusB;
       if (dist >= contactRadius) continue;
       const overlap = (contactRadius - dist) / 2;
       a.x -= nx * overlap; a.y -= ny * overlap; b.x += nx * overlap; b.y += ny * overlap;
@@ -88,7 +98,9 @@ export function step(discs: Disc[], dt: number, shot: Shot, airborne = true, emi
       emit?.({ kind: 'disc', speed: -v, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, key: `disc:${a.id}:${b.id}` });
       const impulse = -(1 + TUNE.restitutionDisc) * v / 2;
       a.vx -= impulse * nx; a.vy -= impulse * ny; b.vx += impulse * nx; b.vy += impulse * ny;
-      if (airborne) { a.vz = Math.max(a.vz, impulse * 0.08); b.vz = Math.max(b.vz, impulse * 0.06); }
+      contactFriction(a, b, nx, ny, radiusA, radiusB, impulse, TUNE.contactFrictionDisc);
+      if (airborne) contactHop([a, b], [Math.max(a.vz, impulse * 0.08), Math.max(b.vz, impulse * 0.06)],
+        0.25 * (1 - TUNE.restitutionDisc ** 2) * v ** 2);
     }
   }
 }

@@ -1,5 +1,6 @@
 import { BOARD, DISC, TUNE } from './constants';
 import type { Disc, PhysicsEvent } from './physics';
+import { contactFriction } from './spin';
 
 /** Local contact approximation, not a full 3D rigid-body solver. Angles in radians. */
 export interface HoleMotion {
@@ -85,7 +86,7 @@ export function interactWithHole(d: Disc, previousRadius: number, dt: number, ai
     const canDropThrough = r <= clearance || (speed > 0.5 && m.dip >= TUNE.holeSinkDip && holeOverlapFraction(r) >= TUNE.holeDropOverlap);
     if (canDropThrough && speed < TUNE.holeCaptureSpeed && Math.abs(m.tilt) < TUNE.holeMaxSinkTilt) {
       emit?.({ kind: 'sink', speed: Math.max(20, speed), x: d.x, y: d.y, key: `sink:${d.id}` });
-      d.state = 'sunk'; d.vx = d.vy = d.vz = 0;
+      d.state = 'sunk'; d.vx = d.vy = d.vz = d.spin = 0;
       return;
     }
   }
@@ -101,6 +102,11 @@ export function interactWithHole(d: Disc, previousRadius: number, dt: number, ai
         const before = d.vx * d.vx + d.vy * d.vy;
         d.vx -= nx * normal * loss; d.vy -= ny * normal * loss;
         const removed = Math.max(0, before - d.vx * d.vx - d.vy * d.vy);
+        // Exiting the bevel contacts the outward rim. Include axial rim slip,
+        // but never apply a spin-dependent sink gate or a free-flight force.
+        // Hop/rocking below still spend only the original radial energy loss.
+        contactFriction(d, undefined, nx, ny, discContactRadius(d, nx, ny), 0,
+          normal * loss, TUNE.contactFrictionLip);
         if (airborne) {
           // Spend only a fraction of lost translational energy on hop/tilt.
           // Remaining energy is dissipated in contact; the hole cannot boost speed.

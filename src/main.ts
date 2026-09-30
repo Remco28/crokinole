@@ -1,13 +1,13 @@
 import { setupBoardArtwork } from './board-artwork';
 import { BoardSound } from './audio/sound';
-import { canStartFlick, crossesDisc, releaseVelocity, shouldRotateInstead } from './game/flick';
+import { canStartFlick, flickContactOffset, releaseShot, shouldRotateInstead } from './game/flick';
 import { createScene, type BoardView } from './render/scene';
 import { makeDisc, moving, step, type Disc, type Shot } from './sim/physics';
 import { completeRound, inspectShot, sideOf, type Mode, type RoundResult } from './game/rules';
 import { assignDitchSlots, beginReview, reviewDuration, type ShotReview } from './game/review';
 import { PLAYER_NAMES as names, PLAYER_COLORS as colors } from './game/players';
 import { remainingTime, resumeDeadline } from './game/clock';
-import { readMatch, type Phase, type SavedMatch } from './game/session';
+import { MATCH_STORAGE_KEY, readMatch, type Phase, type SavedMatch } from './game/session';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('board-canvas');
 // A long press on the board is a context-menu gesture on desktop and mobile.
@@ -117,8 +117,8 @@ const yaw = () => player * Math.PI * 2 / count();
 const side = (owner: number) => sideOf(mode, owner);
 const label = (i: number) => mode === 'teams' ? [`${names[0]} + ${names[2]}`, `${names[1]} + ${names[3]}`][i] : names[i];
 function save() {
-  const snapshot: SavedMatch = { version: 1, mode, player, round, id, discs, scores, used, phase, review, roundResult, winnerDismissed, deadline, paused, remaining: pausedRemaining, stagedId: staged?.id ?? null, hadOpponent, shot: shot ? { touched: [...shot.touched], opponentContact: shot.opponentContact, side: shot.side } : null };
-  try { localStorage.setItem('crokinole-match', JSON.stringify(snapshot)); } catch { /* Storage is optional. */ }
+  const snapshot: SavedMatch = { version: 2, mode, player, round, id, discs, scores, used, phase, review, roundResult, winnerDismissed, deadline, paused, remaining: pausedRemaining, stagedId: staged?.id ?? null, hadOpponent, shot: shot ? { touched: [...shot.touched], opponentContact: shot.opponentContact, side: shot.side } : null };
+  try { localStorage.setItem(MATCH_STORAGE_KEY, JSON.stringify(snapshot)); } catch { /* Storage is optional. */ }
 }
 function pauseGame() {
   if (paused || phase === 'won') return;
@@ -242,7 +242,7 @@ function cancelOrbit() { orbitPointer = null; }
 let trail: { x: number; y: number; t: number }[] = [];
 let press = { x: 0, y: 0 };
 let flickStart = { x: 0, y: 0 };
-let discCrossed = false;
+let discCrossed = false, flickOffset = 0;
 function linePosition(clientX: number, clientY: number) {
   // Placement targets the painted surface, not the elevated flick plane.
   const p = scene.boardPoint(clientX, clientY, 0); if (!p) return null;
@@ -288,7 +288,7 @@ canvas.addEventListener('pointerdown', e => {
     const p = scene.boardPoint(e.clientX, e.clientY);
     if (phase === 'pass' && staged && p && !scene.isViewMoving() && canStartFlick(p, staged)) {
       pointer = e.pointerId; press = { x: e.clientX, y: e.clientY }; flickStart = p;
-      discCrossed = false;
+      discCrossed = false; flickOffset = 0;
       trail = [{ ...p, t: performance.now() }];
     } else if (phase === 'pass' && linePosition(e.clientX, e.clientY)) {
       placementPointer = e.pointerId; placementPress = { x: e.clientX, y: e.clientY };
@@ -340,23 +340,26 @@ function sampleFlick(p: { x: number; y: number }) {
   if (deadline !== null && Date.now() >= deadline) { expireShot(); return; }
   const t = performance.now();
   trail.push({ ...p, t });
-  discCrossed ||= crossesDisc(trail, staged);
+  if (!discCrossed) {
+    const offset = flickContactOffset(trail, staged);
+    if (offset !== null) { discCrossed = true; flickOffset = offset; }
+  }
   trail = trail.filter(sample => t - sample.t <= 120);
 }
 function releaseFlick() {
   if (phase !== 'pass' || !staged || !discCrossed) return;
-  const velocity = releaseVelocity(trail, staged);
+  const velocity = releaseShot(trail, staged, flickOffset);
   if (!velocity) return;
   cancel();
   hadOpponent = discs.some(d => d.state === 'board' && side(d.owner) !== side(player));
   shot = { touched: new Set([staged.id]), opponentContact: false, side: side(player), sideOf: side };
   sound.play('flick', Math.hypot(velocity.x, velocity.y), staged.x, staged.y);
-  staged.vx = velocity.x; staged.vy = velocity.y; used[player]++; phase = 'moving';
+  staged.vx = velocity.x; staged.vy = velocity.y; staged.spin = velocity.spin; used[player]++; phase = 'moving';
   next.hidden = true;
   scene.highlightDisc(null);
   banner.textContent = 'Let it slide'; hint.textContent = 'Waiting for the board to settle…'; hud(); save();
 }
-function cancel() { pointer = null; trail = []; discCrossed = false; }
+function cancel() { pointer = null; trail = []; discCrossed = false; flickOffset = 0; }
 function endPointer(e: PointerEvent) {
   touches.delete(e.pointerId);
   if (touches.size === 0) { pinching = false; pinchDistance = 0; }
@@ -472,7 +475,7 @@ function tick(now: number) {
 }
 try {
   const savedSkin = localStorage.getItem('crokinole-skin'); if (savedSkin && ['maple', 'walnut', 'slate'].includes(savedSkin)) { skin.value = savedSkin; scene.setSkin(savedSkin); }
-  const raw = localStorage.getItem('crokinole-match');
+  const raw = localStorage.getItem(MATCH_STORAGE_KEY) ?? localStorage.getItem('crokinole-match');
   if (raw) {
     const data = readMatch(raw);
     if (data) {

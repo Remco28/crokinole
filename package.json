@@ -1,14 +1,14 @@
 {
   "name": "crokinole",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.2.0-preview.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:browser": "node tests/browser-round.mjs"
+    "test:browser": "node tests/browser-round.mjs && node tests/browser-spin.mjs"
   },
   "dependencies": {
     "three": "^0.180.0"
