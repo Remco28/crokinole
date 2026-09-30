@@ -11,8 +11,8 @@ last 120 milliseconds of the gesture, including follow-through. Missed swipes do
 Framing shifts upward slightly to leave more room below the rim.
 
 Flick strength uses the original power response (speed × 0.8 + 12, capped at
-105), after rejecting stationary gestures. Surface friction is set to 0.115 for
-a slightly shorter glide, with flick power and collision bounce unchanged.
+105), after rejecting stationary gestures. Surface friction is set to 0.120 for
+a modestly shorter glide (previously 0.115), with flick power and collision bounce unchanged.
 
 Tap the painted shooting line to move your disc, including small adjustments
 beside its current position. The shot clock defaults to
