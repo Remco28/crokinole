@@ -19,7 +19,7 @@ while deliberate side contact imparts bounded spin. Disc/peg/lip contacts can
 generate and change it; board friction slows it until rest. A small cream disc
 inlay makes rotation visible. No random misses or artificial curling are added.
 See [physics versions and rollback](PHYSICS-VERSIONS.md) for stable checkpoints,
-save compatibility, tuning details, and the unpublished playtest branch.
+save compatibility, tuning details, and the GitHub Pages playtest deployment.
 
 Tap the painted shooting line to move your disc, including small adjustments
 beside its current position. The shot clock defaults to

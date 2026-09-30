@@ -1,6 +1,6 @@
 # Physics versions and rollback
 
-The spin work is an unpublished playtest on `physics/spin-v0.2`. No push or Pages deployment is part of this change.
+The spin preview is published from `main` through GitHub Pages at https://crokinole.teamremco.org/. The original development branch is retained as `physics/spin-v0.2`.
 
 ## Preserved checkpoints
 
@@ -10,9 +10,9 @@ The spin work is an unpublished playtest on `physics/spin-v0.2`. No push or Page
 | `crokinole-v0.1.1-friction` | `0.1.1` | Small grip increase to `0.120`; original flick power and normal collision bounce. |
 | `crokinole-v0.2.0-spin-preview.1` | `0.2.0-preview.1` | Friction adjustment plus forgiving flick spin and physical tangential contacts. |
 
-The original checkpoint passed all 60 unit tests, production build, and artwork/winner browser flows. The friction checkpoint passed 62 unit tests, build, and the same browser flows. The preview adds spin/input/persistence tests and native mouse/touch browser checks. Tags are local until explicitly pushed.
+The original checkpoint passed all 60 unit tests, production build, and artwork/winner browser flows. The friction checkpoint passed 62 unit tests, build, and the same browser flows. The preview passes 96 unit tests, production build, and native desktop/mobile browser checks, including legacy-save preservation. All three checkpoints are pushed to GitHub with the published preview.
 
-`main` remains at the friction-only commit locally. The new physics is isolated on the playtest branch. To compare without deleting history or resetting work, start with a clean tracked working tree (`git status --short`), then:
+`main` serves the spin preview; the friction-only and original versions remain available through their tags. To roll back the public site without rewriting history, revert the spin feature commit (`0b2ea0c`) on `main`, verify, and push; reverting the separate friction commit (`2ebbd16`) as well restores original grip. Do not move tags or force-push for rollback. To compare without deleting history or resetting work, start with a clean tracked working tree (`git status --short`), then:
 
 ```sh
 # Try the friction-only checkpoint on a separate local branch.
