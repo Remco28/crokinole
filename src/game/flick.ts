@@ -19,6 +19,20 @@ export function crossesDisc(samples: FlickSample[], disc: Point): boolean {
   return flickContactOffset(samples, disc) !== null;
 }
 
+export interface FlickContact { offset: number; direction: Point; powered: boolean }
+
+// A slow brush is provisional: the finger can still settle into a side strike.
+// Freeze the first powered crossing, so post-impact follow-through cannot steer.
+export function updateFlickContact(previous: FlickContact | null, samples: FlickSample[], disc: Point): FlickContact | null {
+  if (previous?.powered) return previous;
+  const offset = flickContactOffset(samples, disc);
+  if (offset === null) return previous;
+  const end = samples[samples.length - 1], start = samples[samples.length - 2];
+  const dx = end.x - start.x, dy = end.y - start.y, length = Math.hypot(dx, dy);
+  const seconds = (end.t - start.t) / 1000;
+  return { offset, direction: { x: dx / length, y: dy / length }, powered: seconds > 0 && length / seconds >= FLICK_STRIKE.minContactSpeed };
+}
+
 // Measure the finish of the gesture, including follow-through, on release.
 export function releaseVelocity(samples: FlickSample[], disc: Point): Point | null {
   const end = samples[samples.length - 1];
@@ -33,24 +47,37 @@ export function releaseVelocity(samples: FlickSample[], disc: Point): Point | nu
   return { x: vx * power, y: vy * power };
 }
 
-// A small neutral center and a smooth ramp: phone-sized discs must not turn
-// subpixel contact errors into strong spin. Offset is captured at first contact,
-// independently of the follow-through used for launch direction and power.
-// Reach full response before the extreme rim so deliberate spin is accessible.
-export const FLICK_SPIN = { centerZone: 0.25, fullSpinOffset: 0.8, rimSpeedRatio: 0.22, maxSpeed: 18 } as const;
-export function releaseShot(samples: FlickSample[], disc: Point, offset = 0): (Point & { spin: number }) | null {
+// A rounded virtual fingertip gives a contact normal, not an arbitrary aim penalty.
+// This softens the response for phone-sized discs without enlarging the hitbox.
+export const FLICK_STRIKE = { fingerRadiusRatio: 0.4, friction: 0.35, minContactSpeed: 8 } as const;
+export const FLICK_SPIN = { centerZone: 0.1, fullGripOffset: 0.4, maxSpeed: 18 } as const;
+export function releaseShot(samples: FlickSample[], disc: Point, contact: number | FlickContact = 0): (Point & { spin: number }) | null {
+  if (typeof contact !== 'number' && !contact.powered) return null;
   const velocity = releaseVelocity(samples, disc);
   if (!velocity) return null;
-  const amount = Math.max(0, Math.min(1, (Math.abs(offset) - FLICK_SPIN.centerZone) / (FLICK_SPIN.fullSpinOffset - FLICK_SPIN.centerZone)));
-  if (!amount) return { ...velocity, spin: 0 };
   const speed = Math.hypot(velocity.x, velocity.y);
-  const ramp = amount * amount * (3 - 2 * amount);
-  const spin = Math.sign(offset) * ramp * Math.min(FLICK_SPIN.maxSpeed, speed * FLICK_SPIN.rimSpeedRatio / DISC.radius);
-  // Share the original launch energy between translation and axial rotation;
-  // offset strikes never receive free bonus energy or a higher power ceiling.
+  const direction = typeof contact === 'number' ? { x: velocity.x / speed, y: velocity.y / speed } : contact.direction;
+  const offset = Math.max(-1, Math.min(1, typeof contact === 'number' ? contact : contact.offset));
+  if (!offset) return { x: direction.x * speed, y: direction.y * speed, spin: 0 };
+  const side = offset / (1 + FLICK_STRIKE.fingerRadiusRatio);
+  const forward = Math.sqrt(1 - side * side);
+  const normal = { x: direction.x * forward - direction.y * side, y: direction.y * forward + direction.x * side };
+  const tangent = { x: -normal.y, y: normal.x };
+  const normalImpulse = speed * forward;
   const inertia = DISC.radius * DISC.radius / 2;
-  const ratio = speed / Math.hypot(speed, Math.sqrt(inertia) * spin);
-  return { x: velocity.x * ratio, y: velocity.y * ratio, spin: spin * ratio };
+  const amount = Math.max(0, Math.min(1, (Math.abs(offset) - FLICK_SPIN.centerZone) / (FLICK_SPIN.fullGripOffset - FLICK_SPIN.centerZone)));
+  const grip = amount * amount * (3 - 2 * amount);
+  // Contact-point slip couples tangential translation to axial rotation. Cap the
+  // sticking impulse by finger grip and angular speed. No bonus launch energy:
+  // jn² + (1 + R²/I)jt² <= speed²; a glancing strike transfers less energy.
+  const stickingImpulse = speed * Math.abs(side) / (1 + DISC.radius ** 2 / inertia);
+  const tangentImpulse = -Math.sign(side) * Math.min(stickingImpulse * grip,
+    FLICK_STRIKE.friction * normalImpulse, FLICK_SPIN.maxSpeed * inertia / DISC.radius);
+  return {
+    x: normal.x * normalImpulse + tangent.x * tangentImpulse,
+    y: normal.y * normalImpulse + tangent.y * tangentImpulse,
+    spin: -DISC.radius * tangentImpulse / inertia || 0,
+  };
 }
 
 export function canStartFlick(p: Point, disc: Point) {

@@ -6,18 +6,21 @@ live in Settings, with game mode and **Start a new game** at the top.
 Players are named Red, Blue, Yellow, and Green; opposite colors partner in teams.
 
 To shoot, start behind your disc (including outside the rim) and flick through
-it. Contact is remembered; lifting your finger launches the disc using the
-last 120 milliseconds of the gesture, including follow-through. Missed swipes do not shoot. A shot gesture holds the view steady until you lift your finger. Your chosen zoom and score layout persist.
+it. A slow brush is provisional; the first powered contact records the strike
+direction and offset. Lifting your finger launches the disc, with power measured
+from the last 120 milliseconds including follow-through. Off-center impact
+deflects the shot away from the finger and can impart axial spin. Missed swipes do not shoot. A shot gesture holds the view steady until you lift your finger. Your chosen zoom and score layout persist.
 Framing shifts upward slightly to leave more room below the rim.
 
 Flick strength uses the original power response (speed × 0.8 + 12, capped at
 105), after rejecting stationary gestures. Surface friction is set to 0.120 for
 a modestly shorter glide (previously 0.115), with the power ceiling and normal collision bounce unchanged.
 
-The spin preview adds forgiving axial rotation: centered flicks stay neutral,
-while deliberate side contact imparts bounded spin. Preview 2 slightly narrows
-the neutral center and brings useful spin within easier reach, without changing
-rotational damping or maximum power. Disc/peg/lip contacts can
+The strike preview couples finger-contact geometry, deflection, and axial
+rotation. Exactly centered flicks retain the original launch response; side
+strikes redirect and spin the disc, and glancing strikes transfer less energy.
+Only a small neutral **spin** zone remains; it does not erase directional errors.
+Board friction, rotational damping, and maximum power are unchanged. Disc/peg/lip contacts can
 generate and change it; board friction slows it until rest. A small cream disc
 inlay makes rotation visible. No random misses or artificial curling are added.
 See [physics versions and rollback](PHYSICS-VERSIONS.md) for stable checkpoints,
@@ -216,9 +219,10 @@ is required. Spin checks cover native mouse/touch flicks, mobile neutral contact
 legacy-save preservation, and paused rotation across reload. The mobile round
 checks keep the score breakdown expanded, verify that Next round is visible
 before and after scrolling, and advance with native touch input in all three
-modes across narrow, short, and landscape viewports. During velocity-sensitive
-spin gestures, software-rendered animation frames are briefly deferred; rendering
-is restored before persistence and settling checks. `npm test` runs the
+modes across narrow, short, and landscape viewports. Strike checks also cover
+slow initial brushes followed by side contact, post-impact follow-through,
+misses, cancellation, and event timestamps. Native CDP input carries explicit
+gesture timestamps; real rendering and physics loops remain running. `npm test` runs the
 unit suite; `npm run build` checks TypeScript and
 builds the production app.
 

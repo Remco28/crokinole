@@ -91,32 +91,42 @@ try {
     await evaluate('window.__calibration.dispose(); window.__calibrationCanvas.remove()');
     return screen;
   }
-  async function flick(offset, touch, view = 'standing') {
+  async function flick(offset, touch, view = 'standing', options = {}) {
     await reset(view);
-    const positions = await project([12.8, 12.3, 11.7, 11.1, 10.5].map(y => ({ x: offset, y })));
+    const points = options.points || [12.8, 12.3, 11.7, 11.1, 10.5].map(y => ({ x: offset, y }));
+    const positions = await project(points);
     const rect = await evaluate('document.getElementById("board-canvas").getBoundingClientRect().toJSON()');
     for (const p of positions) assert.ok(p.x >= rect.x && p.x <= rect.right && p.y >= rect.y && p.y <= rect.bottom, 'Swipe stays on the visible canvas');
-    await evaluate(`window.__gestureEvents=[]; document.getElementById('board-canvas').addEventListener('pointerdown',e=>window.__gestureEvents.push({type:e.type,t:performance.now(),x:e.clientX,y:e.clientY}),true); document.getElementById('board-canvas').addEventListener('pointermove',e=>window.__gestureEvents.push({type:e.type,t:performance.now(),x:e.clientX,y:e.clientY,classes:e.target.className}),false); document.getElementById('board-canvas').addEventListener('pointerup',e=>window.__gestureEvents.push({type:e.type,t:performance.now(),x:e.clientX,y:e.clientY}),true)`);
-    // Defer animation frames during the native swipe only. Software WebGL can
-    // spend >120ms painting and coalesce touch moves beyond the velocity window.
-    // Input handlers stay untouched; actual rendering runs before and after,
-    // and the resumed simulation still has to settle normally below.
-    await evaluate('window.__nativeRAF=window.requestAnimationFrame; window.__frameCallbacks=[]; window.requestAnimationFrame=callback => (window.__frameCallbacks.push(callback),0)');
-    await until('window.__frameCallbacks.length >= 2'); // Both scene-render and game-state loops are parked.
-    const inputs = [];
+    await evaluate(`window.__gestureEvents=[]; for(const type of ['pointerdown','pointermove','pointerup','pointercancel']) document.getElementById('board-canvas').addEventListener(type,e=>window.__gestureEvents.push({type:e.type,t:e.timeStamp,x:e.clientX,y:e.clientY}),true)`);
+    // Native event timestamps carry the intended gesture time even if software
+    // WebGL delays delivery. Rendering and game-state loops remain running.
+    const inputs = [], timestamp = Date.now() / 1000;
+    let elapsed = 0;
+    const delays = options.delays || positions.slice(1).map(() => 20);
     if (touch) {
-      inputs.push(call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...positions[0], id: 1 }] }));
-      for (const p of positions.slice(1)) { await sleep(20); inputs.push(call('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ ...p, id: 1 }] })); }
-      inputs.push(call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }));
+      inputs.push(call('Input.dispatchTouchEvent', { type: 'touchStart', timestamp, touchPoints: [{ ...positions[0], id: 1 }] }));
+      for (const [i, p] of positions.slice(1).entries()) {
+        await sleep(delays[i]); elapsed += delays[i];
+        inputs.push(call('Input.dispatchTouchEvent', { type: 'touchMove', timestamp: timestamp + elapsed / 1000, touchPoints: [{ ...p, id: 1 }] }));
+      }
+      inputs.push(call('Input.dispatchTouchEvent', { type: options.cancel ? 'touchCancel' : 'touchEnd', timestamp: timestamp + (elapsed + 5) / 1000, touchPoints: [] }));
     } else {
-      inputs.push(call('Input.dispatchMouseEvent', { type: 'mousePressed', ...positions[0], button: 'left', buttons: 1, clickCount: 1 }));
-      for (const p of positions.slice(1)) { await sleep(20); inputs.push(call('Input.dispatchMouseEvent', { type: 'mouseMoved', ...p, button: 'left', buttons: 1 })); }
-      inputs.push(call('Input.dispatchMouseEvent', { type: 'mouseReleased', ...positions.at(-1), button: 'left', buttons: 0, clickCount: 1 }));
+      inputs.push(call('Input.dispatchMouseEvent', { type: 'mousePressed', timestamp, ...positions[0], button: 'left', buttons: 1, clickCount: 1 }));
+      for (const [i, p] of positions.slice(1).entries()) {
+        await sleep(delays[i]); elapsed += delays[i];
+        inputs.push(call('Input.dispatchMouseEvent', { type: 'mouseMoved', timestamp: timestamp + elapsed / 1000, ...p, button: 'left', buttons: 1 }));
+      }
+      inputs.push(call('Input.dispatchMouseEvent', { type: 'mouseReleased', timestamp: timestamp + (elapsed + 5) / 1000, ...positions.at(-1), button: 'left', buttons: 0, clickCount: 1 }));
     }
     await Promise.all(inputs);
-    await until('window.__gestureEvents.some(e => e.type === "pointerup")');
-    await evaluate('document.getElementById("pause-button").click(); window.requestAnimationFrame=window.__nativeRAF; for(const callback of window.__frameCallbacks) window.requestAnimationFrame(callback); delete window.__nativeRAF; delete window.__frameCallbacks');
+    await until(`window.__gestureEvents.some(e => e.type === '${options.cancel ? 'pointercancel' : 'pointerup'}')`);
+    await evaluate('document.getElementById("pause-button").click()');
     const s = await state();
+    if (options.miss || options.cancel) {
+      assert.equal(s.phase, 'pass'); assert.equal(s.used[0], 0);
+      assert.equal(s.discs[0].spin, 0, 'Misses and cancellations never launch');
+      return s;
+    }
     if (s.phase !== 'moving') {
       console.log('Gesture diagnostics', JSON.stringify({ offset, touch, view, positions, rect, state: s, events: await evaluate('window.__gestureEvents'), prefs: await evaluate('localStorage.getItem("crokinole-table")'), banner: await evaluate('document.getElementById("turn-banner").textContent') }));
       await evaluate('document.getElementById("pause-dialog").close()');
@@ -124,9 +134,12 @@ try {
       await writeFile(join(process.env.TMPDIR || tmpdir(), 'crokinole-gesture-debug.png'), Buffer.from(shot.data, 'base64'));
     }
     assert.equal(s.version, 2); assert.equal(s.phase, 'moving'); assert.equal(s.used[0], 1);
-    assert.equal(s.paused, true); assert.ok(Math.abs(s.discs[0].vx) < 0.001, 'Offset contact does not introduce fake sideways launch');
-    if (Math.abs(offset) <= 0.15) assert.equal(s.discs[0].spin, 0, 'Neutral zone protects centered/small-error flicks');
-    else assert.ok(s.discs[0].spin * offset < -0.1, 'Deliberate left/right contact produces the correct signed spin');
+    assert.equal(s.paused, true);
+    if (!offset) assert.ok(Math.abs(s.discs[0].vx) < 0.01, 'Exactly centered contact keeps its straight launch');
+    else assert.ok(s.discs[0].vx * offset < 0, 'Side impact deflects away from the finger');
+    if (Math.abs(offset) <= 0.05) assert.equal(s.discs[0].spin, 0, 'Only a small neutral spin zone remains');
+    else assert.ok(s.discs[0].spin * offset < -0.1, 'Deliberate left/right contact produces signed spin');
+    if (Math.abs(offset) >= 0.3) assert.ok(Math.atan2(Math.abs(s.discs[0].vx), -s.discs[0].vy) * 180 / Math.PI > 8, 'Moderate side contact visibly changes launch direction');
     return s;
   }
   const legacy = await state(); legacy.version = 1;
@@ -145,11 +158,22 @@ try {
   await flick(0.3, false); // Moderate contact must work, not just near-rim swipes.
   const left = await flick(-0.45, false), right = await flick(0.45, false);
   assert.ok(left.discs[0].spin > 0 && right.discs[0].spin < 0);
-  console.log('Desktop: actual centered and mirrored offset mouse flicks passed.');
+  const brush = { points: [{x:0,y:12.7},{x:0,y:12.55},{x:0.4,y:12.3},{x:0.4,y:11.5},{x:0.4,y:10.5}], delays:[200,130,20,20] };
+  await flick(0.4, false, 'standing', brush);
+  await flick(0.4, false, 'standing', { points:[{x:0.4,y:12.8},{x:0.4,y:12.3},{x:0.4,y:11.7},{x:0.7,y:11.1},{x:1,y:10.5}] });
+  await flick(0.8, false, 'standing', { miss:true });
+  const brushMiss = { miss:true, points:[{x:0,y:12.6},{x:0,y:12.55},{x:1,y:12.55},{x:1,y:10}], delays:[50,200,50] };
+  await flick(1, false, 'standing', brushMiss);
+  await flick(0, false, 'standing', { miss:true, points:[{x:0,y:12.6},{x:0,y:11.3},{x:0,y:9}], delays:[500,50] });
+  console.log('Desktop: centered/mirrored deflection and spin, slow-brush registration, fixed impact direction, and missed swipes passed.');
   await call('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await call('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
-  await flick(0.12, true);
+  await flick(0.03, true);
   await flick(0.3, true, 'seated');
+  await flick(0.4, true, 'seated', brush);
+  await flick(1, true, 'seated', brushMiss);
+  await flick(0.4, true, 'seated', { cancel:true });
+  await flick(0, true, 'seated');
   const mobile = await flick(0.45, true, 'seated');
   await sleep(250); assert.deepEqual((await state()).discs, mobile.discs, 'Pause freezes axial motion');
   await reload(); assert.deepEqual((await state()).discs, mobile.discs, 'Paused spin survives an actual reload exactly');
@@ -164,7 +188,7 @@ try {
   assert.equal(settled.discs[0].spin, 0, 'Angular motion settles before handover');
   assert.equal((await evaluate('document.querySelectorAll("#board-canvas").length')), 1);
   assert.deepEqual(exceptions, [], 'No uncaught runtime errors');
-  console.log('Mobile: neutral touch zone, deliberate seated-view spin, pause/reload, and resumed settlement passed; no runtime errors.');
+  console.log('Mobile: small neutral spin zone, side deflection, slow-brush registration, cancellation, pause/reload, and resumed settlement passed; no runtime errors.');
 } finally {
   socket?.close(); browser?.kill('SIGTERM'); server.kill('SIGTERM');
   await sleep(300); await rm(directory, { recursive: true, force: true });

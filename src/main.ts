@@ -1,6 +1,6 @@
 import { setupBoardArtwork } from './board-artwork';
 import { BoardSound } from './audio/sound';
-import { canStartFlick, flickContactOffset, releaseShot, shouldRotateInstead } from './game/flick';
+import { canStartFlick, releaseShot, shouldRotateInstead, updateFlickContact, type FlickContact } from './game/flick';
 import { createScene, type BoardView } from './render/scene';
 import { makeDisc, moving, step, type Disc, type Shot } from './sim/physics';
 import { completeRound, inspectShot, sideOf, type Mode, type RoundResult } from './game/rules';
@@ -242,7 +242,7 @@ function cancelOrbit() { orbitPointer = null; }
 let trail: { x: number; y: number; t: number }[] = [];
 let press = { x: 0, y: 0 };
 let flickStart = { x: 0, y: 0 };
-let discCrossed = false, flickOffset = 0;
+let discCrossed = false, flickContact: FlickContact | null = null;
 function linePosition(clientX: number, clientY: number) {
   // Placement targets the painted surface, not the elevated flick plane.
   const p = scene.boardPoint(clientX, clientY, 0); if (!p) return null;
@@ -288,8 +288,8 @@ canvas.addEventListener('pointerdown', e => {
     const p = scene.boardPoint(e.clientX, e.clientY);
     if (phase === 'pass' && staged && p && !scene.isViewMoving() && canStartFlick(p, staged)) {
       pointer = e.pointerId; press = { x: e.clientX, y: e.clientY }; flickStart = p;
-      discCrossed = false; flickOffset = 0;
-      trail = [{ ...p, t: performance.now() }];
+      discCrossed = false; flickContact = null;
+      trail = [{ ...p, t: e.timeStamp }];
     } else if (phase === 'pass' && linePosition(e.clientX, e.clientY)) {
       placementPointer = e.pointerId; placementPress = { x: e.clientX, y: e.clientY };
     } else {
@@ -326,8 +326,12 @@ canvas.addEventListener('pointermove', e => {
     return;
   }
   if (e.pointerId !== pointer) return;
+  // Preserve the real near-impact path and event times when browsers batch moves.
+  for (const sample of [...(e.getCoalescedEvents?.() ?? []), e]) {
+    const p = scene.boardPoint(sample.clientX, sample.clientY);
+    if (p) sampleFlick(p, sample.timeStamp);
+  }
   const p = scene.boardPoint(e.clientX, e.clientY); if (!p) return;
-  sampleFlick(p);
   if (!discCrossed && staged && shouldRotateInstead(flickStart, p, staged)) {
     cancel(); orbitPointer = e.pointerId;
     scene.dragView((e.clientX - press.x) / canvas.clientWidth * Math.PI,
@@ -335,20 +339,17 @@ canvas.addEventListener('pointermove', e => {
     orbitLast = { x: e.clientX, y: e.clientY };
   }
 });
-function sampleFlick(p: { x: number; y: number }) {
+function sampleFlick(p: { x: number; y: number }, t: number) {
   if (phase !== 'pass' || !staged || settings.open || scene.isViewMoving()) return;
   if (deadline !== null && Date.now() >= deadline) { expireShot(); return; }
-  const t = performance.now();
   trail.push({ ...p, t });
-  if (!discCrossed) {
-    const offset = flickContactOffset(trail, staged);
-    if (offset !== null) { discCrossed = true; flickOffset = offset; }
-  }
+  flickContact = updateFlickContact(flickContact, trail, staged);
+  discCrossed = flickContact !== null;
   trail = trail.filter(sample => t - sample.t <= 120);
 }
 function releaseFlick() {
-  if (phase !== 'pass' || !staged || !discCrossed) return;
-  const velocity = releaseShot(trail, staged, flickOffset);
+  if (phase !== 'pass' || !staged || !flickContact?.powered) return;
+  const velocity = releaseShot(trail, staged, flickContact);
   if (!velocity) return;
   cancel();
   hadOpponent = discs.some(d => d.state === 'board' && side(d.owner) !== side(player));
@@ -359,7 +360,7 @@ function releaseFlick() {
   scene.highlightDisc(null);
   banner.textContent = 'Let it slide'; hint.textContent = 'Waiting for the board to settle…'; hud(); save();
 }
-function cancel() { pointer = null; trail = []; discCrossed = false; flickOffset = 0; }
+function cancel() { pointer = null; trail = []; discCrossed = false; flickContact = null; }
 function endPointer(e: PointerEvent) {
   touches.delete(e.pointerId);
   if (touches.size === 0) { pinching = false; pinchDistance = 0; }
@@ -390,7 +391,7 @@ canvas.addEventListener('pointerup', e => {
     cancel(); placeAt(e.clientX, e.clientY); return;
   }
   const p = scene.boardPoint(e.clientX, e.clientY);
-  if (p) { sampleFlick(p); releaseFlick(); }
+  if (p) { sampleFlick(p, e.timeStamp); releaseFlick(); }
   cancel();
 });
 function finishShot() {
