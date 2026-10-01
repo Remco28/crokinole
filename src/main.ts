@@ -1,6 +1,7 @@
 import { setupBoardArtwork } from './board-artwork';
 import { BoardSound } from './audio/sound';
-import { canStartFlick, releaseShot, shouldRotateInstead, updateFlickContact, type FlickContact } from './game/flick';
+import { appendFlickContactSample, canStartFlick, releaseShot, shouldRotateInstead, updateFlickContact, type FlickContact } from './game/flick';
+import { pointerMoveSamples } from './game/pointer';
 import { createScene, type BoardView } from './render/scene';
 import { makeDisc, moving, step, type Disc, type Shot } from './sim/physics';
 import { completeRound, inspectShot, sideOf, type Mode, type RoundResult } from './game/rules';
@@ -240,6 +241,7 @@ let placementPointer: number | null = null;
 let placementPress = { x: 0, y: 0 };
 function cancelOrbit() { orbitPointer = null; }
 let trail: { x: number; y: number; t: number }[] = [];
+let contactTrail: typeof trail = [];
 let press = { x: 0, y: 0 };
 let flickStart = { x: 0, y: 0 };
 let discCrossed = false, flickContact: FlickContact | null = null;
@@ -290,6 +292,7 @@ canvas.addEventListener('pointerdown', e => {
       pointer = e.pointerId; press = { x: e.clientX, y: e.clientY }; flickStart = p;
       discCrossed = false; flickContact = null;
       trail = [{ ...p, t: e.timeStamp }];
+      contactTrail = [...trail];
     } else if (phase === 'pass' && linePosition(e.clientX, e.clientY)) {
       placementPointer = e.pointerId; placementPress = { x: e.clientX, y: e.clientY };
     } else {
@@ -327,7 +330,7 @@ canvas.addEventListener('pointermove', e => {
   }
   if (e.pointerId !== pointer) return;
   // Preserve the real near-impact path and event times when browsers batch moves.
-  for (const sample of [...(e.getCoalescedEvents?.() ?? []), e]) {
+  for (const sample of pointerMoveSamples(e)) {
     const p = scene.boardPoint(sample.clientX, sample.clientY);
     if (p) sampleFlick(p, sample.timeStamp);
   }
@@ -343,7 +346,8 @@ function sampleFlick(p: { x: number; y: number }, t: number) {
   if (phase !== 'pass' || !staged || settings.open || scene.isViewMoving()) return;
   if (deadline !== null && Date.now() >= deadline) { expireShot(); return; }
   trail.push({ ...p, t });
-  flickContact = updateFlickContact(flickContact, trail, staged);
+  contactTrail = appendFlickContactSample(contactTrail, { ...p, t });
+  flickContact = updateFlickContact(flickContact, contactTrail, staged);
   discCrossed = flickContact !== null;
   trail = trail.filter(sample => t - sample.t <= 120);
 }
@@ -360,7 +364,7 @@ function releaseFlick() {
   scene.highlightDisc(null);
   banner.textContent = 'Let it slide'; hint.textContent = 'Waiting for the board to settle…'; hud(); save();
 }
-function cancel() { pointer = null; trail = []; discCrossed = false; flickContact = null; }
+function cancel() { pointer = null; trail = []; contactTrail = []; discCrossed = false; flickContact = null; }
 function endPointer(e: PointerEvent) {
   touches.delete(e.pointerId);
   if (touches.size === 0) { pinching = false; pinchDistance = 0; }

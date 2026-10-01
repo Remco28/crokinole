@@ -19,26 +19,97 @@ export function crossesDisc(samples: FlickSample[], disc: Point): boolean {
   return flickContactOffset(samples, disc) !== null;
 }
 
-export interface FlickContact { offset: number; direction: Point; powered: boolean }
+export interface FlickContact { offset: number; direction: Point; powered: boolean; frontStart?: FlickSample }
+
+// Aim history is spatial, independent of the 120 ms release-power history.
+// Retain 2R BEFORE the newest segment: its endpoint may overshoot contact by
+// several radii. Trimming from that endpoint would erase the incoming approach.
+export function appendFlickContactSample(samples: FlickSample[], sample: FlickSample): FlickSample[] {
+  const last = samples[samples.length - 1];
+  if (last && last.x === sample.x && last.y === sample.y) {
+    if (last.t === sample.t) return samples; // Same event, not a new stop.
+    const before = samples[samples.length - 2];
+    // Preserve a zero-speed segment when time advances. Replacing a moving
+    // endpoint's time would replay the old movement and conceal a real stop.
+    if (before && before.x === last.x && before.y === last.y) return [...samples.slice(0, -1), sample];
+    return [...samples, sample];
+  }
+  let travel = 0;
+  for (let i = samples.length - 2; i >= 0; i--) {
+    travel += Math.hypot(samples[i + 1].x - samples[i].x, samples[i + 1].y - samples[i].y);
+    if (travel >= FLICK_STRIKE.approachDistance) return [...samples.slice(i), sample];
+  }
+  return [...samples, sample];
+}
+
+function spatialApproach(samples: FlickSample[], focus: Point): [Point, Point] {
+  let start: Point = focus, newer: Point = focus, travel = 0;
+  for (let i = samples.length - 2; i >= 0; i--) {
+    // A pause/reposition starts a new approach, not a new time-sized aim window.
+    if (i < samples.length - 2 && samples[i + 1].t - samples[i].t > FLICK_STRIKE.strokeGapMs) break;
+    const older = samples[i], piece = Math.hypot(older.x - newer.x, older.y - newer.y);
+    if (piece && travel + piece >= FLICK_STRIKE.approachDistance) {
+      const f = (FLICK_STRIKE.approachDistance - travel) / piece;
+      start = { x: newer.x + (older.x - newer.x) * f, y: newer.y + (older.y - newer.y) * f };
+      break;
+    }
+    start = older; newer = older; travel += piece;
+  }
+  return [start, focus];
+}
+
+function approachSpan(samples: FlickSample[], disc: Point): [Point, Point] {
+  const end = samples[samples.length - 1], segmentStart = samples[samples.length - 2];
+  const dx = end.x - segmentStart.x, dy = end.y - segmentStart.y, length = Math.hypot(dx, dy);
+  const closest = ((disc.x - segmentStart.x) * dx + (disc.y - segmentStart.y) * dy) / (length * length);
+  const [priorStart] = spatialApproach(samples, segmentStart);
+  // Existing approach travel can already stabilize a powered stroke that starts
+  // inside the disc. Do not move its anchor forward by a fresh minimum distance
+  // in every segment: subdividing the same slow path would change its aim.
+  const ready = Math.hypot(segmentStart.x - priorStart.x, segmentStart.y - priorStart.y) + 1e-9 >= FLICK_STRIKE.minContactTravel;
+  const u = Math.max(0, Math.min(1, Math.max(closest, ready ? 0 : FLICK_STRIKE.minContactTravel / length)));
+  return spatialApproach(samples, { x: segmentStart.x + u * dx, y: segmentStart.y + u * dy });
+}
 
 // A brush or tiny wobble is provisional. Establish direction from a short
-// approach span with meaningful travel, then freeze the first powered crossing.
+// spatial approach with meaningful travel, then freeze the powered crossing.
 export function updateFlickContact(previous: FlickContact | null, samples: FlickSample[], disc: Point): FlickContact | null {
   if (previous?.powered) return previous;
-  const offset = flickContactOffset(samples, disc);
-  if (offset === null) return previous; // A later fast miss cannot power a brush.
+  if (samples.length < 2) return previous;
   const end = samples[samples.length - 1], segmentStart = samples[samples.length - 2];
-  const start = samples.find(s => s.t >= end.t - FLICK_STRIKE.contactWindowMs && s.t < end.t) ?? segmentStart;
-  const dx = end.x - start.x, dy = end.y - start.y, length = Math.hypot(dx, dy);
-  const seconds = (end.t - start.t) / 1000;
   const sx = end.x - segmentStart.x, sy = end.y - segmentStart.y, segmentLength = Math.hypot(sx, sy);
   const segmentSeconds = (end.t - segmentStart.t) / 1000;
-  const stableOffset = flickContactOffset([start, end], disc);
-  if (stableOffset !== null && length >= FLICK_STRIKE.minContactTravel && seconds > 0 && length / seconds >= FLICK_STRIKE.minContactSpeed
-    && segmentSeconds > 0 && segmentLength / segmentSeconds >= FLICK_STRIKE.minContactSpeed) {
+  const poweredSegment = segmentSeconds > 0 && segmentLength / segmentSeconds >= FLICK_STRIKE.minContactSpeed;
+  const continuous = poweredSegment && segmentSeconds * 1000 <= FLICK_STRIKE.strokeGapMs && sx * disc.x + sy * disc.y < 0;
+  const offset = flickContactOffset(samples, disc);
+  if (offset === null) {
+    // A forceful start on the leading face may leave the disc before enough
+    // travel exists to aim. Allow only that uninterrupted powered stroke to
+    // finish registration; a slow brush, pause or outward move cannot do this.
+    if (previous?.frontStart) {
+      const start = previous.frontStart, dx = end.x - start.x, dy = end.y - start.y, length = Math.hypot(dx, dy);
+      const stableOffset = flickContactOffset([start, end], disc);
+      if (continuous && stableOffset !== null) {
+        if (length + 1e-9 >= FLICK_STRIKE.minContactTravel)
+          return { offset: stableOffset, direction: { x: dx / length, y: dy / length }, powered: true };
+        return previous;
+      }
+      return { offset: previous.offset, direction: previous.direction, powered: false };
+    }
+    return previous; // A later fast miss cannot power a slow brush.
+  }
+  const [start, focus] = approachSpan(samples, disc);
+  const dx = focus.x - start.x, dy = focus.y - start.y, length = Math.hypot(dx, dy);
+  const stableOffset = flickContactOffset([{ ...start, t: 0 }, { ...focus, t: 1 }], disc);
+  if (stableOffset !== null && length + 1e-9 >= FLICK_STRIKE.minContactTravel
+    && poweredSegment) {
     return { offset: stableOffset, direction: { x: dx / length, y: dy / length }, powered: true };
   }
-  return { offset, direction: { x: sx / segmentLength, y: sy / segmentLength }, powered: false };
+  const front = Math.hypot(segmentStart.x - disc.x, segmentStart.y - disc.y) <= DISC.radius
+    && (segmentStart.x - disc.x) * disc.x + (segmentStart.y - disc.y) * disc.y < -DISC.radius * 0.3 * Math.hypot(disc.x, disc.y);
+  const frontStart = continuous ? previous?.frontStart ?? (front ? segmentStart : undefined) : undefined;
+  return { offset, direction: { x: sx / segmentLength, y: sy / segmentLength }, powered: false,
+    ...(frontStart ? { frontStart } : {}) };
 }
 
 // Measure the finish of the gesture, including follow-through, on release.
@@ -57,7 +128,8 @@ export function releaseVelocity(samples: FlickSample[], disc: Point): Point | nu
 
 // A rounded virtual fingertip gives a contact normal, not an arbitrary aim penalty.
 // This softens the response for phone-sized discs without enlarging the hitbox.
-export const FLICK_STRIKE = { fingerRadiusRatio: 0.4, friction: 0.35, minContactSpeed: 8, contactWindowMs: 40, minContactTravel: DISC.radius * 0.2 } as const;
+export const FLICK_STRIKE = { fingerRadiusRatio: 0.4, friction: 0.35, minContactSpeed: 8,
+  approachDistance: DISC.radius * 2, minContactTravel: DISC.radius * 0.5, strokeGapMs: 120 } as const;
 export const FLICK_SPIN = { centerZone: 0.1, fullGripOffset: 0.4, maxSpeed: 18 } as const;
 export function releaseShot(samples: FlickSample[], disc: Point, contact: number | FlickContact = 0): (Point & { spin: number }) | null {
   if (typeof contact !== 'number' && !contact.powered) return null;
@@ -90,6 +162,8 @@ export function releaseShot(samples: FlickSample[], disc: Point, contact: number
 
 export function canStartFlick(p: Point, disc: Point) {
   const dx = p.x - disc.x, dy = p.y - disc.y;
+  // A touch on the active disc is a shot candidate, not a camera/placement drag.
+  if (Math.hypot(dx, dy) <= DISC.radius) return true;
   const radius = Math.hypot(disc.x, disc.y);
   const outward = (dx * disc.x + dy * disc.y) / radius;
   const sideways = Math.abs(dx * disc.y - dy * disc.x) / radius;

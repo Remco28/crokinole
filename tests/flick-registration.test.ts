@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { DISC } from '../src/sim/constants';
-import { releaseShot, releaseVelocity, updateFlickContact, type FlickContact, type FlickSample } from '../src/game/flick';
+import { appendFlickContactSample, releaseShot, releaseVelocity, updateFlickContact, type FlickContact, type FlickSample } from '../src/game/flick';
 
 const disc = { x: 0, y: 12 };
 function register(samples: FlickSample[]) {
-  let contact: FlickContact | null = null, trail: FlickSample[] = [];
+  let contact: FlickContact | null = null, trail: FlickSample[] = [], approach: FlickSample[] = [];
   for (const sample of samples) {
-    trail.push(sample); contact = updateFlickContact(contact, trail, disc);
+    trail.push(sample); approach = appendFlickContactSample(approach, sample);
+    contact = updateFlickContact(contact, approach, disc);
     trail = trail.filter(s => sample.t - s.t <= 120);
   }
   return { contact, shot: contact ? releaseShot(trail, disc, contact) : null };

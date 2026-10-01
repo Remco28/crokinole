@@ -6,22 +6,26 @@ live in Settings, with game mode and **Start a new game** at the top.
 Players are named Red, Blue, Yellow, and Green; opposite colors partner in teams.
 
 To shoot, start behind your disc (including outside the rim) and flick through
-it. Slow brushes and tiny initial wobbles are provisional; a short, stable
-powered approach records the strike direction and offset. Finger coordinates
+it. Slow brushes and tiny initial wobbles are provisional; a distance-based
+near-contact approach records the strike direction and offset, independently of
+the timed power window. Touches anywhere on the active disc can start a shot;
+a continuous powered front-face stroke can finish its short registration span
+after leaving the face, but a slow brush or interrupted stroke cannot. Finger coordinates
 follow the visible top face of the disc, not its mid-height plane. Lifting your finger launches the disc, with power measured
 from the last 120 milliseconds including follow-through. Off-center impact
 deflects the shot away from the finger and can impart axial spin. Missed swipes do not shoot. A shot gesture holds the view steady until you lift your finger. Your chosen zoom and score layout persist.
 Framing shifts upward slightly to leave more room below the rim.
 
 Flick strength uses the original power response (speed × 0.8 + 12, capped at
-105), after rejecting stationary gestures. Surface friction is set to 0.120 for
-a modestly shorter glide (previously 0.115), with the power ceiling and normal collision bounce unchanged.
+105), after rejecting stationary gestures. Surface friction is set to 0.1175,
+a small easing from 0.120 toward the original 0.115. The speed-dependent drag
+remains 0.05; power ceiling and normal collision bounce are unchanged.
 
 The strike preview couples finger-contact geometry, deflection, and axial
 rotation. Exactly centered flicks retain the original launch response; side
 strikes redirect and spin the disc, and glancing strikes transfer less energy.
 Only a small neutral **spin** zone remains; it does not erase directional errors.
-Board friction, rotational damping, and maximum power are unchanged. Disc/peg/lip contacts can
+Aim registration changes do not retune maximum power or contact response. Disc/peg/lip contacts can
 generate and change it; board friction slows it until rest. A small cream disc
 inlay makes rotation visible. No random misses or artificial curling are added.
 See [physics versions and rollback](PHYSICS-VERSIONS.md) for stable checkpoints,
@@ -222,7 +226,10 @@ checks keep the score breakdown expanded, verify that Next round is visible
 before and after scrolling, and advance with native touch input in all three
 modes across narrow, short, and landscape viewports. Strike checks also cover
 slow initial brushes followed by side contact, tiny initial left/right wobbles
-with ordinary and millisecond-dense samples, post-impact follow-through,
+with ordinary and millisecond-dense samples, identical imperfect paths at gentle
+and hard speeds, long gentle preparations and their collinear subdivisions,
+coarse overshoots versus collinear subdivisions, front-face
+touch starts, raw/coalesced sample extraction, post-impact follow-through,
 misses, cancellation, and event timestamps. Independent projection of the
 rendered top face checks picking across standing/seated views, shooting
 positions and player quadrants. Native CDP input carries explicit
