@@ -32,7 +32,7 @@ export const PEG_COLLISION_RADIUS = PEGS.radius + DISC.radius;
 
 // Gameplay tunables; see the center-hole guide in README.md.
 export const TUNE = {
-  frictionMu: 0.12, // modest extra grip; flick power and normal bounce stay unchanged
+  frictionMu: 0.1175, // halfway back toward original grip; power and bounce unchanged
   frictionViscous: 0.05,
   restitutionDisc: 0.8,
   restitutionPeg: 0.62,
