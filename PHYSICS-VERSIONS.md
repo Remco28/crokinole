@@ -43,6 +43,12 @@ Returning to an old physics tag therefore restores the pre-spin table on the **s
 
 ## Current strike and spin model
 
+Investigation results, human playtest feedback, reproducible near-edge diagnostics
+and the ordered remaining work are recorded in
+[input findings and remaining physics work](docs/physics/input-findings.md).
+Preview 4's central behavior is accepted as more playable; short grazing contact
+and the fixed screen-pixel tap gate remain known limitations, not silently fixed.
+
 - Maximum translational flick power remains `105`; centered launches use the original response.
 - Flat-slide slowing retains the original formula: `frictionMu × 386 + frictionViscous × speed`. Surface grip is eased to `0.1175` from `0.120`; speed-dependent drag stays at `0.05`. Spin/contact additions did not add another free-slide brake. Contact collisions and glancing launches can still transfer translational energy into rotation or dissipate it.
 - Contact is measured from swept segments through the actual disc radius; the hitbox is not enlarged. Slow intersections and tiny wobbles remain provisional. Direction and offset use up to `2` disc radii of spatial approach near contact, with at least `0.5` radii of net travel. The history retains enough distance before the newest segment, so a coarse overshoot cannot discard the incoming approach. A sample gap above `120 ms` starts a new approach. When sufficient approach travel already exists, a powered segment starting inside the disc fits from that start instead of advancing by another minimum-distance span; subdividing a long gentle preparation therefore does not move its aim anchor in the regression. A real intersection reaching `8 in/s` is required before a shot can launch; slow preparation does not dilute that speed, and an earlier fast outside approach cannot power a slow brush. Stable powered geometry freezes. The final `120 ms` still determine power, with the original response and cap; this release does not freeze a complete launch impulse at contact. Post-contact slowing/holding can still weaken or reject a shot, and release power can still affect outer-strike deflection when the angular cap engages. Raw coalesced events are processed instead of—not in addition to—their processed parent; unsupported/empty lists fall back to the parent. Native event timestamps remain authoritative.

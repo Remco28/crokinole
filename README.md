@@ -35,6 +35,8 @@ zone remains at `0.1` radii. Contacts can generate and change spin; board fricti
 inlay makes rotation visible. No random misses or artificial curling are added.
 See [physics versions and rollback](PHYSICS-VERSIONS.md) for stable checkpoints,
 save compatibility, tuning details, and the GitHub Pages playtest deployment.
+See [input findings](docs/physics/input-findings.md) for near-edge shot-detection
+results, reusable diagnostic scripts, and the remaining separate physics issues.
 
 Tap the painted shooting line to move your disc, including small adjustments
 beside its current position. The shot clock defaults to

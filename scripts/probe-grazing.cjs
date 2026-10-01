@@ -1,0 +1,9 @@
+const fs=require('node:fs'),path=require('node:path'),{createRequire}=require('node:module');
+// Diagnostic only: characterize the current input path; do not retune it.
+const root=path.resolve(__dirname,'..'),ts=createRequire(path.join(root,'package.json'))('typescript');
+require.extensions['.ts']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,f);
+const f=require(root+'/src/game/flick.ts'),{DISC}=require(root+'/src/sim/constants.ts');
+const disc={x:0,y:12},rows=[];
+function replay(samples){let history=[],trail=[],contact=null,rotated=false;const eligible=f.canStartFlick(samples[0],disc);for(const p of samples){history=f.appendFlickContactSample(history,p);contact=f.updateFlickContact(contact,history,disc);trail=[...trail,p].filter(s=>p.t-s.t<=120);if(!contact&&f.shouldRotateInstead(samples[0],p,disc))rotated=true;}const shot=eligible&&!rotated&&contact?f.releaseShot(trail,disc,contact):null;return {eligible,rotated,powered:contact?.powered??false,registeredOffset:contact?.offset,shot,heading:shot?Math.atan2(shot.x,-shot.y)*180/Math.PI:null};}
+for(const offset of [0,.2,.5,.8,.9,.95,.98,.99,1,1.01])for(const sign of [-1,1])for(const dt of [5,20,50])for(const kind of ['long','short','edge-entry']){const ys=kind==='long'?[12.8,12.3,11.7,11.1,10.5]:kind==='short'?[12.15,12,11.85]:[12.4,12.2,12,11.8];const samples=ys.map((y,i)=>({x:sign*offset*DISC.radius,y,t:i*dt}));rows.push({offset:sign*offset,kind,dt,...replay(samples)});}
+console.log(JSON.stringify({count:rows.length,rows},null,2));
