@@ -16,6 +16,7 @@ The strike preview is published from `main` through GitHub Pages at https://crok
 | `crokinole-friction-easing` | `0.3.0-preview.2` | Separate surface-grip easing checkpoint: `0.120` to `0.1175`; viscous drag, power, restitution and hole rules unchanged. |
 | `crokinole-v0.3.0-strike-preview.3` | `0.3.0-preview.3` | Distance-based aim independent of the power window, overshoot-safe approach history, raw/coalesced event normalization, front-face touch starts, and zero-damping numerical guards. |
 | `crokinole-v0.3.0-strike-preview.4` | `0.3.0-preview.4` | Small stroke-relative directional neutral corridor with a smooth deflection ramp; transferred speed, launch spin, power window, board-spin damping, collisions and hole behavior unchanged. |
+| `crokinole-v0.3.0-strike-preview.5` | `0.3.0-preview.5` | Release-only short-edge registration, sampling-boundary robustness, and powered-strike precedence over the screen tap gate; accepted central forgiveness and outer physics response unchanged. |
 
 The original checkpoint passed all 60 unit tests, production build, and artwork/winner browser flows. The friction checkpoint passed 62 unit tests, build, and the same browser flows. Spin preview 1 passed 96 unit tests; spin preview 2 passed 98. Strike preview 1 passed 108; strike preview 2 passed 115. Those releases passed production build and native desktop/mobile browser checks, including legacy-save preservation. Preview 3 passed 133 unit tests, production build and the expanded full browser suite in an isolated immutable release worktree. The earlier interrupted and screenshot-directory-failed attempts remain failures; the corrected isolated run completed with exit code 0. Preview 4 passed 139 unit tests, production build and the expanded full native browser suite in an isolated immutable candidate worktree (exit code 0). Its 24 central native gestures across mouse, laptop touch and emulated phone touch follow the incoming heading within 0.001 degrees at gentle/hard speeds. A separate 24-case native diagonal check on the same placed disc follows each angled stroke within 0.003 degrees instead of snapping to the hole. A separate 7,230-case comparison against preview 3 verifies unchanged launch spin and transferred speed and exact outer-strike response; registration regressions retain geometric misses and slow-brush rejection. Release checkpoints are preserved on GitHub.
 
@@ -47,7 +48,15 @@ Investigation results, human playtest feedback, reproducible near-edge diagnosti
 and the ordered remaining work are recorded in
 [input findings and remaining physics work](docs/physics/input-findings.md).
 Preview 4's central behavior is accepted as more playable; short grazing contact
-and the fixed screen-pixel tap gate remain known limitations, not silently fixed.
+and the fixed screen-pixel tap gate are addressed separately in preview 5.
+The registration-only correction from `physics/graze-registration-v0.3` does not
+tune the outer impulse response. Sampling fixes, tap/hold policy and verification
+status are recorded in the linked findings. Preview 5 passed 151 unit tests and
+production build; the expanded full browser run remains in progress at publication.
+Frank explicitly requested publishing for sole-player physical-device testing
+without waiting for that run. No full-browser pass is claimed. To undo only this
+registration change, run `git revert crokinole-v0.3.0-strike-preview.5` on `main`,
+verify and push; preview 4's accepted directional forgiveness remains intact.
 
 - Maximum translational flick power remains `105`; centered launches use the original response.
 - Flat-slide slowing retains the original formula: `frictionMu × 386 + frictionViscous × speed`. Surface grip is eased to `0.1175` from `0.120`; speed-dependent drag stays at `0.05`. Spin/contact additions did not add another free-slide brake. Contact collisions and glancing launches can still transfer translational energy into rotation or dissipate it.

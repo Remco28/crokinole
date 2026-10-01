@@ -134,14 +134,14 @@ try {
           await evaluate(`(()=>{const m=window.__gestureEvents.findLast(e=>e.type==='pointermove');const e=new PointerEvent('pointermove',{pointerId:m.id,pointerType:m.pointerType,clientX:m.x,clientY:m.y,buttons:1});Object.defineProperty(e,'timeStamp',{value:m.t+${delays[i]}});document.getElementById('board-canvas').dispatchEvent(e)})()`);
         } else inputs.push(call('Input.dispatchTouchEvent', { type: 'touchMove', timestamp: timestamp + elapsed / 1000, touchPoints: [{ ...p, id: 1 }] }));
       }
-      inputs.push(call('Input.dispatchTouchEvent', { type: options.cancel ? 'touchCancel' : 'touchEnd', timestamp: timestamp + (elapsed + 5) / 1000, touchPoints: [] }));
+      inputs.push(call('Input.dispatchTouchEvent', { type: options.cancel ? 'touchCancel' : 'touchEnd', timestamp: timestamp + (elapsed + (options.releaseDelay ?? 5)) / 1000, touchPoints: [] }));
     } else {
       inputs.push(call('Input.dispatchMouseEvent', { type: 'mousePressed', timestamp, ...positions[0], button: 'left', buttons: 1, clickCount: 1 }));
       for (const [i, p] of positions.slice(1).entries()) {
         await sleep(delays[i]); elapsed += delays[i];
         inputs.push(call('Input.dispatchMouseEvent', { type: 'mouseMoved', timestamp: timestamp + elapsed / 1000, ...p, button: 'left', buttons: 1 }));
       }
-      inputs.push(call('Input.dispatchMouseEvent', { type: 'mouseReleased', timestamp: timestamp + (elapsed + 5) / 1000, ...positions.at(-1), button: 'left', buttons: 0, clickCount: 1 }));
+      inputs.push(call('Input.dispatchMouseEvent', { type: 'mouseReleased', timestamp: timestamp + (elapsed + (options.releaseDelay ?? 5)) / 1000, ...positions.at(-1), button: 'left', buttons: 0, clickCount: 1 }));
     }
     await Promise.all(inputs);
     await until(`window.__gestureEvents.some(e => e.type === '${options.cancel ? 'pointercancel' : 'pointerup'}')`);
@@ -154,6 +154,9 @@ try {
     if (options.miss || options.cancel) {
       assert.equal(s.phase, 'pass'); assert.equal(s.used[0], 0);
       assert.equal(s.discs[0].spin, 0, 'Misses and cancellations never launch');
+      if(options.unchangedPlacement) {
+        assert.ok(Math.hypot(s.discs[0].x,s.discs[0].y-12)<0.0001,'Held powered strokes do not accidentally relocate the staged disc');
+      }
       return s;
     }
     if (s.phase !== 'moving') {
@@ -202,6 +205,27 @@ try {
     }
     for(let i=1;i<ramp.length;i++) assert.ok(ramp[i]>ramp[i-1],'Outside the central corridor, deliberate deflection increases smoothly');
     console.log('Central directional forgiveness',JSON.stringify({touch,view,neutral,ramp}));
+  }
+  async function checkShortGrazes(touch, view) {
+    for (const offset of [-0.9,0.9]) {
+      const x=offset*0.625;
+      await flick(x,touch,view,{points:[12.15,12,11.85].map(y=>({x,y})),delays:[5,5]});
+      await flick(x,touch,view,{points:[12.4,12.2,12,11.8].map(y=>({x,y})),delays:[20,20,20]});
+      await flick(x,touch,view,{miss:true,points:[12.15,12,11.85].map(y=>({x,y})),delays:[50,50]});
+      if(touch) await flick(x,touch,view,{cancel:true,points:[12.15,12,11.85].map(y=>({x,y})),delays:[5,5]});
+    }
+    await flick(0,touch,view,{miss:true,points:[{x:0,y:12.15},{x:0,y:12}],delays:[5]});
+    await flick(0.64,touch,view,{miss:true,points:[12.15,12,11.85].map(y=>({x:0.64,y})),delays:[5,5]});
+    await flick(0,touch,view,{miss:true,unchangedPlacement:true,points:[{x:0,y:12.2},{x:0,y:11.8}],delays:[10],releaseDelay:200});
+    for(const offset of [-0.99,0.99]) {
+      const x=offset*0.625;
+      await flick(x,touch,view,{points:[12.15,11.85].map(y=>({x,y})),delays:[10]});
+      for(const divisions of [1,5]) {
+        const points=Array.from({length:2*divisions+1},(_,i)=>({x,y:12.15-0.3*i/(2*divisions)}));
+        await flick(x,touch,view,{points,delays:Array(2*divisions).fill(5/divisions)});
+      }
+    }
+    console.log('Short grazing contact: mirrored fast clips and sub-pixel-threshold powered shots launch; taps, slow brushes, outside misses and cancellations do not.',JSON.stringify({touch,view}));
   }
   function wobbleGesture(dx, dense=false) {
     const samples=[{x:0,y:12.6,t:0},{x:dx,y:12.59,t:5},{x:0,y:12.3,t:20},{x:0,y:11.7,t:40},{x:0,y:11.1,t:60},{x:0,y:10.5,t:80}];
@@ -279,11 +303,13 @@ try {
   await checkPicking('standing');
   await checkPicking('seated');
   await checkAimForgiveness(false,'standing');
+  await checkShortGrazes(false,'standing');
   await checkWobbles(false,'standing');
   await checkSpeedAim(false,'standing');
   // Laptop touchscreen uses desktop layout, not phone emulation.
   await call('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
   await checkAimForgiveness(true,'standing');
+  await checkShortGrazes(true,'standing');
   await checkSpeedAim(true,'standing');
   await checkAuditInput(true,'standing');
   console.log('Picking: visible top centers and rims align across views, placements and player quadrants.');
@@ -303,6 +329,7 @@ try {
   await call('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
   await checkWobbles(true,'seated');
   await checkAimForgiveness(true,'seated');
+  await checkShortGrazes(true,'seated');
   await checkSpeedAim(true,'seated');
   await checkAuditInput(true,'seated');
   await flick(0.03, true);
@@ -334,6 +361,7 @@ try {
       await call('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile});
       await call('Emulation.setTouchEmulationEnabled',{enabled:touch,maxTouchPoints:2});
       await checkAimForgiveness(touch,view);
+      await checkShortGrazes(touch,view);
       const headings=[];
       for(const mirror of [-1,1]) for(const divisions of [1,5]) {
         const path=[{...points[0]}];

@@ -1,6 +1,6 @@
 import { setupBoardArtwork } from './board-artwork';
 import { BoardSound } from './audio/sound';
-import { appendFlickContactSample, canStartFlick, releaseShot, shouldRotateInstead, updateFlickContact, type FlickContact } from './game/flick';
+import { appendFlickContactSample, canStartFlick, finalizeFlickContact, releaseShot, shouldRotateInstead, updateFlickContact, type FlickContact } from './game/flick';
 import { pointerMoveSamples } from './game/pointer';
 import { createScene, type BoardView } from './render/scene';
 import { makeDisc, moving, step, type Disc, type Shot } from './sim/physics';
@@ -391,11 +391,17 @@ canvas.addEventListener('pointerup', e => {
   }
   if (scene.isViewMoving() || e.pointerId !== pointer || !staged || phase !== 'pass') return;
   if (deadline !== null && Date.now() >= deadline) { expireShot(); return; }
-  if (Math.hypot(e.clientX - press.x, e.clientY - press.y) < 5) {
+  const p = scene.boardPoint(e.clientX, e.clientY);
+  if (p) {
+    sampleFlick(p, e.timeStamp);
+    flickContact = finalizeFlickContact(flickContact, contactTrail, staged);
+  }
+  // A board-space powered strike takes precedence over a screen-space tap.
+  // A hold can still cancel release power; it must not relocate the struck disc.
+  if (!flickContact?.powered && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 5) {
     cancel(); placeAt(e.clientX, e.clientY); return;
   }
-  const p = scene.boardPoint(e.clientX, e.clientY);
-  if (p) { sampleFlick(p, e.timeStamp); releaseFlick(); }
+  if (p) releaseFlick();
   cancel();
 });
 function finishShot() {

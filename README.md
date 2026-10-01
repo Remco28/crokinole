@@ -17,6 +17,10 @@ corridor preserves the incoming stroke direction; outside it, directional
 deflection blends smoothly into the existing glancing response. The corridor is
 relative to the stroke, not a fixed region behind the disc or a target on the board.
 Off-center impact can still impart axial spin. Missed swipes do not shoot. A shot gesture holds the view steady until you lift your finger. Your chosen zoom and score layout persist.
+Preview 5 also recognizes completed short, fast near-edge clips on lift. Powered
+board-space strikes are no longer discarded as placement taps merely because
+their phone-screen displacement is under five pixels. Central control and outer
+deflection physics are unchanged; this fixes registration, not glance strength.
 Framing shifts upward slightly to leave more room below the rim.
 
 Flick strength uses the original power response (speed × 0.8 + 12, capped at
