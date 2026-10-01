@@ -102,7 +102,7 @@ body[data-theme=light] #board-mode{color:#292b26}
 }
 @media(max-width:899px){
   #sidebar{display:contents}header{order:1}#match-panel{order:2}#table-controls{order:3}main{order:4}#round-summary{order:5}footer{order:6}
-  #app{padding:12px 14px max(12px,env(safe-area-inset-bottom));gap:8px;height:100dvh;min-height:560px}
+  #app{padding:12px 14px max(12px,env(safe-area-inset-bottom));gap:8px;height:100dvh;min-height:0;overflow-y:auto;overscroll-behavior-y:contain}
   main{min-height:260px;flex-shrink:0}
   header h1{font-size:25px;margin-bottom:0}header .eyebrow{font-size:8px}
   #table-controls{flex-wrap:nowrap;gap:8px}
@@ -112,7 +112,10 @@ body[data-theme=light] #board-mode{color:#292b26}
   #board-status{padding:5px 0;min-height:27px;gap:6px;font-size:10px}
   #board-mode{font-size:10px}
   #flick-guide{min-height:24px;font-size:10px;padding:4px}
-  footer{flex-shrink:0;padding-top:10px}footer #hint{display:block;font-size:11px;line-height:1.35}
+  /* Keep progression visible while the board and expanded scores can scroll. */
+  footer{flex-shrink:0;padding-top:10px;position:sticky;bottom:0;z-index:3;background:#171d1c}
+  body[data-theme=light] footer{background:#f3efe5}
+  footer #hint{display:block;font-size:11px;line-height:1.35}
   footer>div{min-width:0}footer .eyebrow{letter-spacing:1px;font-size:9px}
 }
 

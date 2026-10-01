@@ -145,6 +145,44 @@ try {
   assert.equal((await state()).round, 1); assert.equal((await state()).phase, 'pass');
   assert.equal(await evaluate('document.getElementById("winner-overlay").hidden'), true);
   console.log('Winner: real round completion, final score, dismissal, inspection, reload, reopen, teams, free-for-all, and new game passed.');
+
+  await call('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+  for (const mode of ['duel', 'teams', 'ffa']) {
+    for (const [width, height] of [[320, 568], [360, 640], [390, 664], [844, 390], [899, 500]]) {
+      await call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
+      const roundEnd = { ...finalShot, mode, scores: Array(mode === 'ffa' ? 4 : 2).fill(0), used: Array(mode === 'duel' ? 2 : 4).fill(mode === 'duel' ? 12 : 6) };
+      await restoreMatch(roundEnd);
+      await until('document.getElementById("continue").textContent === "Next round" && !document.getElementById("continue").hidden');
+      if (mode === 'ffa') await evaluate('document.getElementById("score-details").click()');
+      const button = await evaluate(`(() => {
+        const b=document.getElementById('continue'), r=b.getBoundingClientRect();
+        const x=r.x+r.width/2, y=r.y+r.height/2;
+        return {x,y,top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:innerHeight,width:innerWidth,hit:b.contains(document.elementFromPoint(x,y)),summaryExpanded:document.getElementById('round-summary').dataset.boardFocus === 'false'};
+      })()`);
+      assert.equal(button.summaryExpanded, true, 'Round breakdown stays expanded by default');
+      assert.ok(button.top >= 0 && button.bottom <= button.height && button.left >= 0 && button.right <= button.width && button.hit, `Next round is fully visible and tappable without collapsing scores: ${mode} ${width}x${height} ${JSON.stringify(button)}`);
+      await evaluate('document.getElementById("app").scrollTop=document.getElementById("app").scrollHeight');
+      const scrolled = await evaluate(`(() => {
+        const app=document.getElementById('app'), summary=document.getElementById('round-summary');
+        const last=summary.lastElementChild.getBoundingClientRect(), footer=document.querySelector('footer').getBoundingClientRect();
+        const b=document.getElementById('continue'), r=b.getBoundingClientRect(), x=r.x+r.width/2,y=r.y+r.height/2;
+        return {x,y,summaryReadable:last.top>=0 && last.bottom<=footer.top,hit:b.contains(document.elementFromPoint(x,y)),noHorizontalOverflow:app.scrollWidth<=app.clientWidth};
+      })()`);
+      assert.equal(scrolled.summaryReadable, true, 'Expanded breakdown can scroll clear of the pinned action');
+      assert.equal(scrolled.noHorizontalOverflow, true);
+      assert.equal(scrolled.hit, true, 'Next round remains tappable after scrolling');
+      if (process.env.SCREENSHOT_DIR && mode === 'ffa' && width === 320) {
+        const shot = await call('Page.captureScreenshot', { format: 'png' });
+        await writeFile(join(process.env.SCREENSHOT_DIR, 'crokinole-round-small-mobile.png'), Buffer.from(shot.data, 'base64'));
+      }
+      await call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x:scrolled.x, y:scrolled.y, id:1 }] });
+      await call('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await until('document.getElementById("round-summary").hidden');
+      assert.equal((await state()).round, 6, 'Native tap advances to the next round');
+      assert.equal((await state()).phase, 'pass');
+    }
+  }
+  console.log('Round progression: expanded scores, short/narrow/landscape mobile screens, all three modes, and native Next round taps passed.');
 } finally {
   socket?.close(); browser?.kill('SIGTERM'); server.kill('SIGTERM');
   await sleep(300); await rm(directory, { recursive: true, force: true });
