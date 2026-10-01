@@ -21,11 +21,12 @@ describe('forgiving spin from swept flick contact', () => {
       expect(releaseShot(swipe(0), disc, offset)!.spin).toBe(0);
     }
   });
-  it('uses progressively stronger deliberate offsets, with mirrored spin', () => {
+  it('couples mirrored spin to deliberate offsets without a full spin kick on a weak skim', () => {
     const medium = releaseShot(swipe(0), disc, 0.5)!;
     const edge = releaseShot(swipe(0), disc, 1)!;
     const mirrored = releaseShot(swipe(0), disc, -1)!;
-    expect(medium.spin).toBeGreaterThan(5); expect(edge.spin).toBeGreaterThan(medium.spin);
+    expect(medium.spin).toBeGreaterThan(5); expect(edge.spin).toBeGreaterThan(0);
+    expect(edge.spin).toBeLessThan(medium.spin);
     expect(mirrored.spin).toBe(-edge.spin); expect(mirrored.y).toBe(edge.y);
     expect(edge.x).toBeGreaterThan(0);
   });
@@ -37,8 +38,9 @@ describe('forgiving spin from swept flick contact', () => {
   });
   it('reaches strong spin without requiring a rim-grazing strike', () => {
     expect(releaseShot(swipe(0), disc, 0.5)!.spin).toBeGreaterThan(10);
-    expect(releaseShot(swipe(0), disc, 0.8)!.spin).toBe(18);
-    expect(releaseShot(swipe(0), disc, -0.8)!.spin).toBe(-18);
+    const outer = releaseShot(swipe(0), disc, 0.8)!.spin;
+    expect(outer).toBeGreaterThan(15); expect(outer).toBeLessThanOrEqual(18);
+    expect(releaseShot(swipe(0), disc, -0.8)!.spin).toBe(-outer);
   });
   it('is continuous at the center-zone boundary, not a binary spin switch', () => {
     expect(releaseShot(swipe(0), disc, 0.1001)!.spin).toBeLessThan(0.001);

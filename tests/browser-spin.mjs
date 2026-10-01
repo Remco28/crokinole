@@ -120,6 +120,9 @@ try {
     await evaluate(`window.__gestureEvents=[]; for(const type of ['pointerdown','pointermove','pointerup','pointercancel']) document.getElementById('board-canvas').addEventListener(type,e=>window.__gestureEvents.push({type:e.type,t:e.timeStamp,x:e.clientX,y:e.clientY,id:e.pointerId,pointerType:e.pointerType,raw:(e.getCoalescedEvents?.()??[]).map(p=>({t:p.timeStamp,x:p.clientX,y:p.clientY}))}),true)`);
     // Native event timestamps carry the intended gesture time even if software
     // WebGL delays delivery. Rendering and game-state loops remain running.
+    // Capture production launch before friction can stop a weak skim. Each
+    // flick reloads the document, so this observer cannot stack across shots.
+    await evaluate(`window.__initialLaunch=null;const original=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k==='crokinole-match-spin-v2'&&!window.__initialLaunch){const s=JSON.parse(v);if(s.phase==='moving')window.__initialLaunch=s;}return original.call(this,k,v);}`);
     const inputs = [], timestamp = Date.now() / 1000;
     let elapsed = 0;
     const delays = options.delays || positions.slice(1).map(() => 20);
@@ -167,16 +170,19 @@ try {
     }
     assert.equal(s.version, 2); assert.equal(s.phase, 'moving'); assert.equal(s.used[0], 1);
     assert.equal(s.paused, true);
+    const launch = await evaluate('window.__initialLaunch');
+    assert.ok(launch, 'Eligible native stroke persisted its initial launch');
+    const d = launch.discs[0];
     if (options.maxHeadingDegrees) {
-      assert.ok(Math.abs(Math.atan2(s.discs[0].vx,-s.discs[0].vy)*180/Math.PI)<options.maxHeadingDegrees, 'Near-contact aim stays within its requested heading bound');
-      assert.ok(Math.abs(s.discs[0].spin)<=18);
+      assert.ok(Math.abs(Math.atan2(d.vx,-d.vy)*180/Math.PI)<options.maxHeadingDegrees, 'Near-contact aim stays within its requested heading bound');
+      assert.ok(Math.abs(d.spin)<=18);
     } else {
-      if (Math.abs(offset)<=0.125) assert.ok(Math.abs(Math.atan2(s.discs[0].vx,-s.discs[0].vy)*180/Math.PI)<0.1, 'Small central positioning error preserves the incoming heading');
-      else assert.ok(s.discs[0].vx * offset < 0, 'Side impact deflects away from the finger');
-      if (Math.abs(offset) <= 0.05) assert.equal(s.discs[0].spin, 0, 'Only a small neutral spin zone remains');
-      else assert.ok(s.discs[0].spin * offset < -0.1, 'Deliberate left/right contact produces signed spin');
+      if (Math.abs(offset)<=0.125) assert.ok(Math.abs(Math.atan2(d.vx,-d.vy)*180/Math.PI)<0.1, 'Small central positioning error preserves the incoming heading');
+      else assert.ok(d.vx * offset < 0, 'Side impact deflects away from the finger');
+      if (Math.abs(offset) <= 0.05) assert.equal(d.spin, 0, 'Only a small neutral spin zone remains');
+      else assert.ok(d.spin * offset < -0.1, 'Deliberate left/right contact produces signed spin');
     }
-    if (Math.abs(offset) >= 0.3) assert.ok(Math.atan2(Math.abs(s.discs[0].vx), -s.discs[0].vy) * 180 / Math.PI > 8, 'Moderate side contact visibly changes launch direction');
+    if (Math.abs(offset) >= 0.3) assert.ok(Math.atan2(Math.abs(d.vx), -d.vy) * 180 / Math.PI > 8, 'Moderate side contact visibly changes launch direction');
     return s;
   }
   async function checkPicking(view) {
@@ -283,7 +289,9 @@ try {
       console.log('Coarse approach regression',JSON.stringify({touch,view,mirror,headings:[heading(a),heading(b)]}));
     }
     await flick(0,touch,view,{points:Array.from({length:17},(_,i)=>({x:0,y:11.6-i*0.05})),delays:Array(16).fill(3)});
-    await flick(0,touch,view,{miss:true,injectStationary:true,points:[{x:0,y:11.6},{x:0,y:11.37},{x:0,y:11.37},{x:0,y:11.1}],delays:[14,10,16]});
+    // Leave clearance for independent calibration-camera convergence; 11.37
+    // can pick inside the 11.375 rim and invalidate this outside-stop fixture.
+    await flick(0,touch,view,{miss:true,injectStationary:true,points:[{x:0,y:11.6},{x:0,y:11.34},{x:0,y:11.34},{x:0,y:11.1}],delays:[14,10,16]});
     console.log('Audit input: coarse/dense approach agrees and front-face touch launches without orbiting.');
   }
   const focused = process.env.CROKINOLE_INPUT_SMOKE === '1';
@@ -377,7 +385,7 @@ try {
       await flick(0.4,touch,view);
       if(touch) {
         await flick(0,touch,view,{points:Array.from({length:17},(_,i)=>({x:0,y:11.6-i*0.05})),delays:Array(16).fill(3)});
-        await flick(0,touch,view,{miss:true,injectStationary:true,points:[{x:0,y:11.6},{x:0,y:11.37},{x:0,y:11.37},{x:0,y:11.1}],delays:[14,10,16]});
+        await flick(0,touch,view,{miss:true,injectStationary:true,points:[{x:0,y:11.6},{x:0,y:11.34},{x:0,y:11.34},{x:0,y:11.1}],delays:[14,10,16]});
       }
       console.log('Focused native input regression',JSON.stringify({touch,view,headings}));
     }

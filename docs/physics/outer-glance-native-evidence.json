@@ -1,0 +1,272 @@
+{
+  "count": 27,
+  "rows": [
+    {
+      "touch": false,
+      "view": "standing",
+      "offset": -0.99,
+      "kind": "long",
+      "launched": true,
+      "heading": 62.46150254630144,
+      "speed": 8.502315407343822,
+      "spin": 6.259942833292707
+    },
+    {
+      "touch": false,
+      "view": "standing",
+      "offset": -0.9,
+      "kind": "long",
+      "launched": true,
+      "heading": 41.26502201262989,
+      "speed": 20.466824521819767,
+      "spin": 13.955126882136273
+    },
+    {
+      "touch": false,
+      "view": "standing",
+      "offset": 0,
+      "kind": "long",
+      "launched": true,
+      "heading": 0,
+      "speed": 33.61963133227744,
+      "spin": 0
+    },
+    {
+      "touch": false,
+      "view": "standing",
+      "offset": 0.5,
+      "kind": "long",
+      "launched": true,
+      "heading": -13.660074223474119,
+      "speed": 31.68081408376202,
+      "spin": -12.815815053193077
+    },
+    {
+      "touch": false,
+      "view": "standing",
+      "offset": 0.9,
+      "kind": "long",
+      "launched": true,
+      "heading": -41.24451786589488,
+      "speed": 20.456808867146144,
+      "spin": -13.958285808080188
+    },
+    {
+      "touch": false,
+      "view": "standing",
+      "offset": 0.99,
+      "kind": "long",
+      "launched": true,
+      "heading": -62.46150254630158,
+      "speed": 8.502315407343822,
+      "spin": -6.259942833292707
+    },
+    {
+      "touch": false,
+      "view": "standing",
+      "offset": 1.01,
+      "kind": "long",
+      "launched": false,
+      "heading": null,
+      "speed": null
+    },
+    {
+      "touch": false,
+      "view": "standing",
+      "offset": -0.99,
+      "kind": "short",
+      "launched": true,
+      "heading": 59.31975307793735,
+      "speed": 6.934988888729779,
+      "spin": 6.271517368246183
+    },
+    {
+      "touch": false,
+      "view": "standing",
+      "offset": 0.99,
+      "kind": "short",
+      "launched": true,
+      "heading": -59.31975307793737,
+      "speed": 6.934988888729584,
+      "spin": -6.271517368246016
+    },
+    {
+      "touch": true,
+      "view": "standing",
+      "offset": -0.99,
+      "kind": "long",
+      "launched": true,
+      "heading": 62.43400794629939,
+      "speed": 8.518262113992776,
+      "spin": 6.271424870208371
+    },
+    {
+      "touch": true,
+      "view": "standing",
+      "offset": -0.9,
+      "kind": "long",
+      "launched": true,
+      "heading": 41.253555982151,
+      "speed": 20.47160560947299,
+      "spin": 13.958285808080268
+    },
+    {
+      "touch": true,
+      "view": "standing",
+      "offset": 0,
+      "kind": "long",
+      "launched": true,
+      "heading": 0,
+      "speed": 33.61963133227744,
+      "spin": 0
+    },
+    {
+      "touch": true,
+      "view": "standing",
+      "offset": 0.5,
+      "kind": "long",
+      "launched": true,
+      "heading": -13.658750097082786,
+      "speed": 31.65546730810786,
+      "spin": -12.804126424704927
+    },
+    {
+      "touch": true,
+      "view": "standing",
+      "offset": 0.9,
+      "kind": "long",
+      "launched": true,
+      "heading": -41.24451786589488,
+      "speed": 20.456808867146144,
+      "spin": -13.958285808080188
+    },
+    {
+      "touch": true,
+      "view": "standing",
+      "offset": 0.99,
+      "kind": "long",
+      "launched": true,
+      "heading": -62.43400794629961,
+      "speed": 8.51826211399273,
+      "spin": -6.271424870208339
+    },
+    {
+      "touch": true,
+      "view": "standing",
+      "offset": 1.01,
+      "kind": "long",
+      "launched": false,
+      "heading": null,
+      "speed": null
+    },
+    {
+      "touch": true,
+      "view": "standing",
+      "offset": -0.99,
+      "kind": "short",
+      "launched": true,
+      "heading": 59.34696206388612,
+      "speed": 6.921949675004718,
+      "spin": 6.2600375952577
+    },
+    {
+      "touch": true,
+      "view": "standing",
+      "offset": 0.99,
+      "kind": "short",
+      "launched": true,
+      "heading": -59.3642522519548,
+      "speed": 6.913726287152401,
+      "spin": -6.25277050067105
+    },
+    {
+      "touch": true,
+      "view": "seated",
+      "offset": -0.99,
+      "kind": "long",
+      "launched": true,
+      "heading": 62.48491760279604,
+      "speed": 8.48954227465091,
+      "spin": 6.250450392399455
+    },
+    {
+      "touch": true,
+      "view": "seated",
+      "offset": -0.9,
+      "kind": "long",
+      "launched": true,
+      "heading": 41.26049624542358,
+      "speed": 20.45125439750727,
+      "spin": 13.953988586269222
+    },
+    {
+      "touch": true,
+      "view": "seated",
+      "offset": 0,
+      "kind": "long",
+      "launched": true,
+      "heading": 0,
+      "speed": 33.647551745689555,
+      "spin": 0
+    },
+    {
+      "touch": true,
+      "view": "seated",
+      "offset": 0.5,
+      "kind": "long",
+      "launched": true,
+      "heading": -13.661087214524334,
+      "speed": 31.65858076005062,
+      "spin": -12.807917400749202
+    },
+    {
+      "touch": true,
+      "view": "seated",
+      "offset": 0.9,
+      "kind": "long",
+      "launched": true,
+      "heading": -41.246927333028204,
+      "speed": 20.43913056576298,
+      "spin": -13.955348019653309
+    },
+    {
+      "touch": true,
+      "view": "seated",
+      "offset": 0.99,
+      "kind": "long",
+      "launched": true,
+      "heading": -62.481948706467456,
+      "speed": 8.491266929247304,
+      "spin": -6.251690959145264
+    },
+    {
+      "touch": true,
+      "view": "seated",
+      "offset": 1.01,
+      "kind": "long",
+      "launched": false,
+      "heading": null,
+      "speed": null
+    },
+    {
+      "touch": true,
+      "view": "seated",
+      "offset": -0.99,
+      "kind": "short",
+      "launched": true,
+      "heading": 59.36511782593634,
+      "speed": 6.913778231213577,
+      "spin": 6.252586830451564
+    },
+    {
+      "touch": true,
+      "view": "seated",
+      "offset": 0.99,
+      "kind": "short",
+      "launched": true,
+      "heading": -59.3712105702433,
+      "speed": 6.910860657892905,
+      "spin": -6.250017566747151
+    }
+  ]
+}

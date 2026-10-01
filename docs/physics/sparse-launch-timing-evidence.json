@@ -1,0 +1,512 @@
+{
+  "source": "/home/frank/.hermes/cache/scratch/crokinole-sparse-diagnosis-jqoeyjz8",
+  "count": 36,
+  "stoppedPaused": 30,
+  "exceptions": [],
+  "rows": [
+    {
+      "rate": 1,
+      "repeat": 0,
+      "offset": -0.61875,
+      "kind": "sparse",
+      "heading": 59.34696206388612,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 1,
+      "repeat": 0,
+      "offset": -0.61875,
+      "kind": "standard-three",
+      "heading": 59.31975307793735,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 1,
+      "repeat": 0,
+      "offset": -0.61875,
+      "kind": "dense",
+      "heading": 59.34696206388612,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 1,
+      "repeat": 0,
+      "offset": 0.61875,
+      "kind": "sparse",
+      "heading": -59.34696206388615,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 1,
+      "repeat": 0,
+      "offset": 0.61875,
+      "kind": "standard-three",
+      "heading": -59.34696206388615,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 1,
+      "repeat": 0,
+      "offset": 0.61875,
+      "kind": "dense",
+      "heading": -59.34696206388615,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 1,
+      "repeat": 1,
+      "offset": -0.61875,
+      "kind": "sparse",
+      "heading": 59.34696206388612,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 1,
+      "repeat": 1,
+      "offset": -0.61875,
+      "kind": "standard-three",
+      "heading": 59.27711318691694,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 1,
+      "repeat": 1,
+      "offset": -0.61875,
+      "kind": "dense",
+      "heading": 59.34696206388612,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 1,
+      "repeat": 1,
+      "offset": 0.61875,
+      "kind": "sparse",
+      "heading": -59.31975307793737,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 1,
+      "repeat": 1,
+      "offset": 0.61875,
+      "kind": "standard-three",
+      "heading": -59.34696206388615,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 1,
+      "repeat": 1,
+      "offset": 0.61875,
+      "kind": "dense",
+      "heading": -59.34696206388615,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 1,
+      "repeat": 2,
+      "offset": -0.61875,
+      "kind": "sparse",
+      "heading": 59.34696206388612,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 1,
+      "repeat": 2,
+      "offset": -0.61875,
+      "kind": "standard-three",
+      "heading": 59.36425225195484,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 1,
+      "repeat": 2,
+      "offset": -0.61875,
+      "kind": "dense",
+      "heading": 59.31975307793735,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 1,
+      "repeat": 2,
+      "offset": 0.61875,
+      "kind": "sparse",
+      "heading": -59.34696206388615,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 1,
+      "repeat": 2,
+      "offset": 0.61875,
+      "kind": "standard-three",
+      "heading": -59.34696206388615,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 1,
+      "repeat": 2,
+      "offset": 0.61875,
+      "kind": "dense",
+      "heading": -59.34696206388615,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 4,
+      "repeat": 0,
+      "offset": -0.61875,
+      "kind": "sparse",
+      "heading": 59.31975307793735,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 4,
+      "repeat": 0,
+      "offset": -0.61875,
+      "kind": "standard-three",
+      "heading": 59.31975307793735,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 4,
+      "repeat": 0,
+      "offset": -0.61875,
+      "kind": "dense",
+      "heading": 59.31975307793735,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 4,
+      "repeat": 0,
+      "offset": 0.61875,
+      "kind": "sparse",
+      "heading": -59.31975307793737,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 4,
+      "repeat": 0,
+      "offset": 0.61875,
+      "kind": "standard-three",
+      "heading": -59.34696206388615,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 4,
+      "repeat": 0,
+      "offset": 0.61875,
+      "kind": "dense",
+      "heading": -59.31975307793737,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 4,
+      "repeat": 1,
+      "offset": -0.61875,
+      "kind": "sparse",
+      "heading": 59.31975307793735,
+      "initialAway": true,
+      "pausedVelocity": [
+        2.042801609046231,
+        -1.2119744734349978
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 4,
+      "repeat": 1,
+      "offset": -0.61875,
+      "kind": "standard-three",
+      "heading": 59.31975307793735,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 4,
+      "repeat": 1,
+      "offset": -0.61875,
+      "kind": "dense",
+      "heading": 59.31975307793735,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 4,
+      "repeat": 1,
+      "offset": 0.61875,
+      "kind": "sparse",
+      "heading": -59.34696206388615,
+      "initialAway": true,
+      "pausedVelocity": [
+        -2.032215636563307,
+        -1.2043895151709583
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 4,
+      "repeat": 1,
+      "offset": 0.61875,
+      "kind": "standard-three",
+      "heading": -59.31975307793737,
+      "initialAway": true,
+      "pausedVelocity": [
+        -2.042801609046063,
+        -1.2119744734348965
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 4,
+      "repeat": 1,
+      "offset": 0.61875,
+      "kind": "dense",
+      "heading": -59.34696206388615,
+      "initialAway": true,
+      "pausedVelocity": [
+        -2.032215636563307,
+        -1.2043895151709583
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 4,
+      "repeat": 2,
+      "offset": -0.61875,
+      "kind": "sparse",
+      "heading": 59.31975307793735,
+      "initialAway": true,
+      "pausedVelocity": [
+        2.042801609046231,
+        -1.2119744734349978
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 4,
+      "repeat": 2,
+      "offset": -0.61875,
+      "kind": "standard-three",
+      "heading": 59.34696206388612,
+      "initialAway": true,
+      "pausedVelocity": [
+        2.032215636563463,
+        -1.2043895151710533
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 4,
+      "repeat": 2,
+      "offset": -0.61875,
+      "kind": "dense",
+      "heading": 59.34696206388612,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 4,
+      "repeat": 2,
+      "offset": 0.61875,
+      "kind": "sparse",
+      "heading": -59.31975307793737,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 4,
+      "repeat": 2,
+      "offset": 0.61875,
+      "kind": "standard-three",
+      "heading": -59.34696206388615,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    },
+    {
+      "rate": 4,
+      "repeat": 2,
+      "offset": 0.61875,
+      "kind": "dense",
+      "heading": -59.34696206388615,
+      "initialAway": true,
+      "pausedVelocity": [
+        0,
+        0
+      ],
+      "replayStopTime": 0.15,
+      "replayCollisionCount": 0
+    }
+  ]
+}

@@ -177,6 +177,10 @@ export const FLICK_SPIN = { centerZone: 0.1, fullGripOffset: 0.4, maxSpeed: 18 }
 // Directional control forgiveness in disc radii, relative to the incoming stroke.
 // This does not enlarge contact, target the hole, or retune power/spin transfer.
 export const FLICK_AIM = { neutralOffset: 0.2, fullDeflectionOffset: 0.5 } as const;
+// Keep accepted center/moderate strikes exact; near the rim reduce virtual
+// fingertip rounding smoothly. A small rim radius avoids a zero-energy tangent.
+// This is gameplay contact tuning, not a calibrated physical finger model.
+export const FLICK_GLANCE = { startOffset: 0.7, rimFingerRadiusRatio: 0.02 } as const;
 export function releaseShot(samples: FlickSample[], disc: Point, contact: number | FlickContact = 0): (Point & { spin: number }) | null {
   if (typeof contact !== 'number' && !contact.powered) return null;
   const velocity = releaseVelocity(samples, disc);
@@ -185,7 +189,12 @@ export function releaseShot(samples: FlickSample[], disc: Point, contact: number
   const direction = typeof contact === 'number' ? { x: velocity.x / speed, y: velocity.y / speed } : contact.direction;
   const offset = Math.max(-1, Math.min(1, typeof contact === 'number' ? contact : contact.offset));
   if (!offset) return { x: direction.x * speed, y: direction.y * speed, spin: 0 };
-  const side = offset / (1 + FLICK_STRIKE.fingerRadiusRatio);
+  const outer = Math.max(0, Math.min(1, (Math.abs(offset) - FLICK_GLANCE.startOffset)
+    / (1 - FLICK_GLANCE.startOffset)));
+  const blend = outer * outer * (3 - 2 * outer);
+  const fingerRadius = FLICK_STRIKE.fingerRadiusRatio
+    + (FLICK_GLANCE.rimFingerRadiusRatio - FLICK_STRIKE.fingerRadiusRatio) * blend;
+  const side = offset / (1 + fingerRadius);
   const forward = Math.sqrt(1 - side * side);
   const normal = { x: direction.x * forward - direction.y * side, y: direction.y * forward + direction.x * side };
   const tangent = { x: -normal.y, y: normal.x };
@@ -197,8 +206,13 @@ export function releaseShot(samples: FlickSample[], disc: Point, contact: number
   // sticking impulse by finger grip and angular speed. No bonus launch energy:
   // jn² + (1 + R²/I)jt² <= speed²; a glancing strike transfers less energy.
   const stickingImpulse = speed * Math.abs(side) / (1 + DISC.radius ** 2 / inertia);
+  const roundedSide = offset / (1 + FLICK_STRIKE.fingerRadiusRatio);
+  const roundedForward = Math.sqrt(1 - roundedSide * roundedSide);
+  // As the edge becomes more tangent, reduce its spin-transfer ceiling with
+  // normal impulse too; a weak skim must not retain a full powered spin kick.
+  const spinTransfer = forward / roundedForward;
   const tangentImpulse = -Math.sign(side) * Math.min(stickingImpulse * grip,
-    FLICK_STRIKE.friction * normalImpulse, FLICK_SPIN.maxSpeed * inertia / DISC.radius);
+    FLICK_STRIKE.friction * normalImpulse, FLICK_SPIN.maxSpeed * inertia / DISC.radius * spinTransfer);
   const shot = {
     x: normal.x * normalImpulse + tangent.x * tangentImpulse,
     y: normal.y * normalImpulse + tangent.y * tangentImpulse,
