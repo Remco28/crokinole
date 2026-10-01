@@ -6,8 +6,9 @@ live in Settings, with game mode and **Start a new game** at the top.
 Players are named Red, Blue, Yellow, and Green; opposite colors partner in teams.
 
 To shoot, start behind your disc (including outside the rim) and flick through
-it. A slow brush is provisional; the first powered contact records the strike
-direction and offset. Lifting your finger launches the disc, with power measured
+it. Slow brushes and tiny initial wobbles are provisional; a short, stable
+powered approach records the strike direction and offset. Finger coordinates
+follow the visible top face of the disc, not its mid-height plane. Lifting your finger launches the disc, with power measured
 from the last 120 milliseconds including follow-through. Off-center impact
 deflects the shot away from the finger and can impart axial spin. Missed swipes do not shoot. A shot gesture holds the view steady until you lift your finger. Your chosen zoom and score layout persist.
 Framing shifts upward slightly to leave more room below the rim.
@@ -220,8 +221,11 @@ legacy-save preservation, and paused rotation across reload. The mobile round
 checks keep the score breakdown expanded, verify that Next round is visible
 before and after scrolling, and advance with native touch input in all three
 modes across narrow, short, and landscape viewports. Strike checks also cover
-slow initial brushes followed by side contact, post-impact follow-through,
-misses, cancellation, and event timestamps. Native CDP input carries explicit
+slow initial brushes followed by side contact, tiny initial left/right wobbles
+with ordinary and millisecond-dense samples, post-impact follow-through,
+misses, cancellation, and event timestamps. Independent projection of the
+rendered top face checks picking across standing/seated views, shooting
+positions and player quadrants. Native CDP input carries explicit
 gesture timestamps; real rendering and physics loops remain running. `npm test` runs the
 unit suite; `npm run build` checks TypeScript and
 builds the production app.

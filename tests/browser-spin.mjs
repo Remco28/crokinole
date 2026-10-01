@@ -67,7 +67,20 @@ try {
       const rect = document.getElementById('board-canvas').getBoundingClientRect();
       const canvas = document.createElement('canvas');
       Object.assign(canvas.style,{position:'fixed',left:rect.x+'px',top:rect.y+'px',width:rect.width+'px',height:rect.height+'px',visibility:'hidden',pointerEvents:'none'});
-      document.body.append(canvas); window.__calibration = createScene(canvas);
+      document.body.append(canvas);
+      const sceneSource = await (await fetch('/src/render/scene.ts')).text();
+      const threePath = sceneSource.match(/from ["']([^"']*three[^"']*)["']/)?.[1];
+      if (!threePath) throw new Error('Cannot locate the scene renderer dependency');
+      const THREE = await import(threePath);
+      window.__three = THREE;
+      const lookAt = THREE.Object3D.prototype.lookAt;
+      THREE.Object3D.prototype.lookAt = function(...args) {
+        if (this.isPerspectiveCamera) window.__calibrationCamera = this;
+        return lookAt.apply(this,args);
+      };
+      try { window.__calibration = createScene(canvas); }
+      finally { THREE.Object3D.prototype.lookAt = lookAt; }
+      window.__discHeight = (await import('/src/sim/constants.ts')).DISC.height;
       window.__calibration.setView(${JSON.stringify(view)}); window.__calibration.setZoom(1.2);
       window.__calibrationCanvas = canvas;
     })()`);
@@ -77,14 +90,15 @@ try {
   async function project(points) {
     const screen = await evaluate(`(() => {
       const s=window.__calibration, r=window.__calibrationCanvas.getBoundingClientRect();
+      const camera=window.__calibrationCamera, THREE=window.__three;
+      if (!camera) throw new Error('Calibration camera was not captured');
       return ${JSON.stringify(points)}.map(target => {
-        let x=r.x+r.width/2,y=r.y+r.height/2;
-        for(let i=0;i<12;i++) {
-          const p=s.boardPoint(x,y), px=s.boardPoint(x+1,y), py=s.boardPoint(x,y+1);
-          const a=px.x-p.x,b=py.x-p.x,c=px.y-p.y,d=py.y-p.y,det=a*d-b*c;
-          const ex=target.x-p.x,ey=target.y-p.y;
-          x+=(ex*d-b*ey)/det; y+=(a*ey-ex*c)/det;
-        }
+        // Independent projection of the visible top face, not inversion of picking.
+        const ndc=new THREE.Vector3(target.x,window.__discHeight,target.y).project(camera);
+        const x=r.x+(ndc.x+1)*r.width/2, y=r.y+(1-ndc.y)*r.height/2;
+        const picked=s.boardPoint(x,y);
+        if (Math.hypot(picked.x-target.x,picked.y-target.y)>0.0001)
+          throw new Error('Visible disc surface does not match the flick picking plane');
         return {x,y};
       });
     })()`);
@@ -135,12 +149,53 @@ try {
     }
     assert.equal(s.version, 2); assert.equal(s.phase, 'moving'); assert.equal(s.used[0], 1);
     assert.equal(s.paused, true);
-    if (!offset) assert.ok(Math.abs(s.discs[0].vx) < 0.01, 'Exactly centered contact keeps its straight launch');
-    else assert.ok(s.discs[0].vx * offset < 0, 'Side impact deflects away from the finger');
-    if (Math.abs(offset) <= 0.05) assert.equal(s.discs[0].spin, 0, 'Only a small neutral spin zone remains');
-    else assert.ok(s.discs[0].spin * offset < -0.1, 'Deliberate left/right contact produces signed spin');
+    if (options.maxHeadingDegrees) {
+      assert.ok(Math.abs(Math.atan2(s.discs[0].vx,-s.discs[0].vy)*180/Math.PI)<options.maxHeadingDegrees, 'Dense tiny wobble cannot hijack launch direction');
+      assert.ok(Math.abs(s.discs[0].spin)<=18);
+    } else {
+      if (!offset) assert.ok(Math.abs(s.discs[0].vx) < 0.01, 'Exactly centered contact keeps its straight launch');
+      else assert.ok(s.discs[0].vx * offset < 0, 'Side impact deflects away from the finger');
+      if (Math.abs(offset) <= 0.05) assert.equal(s.discs[0].spin, 0, 'Only a small neutral spin zone remains');
+      else assert.ok(s.discs[0].spin * offset < -0.1, 'Deliberate left/right contact produces signed spin');
+    }
     if (Math.abs(offset) >= 0.3) assert.ok(Math.atan2(Math.abs(s.discs[0].vx), -s.discs[0].vy) * 180 / Math.PI > 8, 'Moderate side contact visibly changes launch direction');
     return s;
+  }
+  async function checkPicking(view) {
+    for (const angle of [-Math.PI/4,0,Math.PI/2,Math.PI]) {
+      await reset(view);
+      await evaluate(`window.__calibration.setYawTarget(${angle})`);
+      await until('!window.__calibration.isViewMoving()');
+      const points=[];
+      for(const delta of [-0.6,0,0.6]) {
+        const a=angle+delta, x=12*Math.sin(a), y=12*Math.cos(a);
+        points.push({x,y},{x:x+0.5,y},{x:x-0.5,y},{x,y:y+0.5});
+      }
+      await project(points); // Projects the real top surface and checks default picking.
+    }
+  }
+  function wobbleGesture(dx, dense=false) {
+    const samples=[{x:0,y:12.6,t:0},{x:dx,y:12.59,t:5},{x:0,y:12.3,t:20},{x:0,y:11.7,t:40},{x:0,y:11.1,t:60},{x:0,y:10.5,t:80}];
+    const path=[samples[0]];
+    for(let i=1;i<samples.length;i++) {
+      const a=samples[i-1],b=samples[i];
+      if(!dense) { path.push(b); continue; }
+      for(let t=a.t+1;t<=b.t;t++) {
+        const f=(t-a.t)/(b.t-a.t); path.push({x:a.x+(b.x-a.x)*f,y:a.y+(b.y-a.y)*f,t});
+      }
+    }
+    return {points:path.map(({x,y})=>({x,y})),delays:path.slice(1).map((s,i)=>s.t-path[i].t),...(dense?{maxHeadingDegrees:8}:{})};
+  }
+  async function checkWobbles(touch,view) {
+    for(const dense of [false,true]) {
+      const headings=[];
+      for(const dx of [-0.05,0.05]) {
+        const s=await flick(0,touch,view,wobbleGesture(dx,dense));
+        headings.push(Math.atan2(s.discs[0].vx,-s.discs[0].vy)*180/Math.PI);
+      }
+      assert.ok(Math.abs(headings[0]+headings[1])<1,'Wobble response remains mirrored');
+      console.log('Wobble regression',JSON.stringify({touch,view,dense,headings}));
+    }
   }
   const legacy = await state(); legacy.version = 1;
   legacy.discs = legacy.discs.map(({ spin, angle, ...d }) => d);
@@ -154,6 +209,10 @@ try {
   assert.equal(await evaluate('localStorage.getItem("crokinole-match")'), legacyRaw, 'Subsequent spin saves do not overwrite the stable table');
   console.log('Migration: legacy table copied to version 2; original save preserved for rollback.');
   await call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+  await checkPicking('standing');
+  await checkPicking('seated');
+  await checkWobbles(false,'standing');
+  console.log('Picking: visible top centers and rims align across views, placements and player quadrants.');
   await flick(0, false);
   await flick(0.3, false); // Moderate contact must work, not just near-rim swipes.
   const left = await flick(-0.45, false), right = await flick(0.45, false);
@@ -168,6 +227,7 @@ try {
   console.log('Desktop: centered/mirrored deflection and spin, slow-brush registration, fixed impact direction, and missed swipes passed.');
   await call('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await call('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
+  await checkWobbles(true,'seated');
   await flick(0.03, true);
   await flick(0.3, true, 'seated');
   await flick(0.4, true, 'seated', brush);

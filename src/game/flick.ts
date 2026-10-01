@@ -21,16 +21,24 @@ export function crossesDisc(samples: FlickSample[], disc: Point): boolean {
 
 export interface FlickContact { offset: number; direction: Point; powered: boolean }
 
-// A slow brush is provisional: the finger can still settle into a side strike.
-// Freeze the first powered crossing, so post-impact follow-through cannot steer.
+// A brush or tiny wobble is provisional. Establish direction from a short
+// approach span with meaningful travel, then freeze the first powered crossing.
 export function updateFlickContact(previous: FlickContact | null, samples: FlickSample[], disc: Point): FlickContact | null {
   if (previous?.powered) return previous;
   const offset = flickContactOffset(samples, disc);
-  if (offset === null) return previous;
-  const end = samples[samples.length - 1], start = samples[samples.length - 2];
+  if (offset === null) return previous; // A later fast miss cannot power a brush.
+  const end = samples[samples.length - 1], segmentStart = samples[samples.length - 2];
+  const start = samples.find(s => s.t >= end.t - FLICK_STRIKE.contactWindowMs && s.t < end.t) ?? segmentStart;
   const dx = end.x - start.x, dy = end.y - start.y, length = Math.hypot(dx, dy);
   const seconds = (end.t - start.t) / 1000;
-  return { offset, direction: { x: dx / length, y: dy / length }, powered: seconds > 0 && length / seconds >= FLICK_STRIKE.minContactSpeed };
+  const sx = end.x - segmentStart.x, sy = end.y - segmentStart.y, segmentLength = Math.hypot(sx, sy);
+  const segmentSeconds = (end.t - segmentStart.t) / 1000;
+  const stableOffset = flickContactOffset([start, end], disc);
+  if (stableOffset !== null && length >= FLICK_STRIKE.minContactTravel && seconds > 0 && length / seconds >= FLICK_STRIKE.minContactSpeed
+    && segmentSeconds > 0 && segmentLength / segmentSeconds >= FLICK_STRIKE.minContactSpeed) {
+    return { offset: stableOffset, direction: { x: dx / length, y: dy / length }, powered: true };
+  }
+  return { offset, direction: { x: sx / segmentLength, y: sy / segmentLength }, powered: false };
 }
 
 // Measure the finish of the gesture, including follow-through, on release.
@@ -49,7 +57,7 @@ export function releaseVelocity(samples: FlickSample[], disc: Point): Point | nu
 
 // A rounded virtual fingertip gives a contact normal, not an arbitrary aim penalty.
 // This softens the response for phone-sized discs without enlarging the hitbox.
-export const FLICK_STRIKE = { fingerRadiusRatio: 0.4, friction: 0.35, minContactSpeed: 8 } as const;
+export const FLICK_STRIKE = { fingerRadiusRatio: 0.4, friction: 0.35, minContactSpeed: 8, contactWindowMs: 40, minContactTravel: DISC.radius * 0.2 } as const;
 export const FLICK_SPIN = { centerZone: 0.1, fullGripOffset: 0.4, maxSpeed: 18 } as const;
 export function releaseShot(samples: FlickSample[], disc: Point, contact: number | FlickContact = 0): (Point & { spin: number }) | null {
   if (typeof contact !== 'number' && !contact.powered) return null;
