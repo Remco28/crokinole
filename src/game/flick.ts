@@ -33,14 +33,15 @@ export function releaseVelocity(samples: FlickSample[], disc: Point): Point | nu
   return { x: vx * power, y: vy * power };
 }
 
-// Broad neutral center and a smooth ramp: phone-sized discs must not turn
+// A small neutral center and a smooth ramp: phone-sized discs must not turn
 // subpixel contact errors into strong spin. Offset is captured at first contact,
 // independently of the follow-through used for launch direction and power.
-export const FLICK_SPIN = { centerZone: 0.3, rimSpeedRatio: 0.22, maxSpeed: 18 } as const;
+// Reach full response before the extreme rim so deliberate spin is accessible.
+export const FLICK_SPIN = { centerZone: 0.25, fullSpinOffset: 0.8, rimSpeedRatio: 0.22, maxSpeed: 18 } as const;
 export function releaseShot(samples: FlickSample[], disc: Point, offset = 0): (Point & { spin: number }) | null {
   const velocity = releaseVelocity(samples, disc);
   if (!velocity) return null;
-  const amount = Math.max(0, Math.min(1, (Math.abs(offset) - FLICK_SPIN.centerZone) / (1 - FLICK_SPIN.centerZone)));
+  const amount = Math.max(0, Math.min(1, (Math.abs(offset) - FLICK_SPIN.centerZone) / (FLICK_SPIN.fullSpinOffset - FLICK_SPIN.centerZone)));
   if (!amount) return { ...velocity, spin: 0 };
   const speed = Math.hypot(velocity.x, velocity.y);
   const ramp = amount * amount * (3 - 2 * amount);

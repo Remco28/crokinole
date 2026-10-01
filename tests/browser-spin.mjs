@@ -96,10 +96,13 @@ try {
     const positions = await project([12.8, 12.3, 11.7, 11.1, 10.5].map(y => ({ x: offset, y })));
     const rect = await evaluate('document.getElementById("board-canvas").getBoundingClientRect().toJSON()');
     for (const p of positions) assert.ok(p.x >= rect.x && p.x <= rect.right && p.y >= rect.y && p.y <= rect.bottom, 'Swipe stays on the visible canvas');
-    await evaluate(`window.__gestureEvents=[]; document.getElementById('board-canvas').addEventListener('pointerdown',e=>window.__gestureEvents.push({type:e.type,x:e.clientX,y:e.clientY}),true); document.getElementById('board-canvas').addEventListener('pointermove',e=>window.__gestureEvents.push({type:e.type,x:e.clientX,y:e.clientY,classes:e.target.className}),false); document.getElementById('board-canvas').addEventListener('pointerup',e=>window.__gestureEvents.push({type:e.type,x:e.clientX,y:e.clientY}),true)`);
-    // Queue the native events on a timed schedule without waiting for each CDP
-    // acknowledgement. Software-rendered Chrome can spend >120ms acknowledging
-    // a frame; that transport delay must not turn a fast swipe into a long hold.
+    await evaluate(`window.__gestureEvents=[]; document.getElementById('board-canvas').addEventListener('pointerdown',e=>window.__gestureEvents.push({type:e.type,t:performance.now(),x:e.clientX,y:e.clientY}),true); document.getElementById('board-canvas').addEventListener('pointermove',e=>window.__gestureEvents.push({type:e.type,t:performance.now(),x:e.clientX,y:e.clientY,classes:e.target.className}),false); document.getElementById('board-canvas').addEventListener('pointerup',e=>window.__gestureEvents.push({type:e.type,t:performance.now(),x:e.clientX,y:e.clientY}),true)`);
+    // Defer animation frames during the native swipe only. Software WebGL can
+    // spend >120ms painting and coalesce touch moves beyond the velocity window.
+    // Input handlers stay untouched; actual rendering runs before and after,
+    // and the resumed simulation still has to settle normally below.
+    await evaluate('window.__nativeRAF=window.requestAnimationFrame; window.__frameCallbacks=[]; window.requestAnimationFrame=callback => (window.__frameCallbacks.push(callback),0)');
+    await until('window.__frameCallbacks.length >= 2'); // Both scene-render and game-state loops are parked.
     const inputs = [];
     if (touch) {
       inputs.push(call('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ ...positions[0], id: 1 }] }));
@@ -111,7 +114,8 @@ try {
       inputs.push(call('Input.dispatchMouseEvent', { type: 'mouseReleased', ...positions.at(-1), button: 'left', buttons: 0, clickCount: 1 }));
     }
     await Promise.all(inputs);
-    await evaluate('document.getElementById("pause-button").click()');
+    await until('window.__gestureEvents.some(e => e.type === "pointerup")');
+    await evaluate('document.getElementById("pause-button").click(); window.requestAnimationFrame=window.__nativeRAF; for(const callback of window.__frameCallbacks) window.requestAnimationFrame(callback); delete window.__nativeRAF; delete window.__frameCallbacks');
     const s = await state();
     if (s.phase !== 'moving') {
       console.log('Gesture diagnostics', JSON.stringify({ offset, touch, view, positions, rect, state: s, events: await evaluate('window.__gestureEvents'), prefs: await evaluate('localStorage.getItem("crokinole-table")'), banner: await evaluate('document.getElementById("turn-banner").textContent') }));
@@ -138,12 +142,14 @@ try {
   console.log('Migration: legacy table copied to version 2; original save preserved for rollback.');
   await call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
   await flick(0, false);
+  await flick(0.3, false); // Moderate contact must work, not just near-rim swipes.
   const left = await flick(-0.45, false), right = await flick(0.45, false);
   assert.ok(left.discs[0].spin > 0 && right.discs[0].spin < 0);
   console.log('Desktop: actual centered and mirrored offset mouse flicks passed.');
   await call('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await call('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
   await flick(0.12, true);
+  await flick(0.3, true, 'seated');
   const mobile = await flick(0.45, true, 'seated');
   await sleep(250); assert.deepEqual((await state()).discs, mobile.discs, 'Pause freezes axial motion');
   await reload(); assert.deepEqual((await state()).discs, mobile.discs, 'Paused spin survives an actual reload exactly');

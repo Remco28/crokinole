@@ -14,9 +14,9 @@ describe('forgiving spin from swept flick contact', () => {
     expect(flickContactOffset(swipe(0.8), disc)).toBeNull();
     expect(flickContactOffset([...swipe(0)].reverse(), disc)).toBeNull();
   });
-  it('keeps a generous center zone and the original centered launch response', () => {
+  it('keeps a slightly narrower center zone and the original centered launch response', () => {
     const velocity = releaseVelocity(swipe(0), disc)!;
-    for (const offset of [-0.3, -0.1, 0, 0.1, 0.3]) {
+    for (const offset of [-0.25, -0.1, 0, 0.1, 0.25]) {
       expect(releaseShot(swipe(0), disc, offset)).toEqual({ ...velocity, spin: 0 });
     }
   });
@@ -24,12 +24,22 @@ describe('forgiving spin from swept flick contact', () => {
     const medium = releaseShot(swipe(0), disc, 0.5)!;
     const edge = releaseShot(swipe(0), disc, 1)!;
     const mirrored = releaseShot(swipe(0), disc, -1)!;
-    expect(medium.spin).toBeGreaterThan(0); expect(edge.spin).toBeGreaterThan(medium.spin);
+    expect(medium.spin).toBeGreaterThan(5); expect(edge.spin).toBeGreaterThan(medium.spin);
     expect(mirrored.spin).toBe(-edge.spin); expect(mirrored.y).toBe(edge.y);
     expect(edge.x).toBe(0);
   });
+  it('starts gentle signed spin inside the previous neutral zone', () => {
+    const left = releaseShot(swipe(0), disc, 0.28)!;
+    const right = releaseShot(swipe(0), disc, -0.28)!;
+    expect(left.spin).toBeGreaterThan(0); expect(left.spin).toBeLessThan(1);
+    expect(right.spin).toBe(-left.spin);
+  });
+  it('reaches strong spin before a rim-grazing strike, without raising the cap', () => {
+    expect(releaseShot(swipe(0), disc, 0.8)).toEqual(releaseShot(swipe(0), disc, 1));
+    expect(releaseShot(swipe(0), disc, -0.8)).toEqual(releaseShot(swipe(0), disc, -1));
+  });
   it('is continuous at the center-zone boundary, not a binary spin switch', () => {
-    expect(releaseShot(swipe(0), disc, 0.3001)!.spin).toBeLessThan(0.001);
+    expect(releaseShot(swipe(0), disc, 0.2501)!.spin).toBeLessThan(0.001);
   });
   it('caps angular speed and shares rather than adds launch energy', () => {
     for (const duration of [20, 70, 100, 200, 400]) for (const offset of [-2, -1, -0.4, 0, 0.4, 1, 2]) {

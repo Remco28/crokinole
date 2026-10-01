@@ -15,7 +15,9 @@ Flick strength uses the original power response (speed × 0.8 + 12, capped at
 a modestly shorter glide (previously 0.115), with the power ceiling and normal collision bounce unchanged.
 
 The spin preview adds forgiving axial rotation: centered flicks stay neutral,
-while deliberate side contact imparts bounded spin. Disc/peg/lip contacts can
+while deliberate side contact imparts bounded spin. Preview 2 slightly narrows
+the neutral center and brings useful spin within easier reach, without changing
+rotational damping or maximum power. Disc/peg/lip contacts can
 generate and change it; board friction slows it until rest. A small cream disc
 inlay makes rotation visible. No random misses or artificial curling are added.
 See [physics versions and rollback](PHYSICS-VERSIONS.md) for stable checkpoints,
@@ -211,7 +213,12 @@ deletion, selection and reloads, final-shot scoring, winner messages for each mo
 dismissal and reopening, final-board inspection, and starting a new game. Set
 `CHROME_BIN` to your Chrome or Chromium executable if needed. Node 22 or later
 is required. Spin checks cover native mouse/touch flicks, mobile neutral contact,
-legacy-save preservation, and paused rotation across reload. `npm test` runs the
+legacy-save preservation, and paused rotation across reload. The mobile round
+checks keep the score breakdown expanded, verify that Next round is visible
+before and after scrolling, and advance with native touch input in all three
+modes across narrow, short, and landscape viewports. During velocity-sensitive
+spin gestures, software-rendered animation frames are briefly deferred; rendering
+is restored before persistence and settling checks. `npm test` runs the
 unit suite; `npm run build` checks TypeScript and
 builds the production app.
 
