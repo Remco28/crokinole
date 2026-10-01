@@ -131,6 +131,9 @@ export function releaseVelocity(samples: FlickSample[], disc: Point): Point | nu
 export const FLICK_STRIKE = { fingerRadiusRatio: 0.4, friction: 0.35, minContactSpeed: 8,
   approachDistance: DISC.radius * 2, minContactTravel: DISC.radius * 0.5, strokeGapMs: 120 } as const;
 export const FLICK_SPIN = { centerZone: 0.1, fullGripOffset: 0.4, maxSpeed: 18 } as const;
+// Directional control forgiveness in disc radii, relative to the incoming stroke.
+// This does not enlarge contact, target the hole, or retune power/spin transfer.
+export const FLICK_AIM = { neutralOffset: 0.2, fullDeflectionOffset: 0.5 } as const;
 export function releaseShot(samples: FlickSample[], disc: Point, contact: number | FlickContact = 0): (Point & { spin: number }) | null {
   if (typeof contact !== 'number' && !contact.powered) return null;
   const velocity = releaseVelocity(samples, disc);
@@ -153,11 +156,22 @@ export function releaseShot(samples: FlickSample[], disc: Point, contact: number
   const stickingImpulse = speed * Math.abs(side) / (1 + DISC.radius ** 2 / inertia);
   const tangentImpulse = -Math.sign(side) * Math.min(stickingImpulse * grip,
     FLICK_STRIKE.friction * normalImpulse, FLICK_SPIN.maxSpeed * inertia / DISC.radius);
-  return {
+  const shot = {
     x: normal.x * normalImpulse + tangent.x * tangentImpulse,
     y: normal.y * normalImpulse + tangent.y * tangentImpulse,
     spin: -DISC.radius * tangentImpulse / inertia || 0,
   };
+  if (Math.abs(offset) >= FLICK_AIM.fullDeflectionOffset) return shot;
+  const t = Math.max(0, (Math.abs(offset) - FLICK_AIM.neutralOffset)
+    / (FLICK_AIM.fullDeflectionOffset - FLICK_AIM.neutralOffset));
+  const response = t * t * (3 - 2 * t);
+  const deflection = Math.atan2(direction.x * shot.y - direction.y * shot.x,
+    direction.x * shot.x + direction.y * shot.y) * response;
+  const c = Math.cos(deflection), s = Math.sin(deflection), transferredSpeed = Math.hypot(shot.x, shot.y);
+  // Rotate only the launch heading toward the actual stroke, preserving the
+  // existing transferred speed, axial spin and energy budget. No target snap.
+  return { x: transferredSpeed * (direction.x * c - direction.y * s) || 0,
+    y: transferredSpeed * (direction.x * s + direction.y * c) || 0, spin: shot.spin };
 }
 
 export function canStartFlick(p: Point, disc: Point) {

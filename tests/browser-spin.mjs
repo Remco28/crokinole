@@ -168,7 +168,7 @@ try {
       assert.ok(Math.abs(Math.atan2(s.discs[0].vx,-s.discs[0].vy)*180/Math.PI)<options.maxHeadingDegrees, 'Near-contact aim stays within its requested heading bound');
       assert.ok(Math.abs(s.discs[0].spin)<=18);
     } else {
-      if (!offset) assert.ok(Math.abs(s.discs[0].vx) < 0.01, 'Exactly centered contact keeps its straight launch');
+      if (Math.abs(offset)<=0.125) assert.ok(Math.abs(Math.atan2(s.discs[0].vx,-s.discs[0].vy)*180/Math.PI)<0.1, 'Small central positioning error preserves the incoming heading');
       else assert.ok(s.discs[0].vx * offset < 0, 'Side impact deflects away from the finger');
       if (Math.abs(offset) <= 0.05) assert.equal(s.discs[0].spin, 0, 'Only a small neutral spin zone remains');
       else assert.ok(s.discs[0].spin * offset < -0.1, 'Deliberate left/right contact produces signed spin');
@@ -188,6 +188,20 @@ try {
       }
       await project(points); // Projects the real top surface and checks default picking.
     }
+  }
+  async function checkAimForgiveness(touch, view) {
+    const neutral=[];
+    for(const offset of [-0.11,-0.05,0.05,0.11]) for(const dt of [5,50]) {
+      const d=(await flick(offset,touch,view,{delays:[dt,dt,dt,dt],maxHeadingDegrees:0.1})).discs[0];
+      neutral.push({offset,sampleMs:dt,heading:Math.atan2(d.vx,-d.vy)*180/Math.PI});
+    }
+    const ramp=[];
+    for(const offset of [0.15,0.2,0.25,0.3]) {
+      const d=(await flick(offset,touch,view,{maxHeadingDegrees:45})).discs[0];
+      ramp.push(Math.atan2(-d.vx,-d.vy)*180/Math.PI);
+    }
+    for(let i=1;i<ramp.length;i++) assert.ok(ramp[i]>ramp[i-1],'Outside the central corridor, deliberate deflection increases smoothly');
+    console.log('Central directional forgiveness',JSON.stringify({touch,view,neutral,ramp}));
   }
   function wobbleGesture(dx, dense=false) {
     const samples=[{x:0,y:12.6,t:0},{x:dx,y:12.59,t:5},{x:0,y:12.3,t:20},{x:0,y:11.7,t:40},{x:0,y:11.1,t:60},{x:0,y:10.5,t:80}];
@@ -264,10 +278,12 @@ try {
   await call('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
   await checkPicking('standing');
   await checkPicking('seated');
+  await checkAimForgiveness(false,'standing');
   await checkWobbles(false,'standing');
   await checkSpeedAim(false,'standing');
   // Laptop touchscreen uses desktop layout, not phone emulation.
   await call('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
+  await checkAimForgiveness(true,'standing');
   await checkSpeedAim(true,'standing');
   await checkAuditInput(true,'standing');
   console.log('Picking: visible top centers and rims align across views, placements and player quadrants.');
@@ -286,6 +302,7 @@ try {
   await call('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await call('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
   await checkWobbles(true,'seated');
+  await checkAimForgiveness(true,'seated');
   await checkSpeedAim(true,'seated');
   await checkAuditInput(true,'seated');
   await flick(0.03, true);
@@ -316,6 +333,7 @@ try {
     for(const [touch,view,width,height,mobile] of [[false,'standing',1280,800,false],[true,'standing',1280,800,false],[true,'seated',390,844,true]]) {
       await call('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile});
       await call('Emulation.setTouchEmulationEnabled',{enabled:touch,maxTouchPoints:2});
+      await checkAimForgiveness(touch,view);
       const headings=[];
       for(const mirror of [-1,1]) for(const divisions of [1,5]) {
         const path=[{...points[0]}];

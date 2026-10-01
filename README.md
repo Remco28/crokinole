@@ -12,8 +12,11 @@ the timed power window. Touches anywhere on the active disc can start a shot;
 a continuous powered front-face stroke can finish its short registration span
 after leaving the face, but a slow brush or interrupted stroke cannot. Finger coordinates
 follow the visible top face of the disc, not its mid-height plane. Lifting your finger launches the disc, with power measured
-from the last 120 milliseconds including follow-through. Off-center impact
-deflects the shot away from the finger and can impart axial spin. Missed swipes do not shoot. A shot gesture holds the view steady until you lift your finger. Your chosen zoom and score layout persist.
+from the last 120 milliseconds including follow-through. A small central strike
+corridor preserves the incoming stroke direction; outside it, directional
+deflection blends smoothly into the existing glancing response. The corridor is
+relative to the stroke, not a fixed region behind the disc or a target on the board.
+Off-center impact can still impart axial spin. Missed swipes do not shoot. A shot gesture holds the view steady until you lift your finger. Your chosen zoom and score layout persist.
 Framing shifts upward slightly to leave more room below the rim.
 
 Flick strength uses the original power response (speed × 0.8 + 12, capped at
@@ -24,9 +27,11 @@ remains 0.05; power ceiling and normal collision bounce are unchanged.
 The strike preview couples finger-contact geometry, deflection, and axial
 rotation. Exactly centered flicks retain the original launch response; side
 strikes redirect and spin the disc, and glancing strikes transfer less energy.
-Only a small neutral **spin** zone remains; it does not erase directional errors.
-Aim registration changes do not retune maximum power or contact response. Disc/peg/lip contacts can
-generate and change it; board friction slows it until rest. A small cream disc
+Directional forgiveness uses a neutral offset of `0.2` disc radii and reaches
+the unchanged full-deflection response at `0.5` radii. It changes launch heading
+only: transferred speed, launch spin, maximum power, board-spin damping and
+disc/peg/lip collision responses are unchanged. The separate neutral **spin**
+zone remains at `0.1` radii. Contacts can generate and change spin; board friction slows it until rest. A small cream disc
 inlay makes rotation visible. No random misses or artificial curling are added.
 See [physics versions and rollback](PHYSICS-VERSIONS.md) for stable checkpoints,
 save compatibility, tuning details, and the GitHub Pages playtest deployment.

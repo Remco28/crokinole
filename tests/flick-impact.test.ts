@@ -16,9 +16,9 @@ describe('rounded finger strike', () => {
     expect(angle).toBeGreaterThan(10); expect(angle).toBeLessThan(25);
     expect(side.spin).toBeLessThan(-10);
   });
-  it('does not hide directional impact error inside the small neutral spin zone', () => {
+  it('preserves the stroke direction inside the new directional neutral zone', () => {
     const side = releaseShot(swipe, disc, 0.05)!;
-    expect(side.x).toBeGreaterThan(0); expect(side.y).toBeLessThan(0);
+    expect(side.x).toBe(0); expect(side.y).toBeLessThan(0);
     expect(side.spin).toBe(0);
   });
   it('mirrors deflection and spin, and makes grazing contact less efficient', () => {
