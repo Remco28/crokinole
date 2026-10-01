@@ -24,11 +24,19 @@ export function integrateSpin(d: Disc, dt: number, support = 1) {
   const torque = TUNE.frictionMu * 386 * (2 * DISC.contactRadius / 3) * support * slipBlend;
   const deceleration = torque / DISC_SPIN_INERTIA;
   const viscous = TUNE.frictionViscous * support;
-  const stopTime = Math.log1p(viscous * speed / deceleration) / viscous;
+  const stopTime = deceleration > 0
+    ? (viscous > 0 ? Math.log1p(viscous * speed / deceleration) / viscous : speed / deceleration)
+    : Infinity;
   const duration = Math.min(dt, stopTime);
-  const decay = -Math.expm1(-viscous * duration);
-  const next = Math.max(0, speed - (speed + deceleration / viscous) * decay);
-  d.angle += sign * ((speed + deceleration / viscous) * decay / viscous - deceleration * duration / viscous);
+  const x = viscous * duration;
+  const integral = viscous > 0 ? -Math.expm1(-x) / viscous : duration;
+  // The second integral tends to dt²/2. Its small-x series avoids subtracting
+  // almost equal terms, including the pure-Coulomb/both-zero friction limits.
+  const secondIntegral = x < 1e-3
+    ? duration ** 2 * (0.5 - x / 6 + x ** 2 / 24 - x ** 3 / 120 + x ** 4 / 720)
+    : (duration - integral) / viscous;
+  const next = Math.max(0, speed * Math.exp(-x) - deceleration * integral);
+  d.angle += sign * (speed * integral - deceleration * secondIntegral);
   d.spin = next > TUNE.sleepSpin ? sign * next : 0;
 }
 
