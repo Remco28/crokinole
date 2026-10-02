@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BOARD, DISC, TUNE, pegPositions } from '../src/sim/constants';
+import { BOARD, DISC, PEGS, TUNE, pegPositions } from '../src/sim/constants';
 import { discContactRadius, interactWithHole, makeHoleMotion } from '../src/sim/hole';
 import { makeDisc, moving, step, type Disc, type Shot } from '../src/sim/physics';
 import { DISC_SPIN_INERTIA, contactFriction, contactHop, integrateSpin } from '../src/sim/spin';
@@ -104,7 +104,7 @@ describe('physical axial spin', () => {
   });
   it('keeps a centered zero-spin normal collision unchanged', () => {
     const a = makeDisc(1, 0, 0, 7), b = makeDisc(2, 1, 1.24, 7); a.vx = 40;
-    const dt = 0.0001, speed = 40 - (TUNE.frictionMu * 386 + TUNE.frictionViscous * 40) * dt;
+    const dt = 0.0001, speed = 40 - (TUNE.frictionMu * TUNE.surfaceGravity + TUNE.frictionViscous * 40) * dt;
     step([a, b], dt, shot(), false);
     expect(a.vx).toBeCloseTo(speed * (1 - TUNE.restitutionDisc) / 2, 12);
     expect(b.vx).toBeCloseTo(speed * (1 + TUNE.restitutionDisc) / 2, 12);
@@ -156,9 +156,11 @@ describe('physical axial spin', () => {
   });
   it('preserves centered peg restitution and the existing hop target at zero spin', () => {
     const p = pegPositions()[0], d = makeDisc(1, 0, p.x + 0.8, p.y); d.vx = -40;
-    const dt = 0.0001, speed = 40 - (TUNE.frictionMu * 386 + TUNE.frictionViscous * 40) * dt;
+    const dt = 0.0001, speed = 40 - (TUNE.frictionMu * TUNE.surfaceGravity + TUNE.frictionViscous * 40) * dt;
     step([d], dt, shot(), true);
     expect(d.vx).toBeCloseTo(speed * TUNE.restitutionPeg, 12);
+    // Keep the existing dimensionless 2% peg margin on the projected radius.
+    expect(d.x - p.x).toBeCloseTo((DISC.radius + PEGS.radius) * 1.02, 12);
     expect(d.vz).toBeCloseTo(speed * 0.1, 12);
     expect(d.vy).toBe(0); expect(d.spin).toBe(0);
   });
@@ -218,6 +220,179 @@ describe('physical axial spin', () => {
     for (let i = 0; i < 120; i++) integrateSpin(c, 1 / 120);
     for (let i = 0; i < 240; i++) integrateSpin(d, 1 / 240);
     expect(c.angle).toBeCloseTo(d.angle, 5);
+  });
+});
+
+describe('signed contact hop', () => {
+  function hop(velocities: number[], targets: number[], budget: number) {
+    const ds = velocities.map((vz, i) => Object.assign(makeDisc(i + 1, i, 0, 7), { vz }));
+    contactHop(ds, targets, budget);
+    return ds.map(d => d.vz);
+  }
+
+  it.each([0, -1, -100])('does not kick falling, grounded, or rising discs with budget %s', budget => {
+    expect(hop([-10, 0, 1, 10], [2, 8, 8, 20], budget)).toEqual([-10, 0, 1, 10]);
+    expect(hop([-10], [20], budget)).toEqual([-10]);
+  });
+
+  it.each([
+    [-10, 2, 1, -10 + Math.SQRT2],
+    [-10, 2, 2, -8],
+    [-10, 20, 50, 0],
+    [-10, 20, 200, 10],
+    [-1, 2, 2, 1],
+  ])('adds a funded kick to incoming %s, target %s, budget %s', (vz, target, budget, expected) => {
+    expect(hop([vz], [target], budget)[0]).toBeCloseTo(expected, 12);
+  });
+
+  it('allocates one common work fraction from the incoming falling/rising snapshot, independent of order', () => {
+    // Costs are 2 and 4; budget 3 funds half of each, not a free
+    // reversal for the falling disc or a budget recalculated after mutation.
+    const forward = hop([-10, 1], [2, 3], 3);
+    expect(forward[0]).toBeCloseTo(-10 + Math.SQRT2, 12);
+    expect(forward[1]).toBeCloseTo(Math.sqrt(5), 12);
+    expect(hop([1, -10], [3, 2], 3).reverse()).toEqual(forward);
+  });
+
+  it('does not lower rising velocity or give negative/zero targets a kick', () => {
+    for (const budget of [0, 1, 1000]) {
+      expect(hop([10, 1, 0, -10], [2, -2, 0, -2], budget)).toEqual([10, 1, 0, -10]);
+    }
+    expect(hop([], [], 10)).toEqual([]);
+  });
+
+  it('preserves the grounded/rising energy allocation for full and partial funding', () => {
+    for (const budget of [0, 1, 100]) {
+      // Old production callers supplied max(vz, hopSpeed). For nonnegative
+      // inputs the additive policy must reproduce that squared-speed model.
+      const fraction = Math.min(1, budget / (32 + 30));
+      const out = hop([0, 2, 10], [8, 8, 2], budget);
+      expect(out[0]).toBeCloseTo(Math.sqrt(64 * fraction), 12);
+      expect(out[1]).toBeCloseTo(Math.sqrt(4 + 60 * fraction), 12);
+      expect(out[2]).toBe(10);
+    }
+  });
+
+  it('sweeps signed kick bounds, synthetic work, actual KE, and nonnegative caller compatibility', () => {
+    let cases = 0, compatible = 0;
+    for (const va of [-40, -10, -1, 0, 1, 10, 40]) for (const vb of [-40, -10, -1, 0, 1, 10, 40])
+      for (const ha of [-2, 0, 2, 20, 60]) for (const hb of [-2, 0, 2, 20, 60])
+        for (const budget of [-10, 0, 0.001, 1, 100, 1000]) {
+          const incoming = [va, vb], targets = [ha, hb], out = hop(incoming, targets, budget);
+          const bases = incoming.map(v => Math.max(v, 0));
+          const caps = targets.map((h, i) => Math.max(0, h - bases[i]));
+          const costs = caps.map((q, i) => bases[i] * q + q ** 2 / 2);
+          const requested = costs[0] + costs[1];
+          const fraction = requested > 0 ? Math.min(1, Math.max(0, budget) / requested) : 0;
+          let syntheticWork = 0, actualAdded = 0;
+          out.forEach((v, i) => {
+            const kick = v - incoming[i];
+            expect(Number.isFinite(v)).toBe(true);
+            expect(kick).toBeGreaterThanOrEqual(-1e-12);
+            expect(kick).toBeLessThanOrEqual(caps[i] + 1e-12);
+            syntheticWork += bases[i] * kick + kick ** 2 / 2;
+            // Sum positive increases too: dissipating one disc's falling KE
+            // must not fund additional energy for its rising partner.
+            actualAdded += Math.max(0, (v ** 2 - incoming[i] ** 2) / 2);
+            if (budget <= 0) expect(v).toBe(incoming[i]);
+            if (va >= 0 && vb >= 0) {
+              expect(v).toBeCloseTo(Math.sqrt(incoming[i] ** 2 + 2 * costs[i] * fraction), 10);
+            }
+          });
+          expect(syntheticWork).toBeLessThanOrEqual(Math.max(0, budget) + 1e-8);
+          expect(actualAdded).toBeLessThanOrEqual(Math.max(0, budget) + 1e-8);
+          cases++;
+          if (va >= 0 && vb >= 0) compatible++;
+        }
+    expect(cases).toBe(7350);
+    expect(compatible).toBe(2400);
+  });
+
+  const dt = 0.00001;
+  function collision(peg: boolean, vz: number, otherVz = vz, airborne = true, speed = 20, z = 0.1) {
+    const p = peg ? pegPositions()[0] : { x: 0, y: 7 };
+    const a = makeDisc(1, 0, p.x + (peg ? 0.8 : 1.24), p.y), b = makeDisc(2, 1, p.x, p.y);
+    a.vx = -speed; a.vz = vz; b.vz = otherVz; a.z = b.z = z;
+    const ds = peg ? [a] : [a, b], s = shot(), events: string[] = [], before = total(ds);
+    step(ds, dt, s, airborne, e => events.push(e.kind));
+    return { ds, s, events, before };
+  }
+
+  it.each([true, false])('adds a bounded kick in real contacts (peg=%s), including strong/mild descent', peg => {
+    for (const vz of [-10, -1, 0, 10]) {
+      const { ds, s, events, before } = collision(peg, vz);
+      const incoming = vz - TUNE.gravityZ * dt;
+      const kicks = peg ? [2] : [1.44, 1.08];
+      ds.forEach((d, i) => {
+        expect(d.vz).toBeCloseTo(incoming + Math.max(0, kicks[i] - Math.max(0, incoming)), 12);
+        if (vz === -10) expect(d.vz).toBeLessThan(0);
+        if (vz === -1) expect(d.vz).toBeGreaterThan(0);
+        expect([d.vy, d.spin, d.state]).toEqual([0, 0, 'board']);
+      });
+      // Horizontal restitution and contact/rules registration are untouched.
+      expect(ds[0].vx).toBeCloseTo(peg ? 20 * TUNE.restitutionPeg : -20 * (1 - TUNE.restitutionDisc) / 2, 12);
+      expect(events).toEqual([peg ? 'peg' : 'disc']);
+      if (!peg) {
+        expect(ds[1].vx).toBeCloseTo(-20 * (1 + TUNE.restitutionDisc) / 2, 12);
+        expect([...s.touched]).toEqual([1, 2]); expect(s.opponentContact).toBe(true);
+      }
+      expect(total(ds)).toBeLessThanOrEqual(before + 1e-8);
+    }
+  });
+
+  it('uses the incoming mixed falling/rising state in the real disc caller', () => {
+    const { ds } = collision(false, -10, 1);
+    expect(ds[0].vz).toBeCloseTo(-10 - TUNE.gravityZ * dt + 1.44, 12);
+    expect(ds[1].vz).toBeCloseTo(1 - TUNE.gravityZ * dt + (1.08 - (1 - TUNE.gravityZ * dt)), 12);
+  });
+
+  it.each([true, false])('leaves grounded pops math-equivalent and disables only the hop when airborne=false (peg=%s)', peg => {
+    const grounded = collision(peg, 0, 0, true, 20, 0);
+    const speed = 20 - (TUNE.frictionMu * 386 + TUNE.frictionViscous * 20) * dt;
+    const impulse = (1 + TUNE.restitutionDisc) * speed / 2;
+    expect(grounded.ds[0].vz).toBeCloseTo(peg ? speed * 0.1 : impulse * 0.08, 12);
+    if (!peg) expect(grounded.ds[1].vz).toBeCloseTo(impulse * 0.06, 12);
+    const enabled = collision(peg, -10), disabled = collision(peg, -10, -10, false);
+    disabled.ds.forEach((d, i) => {
+      expect(d.vz).toBeCloseTo(-10 - TUNE.gravityZ * dt, 12);
+      expect([d.x, d.y, d.vx, d.vy, d.spin]).toEqual([
+        enabled.ds[i].x, enabled.ds[i].y, enabled.ds[i].vx, enabled.ds[i].vy, enabled.ds[i].spin,
+      ]);
+    });
+    expect(disabled.events).toEqual(enabled.events);
+    expect([...disabled.s.touched]).toEqual([...enabled.s.touched]);
+    expect(disabled.s.opponentContact).toBe(enabled.s.opponentContact);
+  });
+
+  it.each([true, false])('does not kick resting/separating overlaps or height-excluded contacts (peg=%s)', peg => {
+    for (const speed of [0, -20]) {
+      const { ds, s, events } = collision(peg, -10, -10, true, speed);
+      ds.forEach(d => expect(d.vz).toBeCloseTo(-10 - TUNE.gravityZ * dt, 12));
+      expect(events).toEqual([]); expect([...s.touched]).toEqual([1]); expect(s.opponentContact).toBe(false);
+    }
+    const p = peg ? pegPositions()[0] : { x: 0, y: 7 };
+    const a = makeDisc(1, 0, p.x + (peg ? 0.8 : 1.24), p.y), b = makeDisc(2, 1, p.x, p.y);
+    a.vx = -20; a.vz = -10; a.z = peg ? PEGS.height + 0.01 : 1; b.z = 0.1; b.vz = -10;
+    const events: string[] = [], s = shot();
+    step(peg ? [a] : [a, b], dt, s, true, e => events.push(e.kind));
+    expect(a.vz).toBeCloseTo(-10 - TUNE.gravityZ * dt, 12); expect(a.vx).toBe(-20);
+    expect(events).toEqual([]); expect([...s.touched]).toEqual([1]);
+  });
+
+  it.each(['sunk', 'out'] as const)('does not kick a non-board disc (%s)', state => {
+    const a = makeDisc(1, 0, 1.24, 7), b = makeDisc(2, 1, 0, 7);
+    a.vx = -20; a.z = 0.1; a.vz = -10; b.state = state;
+    const events: string[] = [], s = shot(); step([a, b], dt, s, true, e => events.push(e.kind));
+    expect(a.vz).toBeCloseTo(-10 - TUNE.gravityZ * dt, 12);
+    expect(events).toEqual([]); expect([...s.touched]).toEqual([1]);
+  });
+
+  it('preserves a legitimate support/landing bounce rather than suppressing every falling reversal', () => {
+    const d = makeDisc(1, 0, 0, 9); d.z = 0.00001; d.vz = -10;
+    const events: string[] = []; step([d], dt, shot(), true, e => events.push(e.kind));
+    expect(events).toEqual(['land']); expect(d.z).toBe(0);
+    expect(d.vz).toBeCloseTo((10 + TUNE.gravityZ * dt) * TUNE.landBounce, 12);
+    expect(d.vz).toBeGreaterThan(0);
   });
 });
 

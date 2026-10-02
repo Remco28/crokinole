@@ -1,5 +1,7 @@
 # Input findings and remaining physics work
 
+> Current status: published/live preview7 remains exact `8c719b46e195b3ba80bea6268bc2aa2562b7a744`. Older preview3–5 sections/tables below are historical. The parent reports current preview7 main-browser pass (79 frozen files hash-exact, `npm run test:browser` exit 0). Separate spin-only trusted-CDP aiming also passed 46 cases; neither verifies the combined candidate or physical devices. Cleanup + spin0.12 + signed contactHop below are unpublished integration only; combined native main/aim verification remains pending.
+
 Baseline: `0.3.0-preview.4`, commit `e3e7d6ec2351f864041499819209a42efdc4a4ed`, tag `crokinole-v0.3.0-strike-preview.4`. See [versions/rollback](../../PHYSICS-VERSIONS.md). The baseline evidence below remains historical; preview 5 adds the separate registration correction described next.
 
 ## Registration correction — preview 5
@@ -138,14 +140,46 @@ node scripts/probe-grazing-native.mjs
 
 Both are diagnostics that report the current behavior, not acceptance tests asserting that rejected grazes are correct. The native script uses isolated temporary storage and cleans its browser/server; it does not touch the public game. [Recorded native outcomes](grazing-native-evidence.json) retain all 45 baseline and 18 confirmation measurements, including screen travel. Scratch full event traces were inspected to verify raw-sample delivery; the durable script emits those traces on rerun.
 
+## Preview-7 slower-spin candidate verification (unpublished)
+
+> Historical isolated spin-only verification below. Its ratio-one replay is not
+> the combined candidate: integration requires explicit restored-baseline and
+> independent approved-reference profiles documented in the current report.
+
+Preview 7 remains the public baseline, pinned to
+`8c719b46e195b3ba80bea6268bc2aa2562b7a744`. Frank's latest aiming feedback is
+positive; the follow-up resumes verification of the separate, already-copied
+`spinFrictionRatio = 0.12` candidate, without changing its gameplay source.
+The old spin probe incorrectly required preview-6 flick-source equality and
+failed before measuring anything; it now uses the exact preview-7 commit and
+production-style accumulation, 120ms power pruning, contact finalization and
+release. Its old preview-6 evidence is superseded, not evidence for this candidate.
+
+The repaired durable probe preserves exact ratio-1 baseline replay, protected
+source equality and unchanged launch transfer. Signed launches retain about
+98.59% of launch spin at first disc contact at 120Hz. **Rebounds do change**:
+slower face damping changes incoming angular velocity and tangential impulse,
+despite identical collision coefficients. Full-step zero-viscosity regressions
+settle signed stationary, launched, disc-contact and peg-contact scenes.
+Complex peg/lip trajectories remain timestep-sensitive in both baseline and
+candidate; no global collision or trajectory invariance is claimed.
+
+See [candidate verification](spin-persistence-verification.md) and regenerated
+[source-hashed evidence](isolated-spin-persistence-evidence.json) for exact fixture
+geometry, measured waits, counts and limitations. Unit/build/probe verification
+does not establish native turn-handover, physical-device feel, real-board
+calibration or a one-in-five shot quota. This paragraph records the isolated spin slice. It does not publish spin or
+change the public version; the separate integration adds the approved signed
+`contactHop` correction while protecting the unfixed hole behavior.
+
 ## Recap: resolved, open and intentionally unchanged
 
 1. **Central directional sensitivity: improved and published.** Stroke-relative neutral corridor 0.20R, smooth ramp to unchanged deflection at 0.50R. User confirms better playability. 139 unit tests, full isolated browser suite, and diagonal native checks passed for preview 4. No blanket rightward correction or target snap.
-2. **Extreme grazing: registration corrected in preview 5; outer response unchanged.** Short-travel and phone tap gates are addressed separately from the limited outer normal. Full-browser verification is still pending at publication. Independently evaluate stronger extreme deflection after physical-device playtesting; keep accepted centre behavior unchanged.
-3. **Follow-through power/timing: confirmed separate issue, not fixed.** Direction/offset freeze at powered contact, but the final 120 ms before release still supply power. Prior 476 helper and 54 native cases showed late slowing/acceleration changes power, 150 ms holds can cancel an already registered crossing, and off-centre heading varies through power-dependent impulse caps. A future complete-launch freeze at contact should be tested separately while retaining lift-to-release. These earlier exact measurements were on preview 3; the release-power path remains unchanged in preview 4, whose central corridor now suppresses central directional deflection.
-4. **Spin deceleration: unchanged; separate physical tuning pending.** No dedicated rotational-resistance factor exists yet. Current stationary-spin model at 18 rad/s predicts roughly 0.21 seconds and less than one-third revolution, not a real-board measurement. Research found qualitative face/wax variability but no controlled crokinole spin-decay target. A separate resistance factor would alter angular velocity retained at collisions, tangential impulses and settling—not merely the cream dash. Preserve translational grip/drag; label unmeasured tuning honestly. Useful sources: [coupled slide/spin friction](https://arxiv.org/pdf/physics/0210024), [maker maintenance guidance](https://traceyboards.com/faq), [qualitative face comparison](https://www.youtube.com/watch?v=qNK4h6cc69Q).
-5. **Audit hop issue: confirmed, unfixed.** `contactHop` can reverse a falling disc toward an upward target even with zero incremental-energy budget. One-sided energy bounds alone do not protect signed vertical velocity; the previously suggested simple `Math.max` repair did not resolve the class. Treat as an isolated simulation fix with falling/rising regressions, not input tuning.
-6. **Shared-constant maintenance: verified but not deployed.** Commit `2c6a657` on `physics/review-cleanups-v0.3`, tag `crokinole-review-constants-cleanup`; 134 tests/build and exact launch/simulation comparisons passed. Shares unchanged surface gravity/inertia, names unchanged peg margin and removes an unused constant. Keep separate from behavioral experiments.
+2. **Extreme grazing: registration corrected in preview 5; outer response unchanged.** Short-travel and phone tap gates remain separate from the limited outer normal. Current preview7 main-browser suite passed per parent: frozen 79-file source exact, `npm run test:browser` exit 0; the extra native aim command is separate. This is published-preview7 evidence, not integrated-candidate or physical-device verification.
+3. **Follow-through power/timing: historical preview3 measurements, no power change in this integration.** The earlier 476 helper / 54 native measurements remain historical, not current-preview7 evidence. The [current preview7 read-only review](release-power-preview7-review.md) independently replays 560 helper and 1,120 production-handler cases with zero mismatches (parent rerun). It rejects a complete launch freeze at contact because it loses accepted 30° onset / 45° hook intent. Scalar lift-only stabilization would change power feel and possibly rim heading; it needs a separate A/B choice and is not implemented. Preview7 remains live unchanged.
+4. **Spin deceleration: live preview7 unchanged; 0.12 is an unpublished integrated candidate.** Isolated spin evidence is historical and retained byte-exact; integrated tests/probes verify signed first-impact spin, changed rebounds, zero-viscosity and finite rest without changing sliding grip/drag. Native candidate and physical-device checks remain pending. Resistance is gameplay tuning, not physical calibration or a shot-frequency quota. See [integrated verification](integrated-followup-verification.md).
+5. **Audit contactHop issue: corrected only in the unpublished integrated candidate.** Approved signed additive kicks preserve falling velocity with zero budget and bound kick work; normal 120/240Hz contacts and settlement are explicitly checked. The analogous hole-lip signed-reversal limitation remains unfixed: `hole.ts` is byte-exact preview7. This is not a complete 3D momentum solver.
+6. **Shared-constant maintenance: newest neutral verification is pinned preview7 cleanup.** The older 2c6a657 review remains historical. The independently verified preview7 cleanup names unchanged surface gravity 386, distinct vertical gravity 180, inertia and peg margin 1.02. Integration preserves the strict 34,944 launch / 292 gesture / 72 run / 4,455 frame baseline gates under an explicitly restored-baseline counterfactual, and checks the actual spin/hop candidate against a separately constructed verified unrefactored reference. Counterfactual equality is not actual candidate collision equality; nothing is deployed.
 7. **Protected behavior:** the 20-hole, scoring, maximum power 105, sliding friction 0.1175, viscous drag 0.05, normal restitution, mobile Next round accessibility, legacy-save boundary and cream rotation marker. No changes to these in this investigation.
 
 Do not restart a broad left-bias search solely because short edge clips fail: the present evidence identifies distinct gates and outer-model limits, with mirrored behavior. The actual user's gesture is not fully captured by these deterministic tests, and physical-device playtesting remains necessary.

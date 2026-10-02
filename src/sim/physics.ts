@@ -1,5 +1,5 @@
 import { discContactRadius, discHalfHeight, holeMoving, interactWithHole, rollingAmount, settleTilt, type HoleMotion } from './hole';
-import { BOARD, DISC, PEGS, TUNE, pegPositions } from './constants';
+import { BOARD, DISC, PEGS, PEG_COLLISION_MARGIN, TUNE, pegPositions } from './constants';
 import { contactFriction, contactHop, integrateSpin } from './spin';
 
 export interface Disc { id: number; owner: number; x: number; y: number; vx: number; vy: number; z: number; vz: number; spin: number; angle: number; state: 'board' | 'sunk' | 'out'; hole?: HoleMotion; ditchSlot?: number; holeCleared?: boolean }
@@ -31,7 +31,7 @@ export function step(discs: Disc[], dt: number, shot: Shot, airborne = true, emi
       const v = Math.hypot(d.vx, d.vy);
       const friction = d.z > 0.01 ? 0 : 1 - rollingAmount(d) * (1 - TUNE.rollingFrictionRatio);
       integrateSpin(d, h, friction);
-      const next = Math.max(0, v - (TUNE.frictionMu * 386 + TUNE.frictionViscous * v) * friction * h);
+      const next = Math.max(0, v - (TUNE.frictionMu * TUNE.surfaceGravity + TUNE.frictionViscous * v) * friction * h);
       const ratio = v > 0 && next > TUNE.sleepSpeed ? next / v : 0;
       d.vx *= ratio; d.vy *= ratio;
       const radius = Math.hypot(d.x, d.y);
@@ -64,7 +64,7 @@ export function step(discs: Disc[], dt: number, shot: Shot, airborne = true, emi
         if (d.z > PEGS.height) continue;
         const dx = d.x - p.x, dy = d.y - p.y, dist = Math.hypot(dx, dy);
         const nx = dist ? dx / dist : 1, ny = dist ? dy / dist : 0;
-        const r = (discContactRadius(d, nx, ny) + PEGS.radius) * 1.02;
+        const r = (discContactRadius(d, nx, ny) + PEGS.radius) * PEG_COLLISION_MARGIN;
         if (dist >= r) continue;
         d.x += nx * (r - dist); d.y += ny * (r - dist);
         const normal = d.vx * nx + d.vy * ny;

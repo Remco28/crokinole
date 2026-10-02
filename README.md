@@ -25,6 +25,15 @@ A symmetric diagonal-intent guard bounds opposing glancing deflection without
 changing transferred speed or spin. It preserves sharp radial edge glances,
 not exact clock-face heading on every off-center strike. Spin damping, holes,
 scoring, slide friction and maximum power are unchanged.
+Preview 8 retains preview 7's aiming and release-power behavior, but reduces
+axial Coulomb resistance to retain useful spin longer. Strong stationary spins
+in the model rest in roughly 1–2 seconds; weaker/centered shots need not wait.
+Retained spin changes spinning rebounds. Falling disc/peg contact hops now add
+an explicitly budgeted upward kick instead of replacing signed vertical speed;
+normal landing rebounds remain. Shared constants/inertia are cleanup only.
+Hole capture, scoring, sliding grip, maximum power and saved-game keys stay
+unchanged. This is gameplay tuning, not measured real-board calibration. See
+[integrated verification and limitations](docs/physics/integrated-followup-verification.md).
 Preview 5 also recognizes completed short, fast near-edge clips on lift. Powered
 board-space strikes are no longer discarded as placement taps merely because
 their phone-screen displacement is under five pixels. Central control and outer

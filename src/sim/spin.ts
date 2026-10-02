@@ -8,8 +8,10 @@ export const DISC_SPIN_INERTIA = DISC.radius ** 2 / 2;
  * Coulomb torque from a uniformly loaded face: mean friction arm = 2R/3.
  * While translating, face slip mostly points along the shot, so its torque is
  * smaller than for a disc spinning in place. A regularized blend preserves the
- * uniform-face limits: full 2R/3 torque at rest, and torque proportional to
- * omega*R²/(4v) at high sliding speed. It does not create lateral force.
+ * uniform-face geometry: 2R/3 arm at rest and omega*R²/(4v) at high
+ * sliding speed. spinFrictionRatio scales only this rotational Coulomb torque
+ * to tune axial persistence independently of launch and translational grip.
+ * The existing viscous coefficient is unchanged. No lateral force is created.
  * Integrate Coulomb + viscous decay analytically with the current slip blend;
  * the fixed/adaptive physics steps update that blend as the shot slows.
  */
@@ -21,7 +23,7 @@ export function integrateSpin(d: Disc, dt: number, support = 1) {
   const slidingSpeed = Math.hypot(d.vx, d.vy);
   const rimSpeed = DISC.contactRadius * speed;
   const slipBlend = rimSpeed / Math.hypot(rimSpeed, slidingSpeed * 8 / 3);
-  const torque = TUNE.frictionMu * 386 * (2 * DISC.contactRadius / 3) * support * slipBlend;
+  const torque = TUNE.spinFrictionRatio * TUNE.frictionMu * TUNE.surfaceGravity * (2 * DISC.contactRadius / 3) * support * slipBlend;
   const deceleration = torque / DISC_SPIN_INERTIA;
   const viscous = TUNE.frictionViscous * support;
   const stopTime = deceleration > 0
@@ -65,14 +67,26 @@ export function contactFriction(a: Disc, b: Disc | undefined, nx: number, ny: nu
   }
 }
 
-/** Spend at most the dissipated normal-contact energy on the existing hop model. */
+/**
+ * Add an upward kick, funded only by dissipated normal-contact energy.
+ * Targets are zero-baseline hop speeds, not replacements for signed vz.
+ * Charge work against max(vz, 0): falling KE never pays for a free reversal.
+ * This conservative pop policy is not a full 3D momentum/contact solver.
+ */
 export function contactHop(discs: Disc[], targets: number[], energyBudget: number) {
-  const additions = discs.map((d, i) => Math.max(0, (targets[i] ** 2 - d.vz ** 2) / 2));
-  const requested = additions.reduce((sum, energy) => sum + energy, 0);
-  const fraction = requested > 0 ? Math.min(1, Math.max(0, energyBudget) / requested) : 1;
+  const incoming = discs.map(d => d.vz);
+  const bases = incoming.map(v => Math.max(v, 0));
+  const costs = bases.map((u, i) => {
+    const q = Math.max(targets[i] - u, 0);
+    return u * q + q ** 2 / 2;
+  });
+  const requested = costs.reduce((sum, work) => sum + work, 0);
+  const fraction = requested > 0 ? Math.min(1, Math.max(0, energyBudget) / requested) : 0;
   discs.forEach((d, i) => {
-    d.vz = additions[i] > 0
-      ? Math.sign(targets[i]) * Math.sqrt(d.vz ** 2 + 2 * additions[i] * fraction)
-      : targets[i];
+    const work = fraction * costs[i], u = bases[i];
+    // Rationalized sqrt(u² + 2W) - u avoids cancellation for small kicks.
+    const denominator = Math.sqrt(u ** 2 + 2 * work) + u;
+    const kick = denominator > 0 ? 2 * work / denominator : 0;
+    d.vz = incoming[i] + kick;
   });
 }

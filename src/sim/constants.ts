@@ -28,12 +28,15 @@ export const PEGS = {
   height: 0.8, // exposed rubber-covered post; mounting thread is below the board
 } as const;
 
-export const PEG_COLLISION_RADIUS = PEGS.radius + DISC.radius;
+// Dimensionless padding on the peg plus tilt-aware projected disc radius.
+export const PEG_COLLISION_MARGIN = 1.02;
 
 // Gameplay tunables; see the center-hole guide in README.md.
 export const TUNE = {
+  surfaceGravity: 386, // in/s^2; physical 1 g for sliding/axial friction, independent of stylized vertical motion
   frictionMu: 0.1175, // halfway back toward original grip; power and bounce unchanged
   frictionViscous: 0.05,
+  spinFrictionRatio: 0.12, // axial Coulomb torque only; strong grounded spin rests in ~1–2s
   restitutionDisc: 0.8,
   restitutionPeg: 0.62,
   gravityZ: 180.0, // in/s^2 for hop channel

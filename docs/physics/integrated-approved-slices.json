@@ -1,0 +1,253 @@
+{
+  "baseline": "8c719b46e195b3ba80bea6268bc2aa2562b7a744",
+  "slices": {
+    "cleanup": {
+      "src/game/flick.ts": {
+        "baselineSha256": "e69616a3a819cd0158a1be00aaff857a531238409638743076f1a600e597fe70",
+        "approvedSha256": "934aff2f26fc43ead3177a9adfd95f0f47519e17f658ed67d5b48e1eeae2bd51",
+        "patches": [
+          {
+            "from": "import { DISC } from '../sim/constants';\n",
+            "to": "import { DISC } from '../sim/constants';\nimport { DISC_SPIN_INERTIA } from '../sim/spin';\n",
+            "offset": 0
+          },
+          {
+            "from": "  const inertia = DISC.radius * DISC.radius / 2;\n",
+            "to": "",
+            "offset": 16616
+          },
+          {
+            "from": "  const stickingImpulse = speed * Math.abs(side) / (1 + DISC.radius ** 2 / inertia);\n",
+            "to": "  const stickingImpulse = speed * Math.abs(side) / (1 + DISC.radius ** 2 / DISC_SPIN_INERTIA);\n",
+            "offset": 17096
+          },
+          {
+            "from": "    FLICK_STRIKE.friction * normalImpulse, FLICK_SPIN.maxSpeed * inertia / DISC.radius * spinTransfer);\n",
+            "to": "    FLICK_STRIKE.friction * normalImpulse, FLICK_SPIN.maxSpeed * DISC_SPIN_INERTIA / DISC.radius * spinTransfer);\n",
+            "offset": 17599
+          },
+          {
+            "from": "    spin: -DISC.radius * tangentImpulse / inertia || 0,\n",
+            "to": "    spin: -DISC.radius * tangentImpulse / DISC_SPIN_INERTIA || 0,\n",
+            "offset": 17844
+          }
+        ]
+      },
+      "src/sim/constants.ts": {
+        "baselineSha256": "cf4449d0e8412dfa5dbe0f914502d62bda679add233e3a92c5a36845f0547d89",
+        "approvedSha256": "c3388db4a540726cbe9a2a93393d32e6a155f0258d2baaf1d68ffe323cb886a0",
+        "patches": [
+          {
+            "from": "export const PEG_COLLISION_RADIUS = PEGS.radius + DISC.radius;\n",
+            "to": "// Dimensionless padding on the peg plus tilt-aware projected disc radius.\nexport const PEG_COLLISION_MARGIN = 1.02;\n",
+            "offset": 1056
+          },
+          {
+            "from": "export const TUNE = {\n",
+            "to": "export const TUNE = {\n  surfaceGravity: 386, // in/s^2; physical 1 g for sliding/axial friction, independent of stylized vertical motion\n",
+            "offset": 1182
+          }
+        ]
+      },
+      "src/sim/physics.ts": {
+        "baselineSha256": "32c5a7c52ec65364a1dbc82ba29b8b10e6680bcb2211e71b4ad5594875f18c2a",
+        "approvedSha256": "32f0748175afb91cd16568aac0a563e562abbffe452ba82c4c5696950d92bf59",
+        "patches": [
+          {
+            "from": "import { BOARD, DISC, PEGS, TUNE, pegPositions } from './constants';\n",
+            "to": "import { BOARD, DISC, PEGS, PEG_COLLISION_MARGIN, TUNE, pegPositions } from './constants';\n",
+            "offset": 134
+          },
+          {
+            "from": "      const next = Math.max(0, v - (TUNE.frictionMu * 386 + TUNE.frictionViscous * v) * friction * h);\n",
+            "to": "      const next = Math.max(0, v - (TUNE.frictionMu * TUNE.surfaceGravity + TUNE.frictionViscous * v) * friction * h);\n",
+            "offset": 2608
+          },
+          {
+            "from": "        const r = (discContactRadius(d, nx, ny) + PEGS.radius) * 1.02;\n",
+            "to": "        const r = (discContactRadius(d, nx, ny) + PEGS.radius) * PEG_COLLISION_MARGIN;\n",
+            "offset": 4711
+          }
+        ]
+      },
+      "src/sim/spin.ts": {
+        "baselineSha256": "55e4b884a7cb38b7d82e25975dc57ce7a26eae26fd4423fb368eb3e6f29c7d38",
+        "approvedSha256": "29e5fc9b6e3db18525fba24e6eacb9496e4cea4847c33c35ac1a68355387f06a",
+        "patches": [
+          {
+            "from": "  const torque = TUNE.frictionMu * 386 * (2 * DISC.contactRadius / 3) * support * slipBlend;\n",
+            "to": "  const torque = TUNE.frictionMu * TUNE.surfaceGravity * (2 * DISC.contactRadius / 3) * support * slipBlend;\n",
+            "offset": 1242
+          }
+        ]
+      },
+      "tests/friction.test.ts": {
+        "baselineSha256": "39cad3aaf1ed698204244f6c2c23b4d5b20006f5a88e19df5e57dc76615bf497",
+        "approvedSha256": "b9eb03dba5809c91529f6100adbca331e1749e2777bb3353719ce80b6ed62f66",
+        "patches": [
+          {
+            "from": "import { TUNE } from '../src/sim/constants';\n",
+            "to": "import { DISC, TUNE } from '../src/sim/constants';\n",
+            "offset": 47
+          },
+          {
+            "from": "import { makeDisc, moving, step, type Shot } from '../src/sim/physics';\n",
+            "to": "import { makeDisc, moving, step, type Shot } from '../src/sim/physics';\nimport { DISC_SPIN_INERTIA } from '../src/sim/spin';\n",
+            "offset": 92
+          },
+          {
+            "from": "    expect(TUNE.frictionViscous).toBe(0.05);\n",
+            "to": "    expect(TUNE.frictionViscous).toBe(0.05);\n    expect(TUNE.surfaceGravity).toBe(386);\n    expect(TUNE.gravityZ).toBe(180);\n",
+            "offset": 450
+          },
+          {
+            "from": "});\n",
+            "to": "});\n\ndescribe('shared surface-friction gravity', () => {\n  it('drives sliding and axial damping independently of stylized vertical gravity', () => {\n    const tune = TUNE as { surfaceGravity: number; gravityZ: number };\n    const original = { surfaceGravity: tune.surfaceGravity, gravityZ: tune.gravityZ };\n    try {\n      for (const surfaceGravity of [386, 193]) for (const gravityZ of [180, 360]) {\n        tune.surfaceGravity = surfaceGravity; tune.gravityZ = gravityZ;\n        const d = makeDisc(1, 0, 0, 9); d.vx = 20; d.spin = 12;\n        const dt = 0.001, rimSpeed = DISC.contactRadius * d.spin;\n        const blend = rimSpeed / Math.hypot(rimSpeed, d.vx * 8 / 3);\n        const a = TUNE.frictionMu * surfaceGravity * (2 * DISC.contactRadius / 3) * blend / DISC_SPIN_INERTIA;\n        const b = TUNE.frictionViscous, decay = Math.exp(-b * dt);\n        const integral = -Math.expm1(-b * dt) / b;\n        step([d], dt, shot(), false);\n        expect(d.vx).toBeCloseTo(20 - (TUNE.frictionMu * surfaceGravity + b * 20) * dt, 12);\n        expect(d.spin).toBeCloseTo(12 * decay - a * integral, 12);\n        expect(d.angle).toBeCloseTo(12 * integral - a * (dt - integral) / b, 12);\n        expect([d.y, d.vy, d.z, d.vz]).toEqual([9, 0, 0, 0]);\n      }\n    } finally { tune.surfaceGravity = original.surfaceGravity; tune.gravityZ = original.gravityZ; }\n  });\n});\n",
+            "offset": 1735
+          }
+        ]
+      },
+      "tests/spin-damping-limits.test.ts": {
+        "baselineSha256": "47441edd1cd465f424d2e440bc920141ec9e66acf6c1b7530fb894882fafd4c0",
+        "approvedSha256": "a6507916f72f0a68a40272b7a613bf356c0f02a86c1527432aad3094fba7a49a",
+        "patches": [
+          {
+            "from": "import { integrateSpin } from '../src/sim/spin';\n",
+            "to": "import { DISC_SPIN_INERTIA, integrateSpin } from '../src/sim/spin';\n",
+            "offset": 145
+          },
+          {
+            "from": "        const a = TUNE.frictionMu * 386 * (2 * DISC.contactRadius / 3) / (DISC.radius ** 2 / 2), dt = 0.01;\n",
+            "to": "        const a = TUNE.frictionMu * TUNE.surfaceGravity * (2 * DISC.contactRadius / 3) / DISC_SPIN_INERTIA, dt = 0.01;\n",
+            "offset": 617
+          }
+        ]
+      },
+      "tests/spin.test.ts": {
+        "baselineSha256": "5da623aa622df63be93ea58f67ec46bab8d0fd7bdc0e48bf2eea7d1e4b6c82f1",
+        "approvedSha256": "8e82f41108f20da19cdd6226c5a08efcb7ca064844d6d23c062f23c699dd3ed5",
+        "patches": [
+          {
+            "from": "import { BOARD, DISC, TUNE, pegPositions } from '../src/sim/constants';\n",
+            "to": "import { BOARD, DISC, PEGS, TUNE, pegPositions } from '../src/sim/constants';\n",
+            "offset": 47
+          },
+          {
+            "from": "    const dt = 0.0001, speed = 40 - (TUNE.frictionMu * 386 + TUNE.frictionViscous * 40) * dt;\n",
+            "to": "    const dt = 0.0001, speed = 40 - (TUNE.frictionMu * TUNE.surfaceGravity + TUNE.frictionViscous * 40) * dt;\n",
+            "offset": 6014
+          },
+          {
+            "from": "    const dt = 0.0001, speed = 40 - (TUNE.frictionMu * 386 + TUNE.frictionViscous * 40) * dt;\n",
+            "to": "    const dt = 0.0001, speed = 40 - (TUNE.frictionMu * TUNE.surfaceGravity + TUNE.frictionViscous * 40) * dt;\n",
+            "offset": 9192
+          },
+          {
+            "from": "    expect(d.vx).toBeCloseTo(speed * TUNE.restitutionPeg, 12);\n",
+            "to": "    expect(d.vx).toBeCloseTo(speed * TUNE.restitutionPeg, 12);\n    // Keep the existing dimensionless 2% peg margin on the projected radius.\n    expect(d.x - p.x).toBeCloseTo((DISC.radius + PEGS.radius) * 1.02, 12);\n",
+            "offset": 9319
+          }
+        ]
+      }
+    },
+    "spin": {
+      "src/sim/constants.ts": {
+        "baselineSha256": "cf4449d0e8412dfa5dbe0f914502d62bda679add233e3a92c5a36845f0547d89",
+        "approvedSha256": "0df71607018ef498285b697914522c9bcfcff001081345a577b9a8c6d3ec817f",
+        "patches": [
+          {
+            "from": "  frictionViscous: 0.05,\n",
+            "to": "  frictionViscous: 0.05,\n  spinFrictionRatio: 0.12, // axial Coulomb torque only; strong grounded spin rests in ~1\u20132s\n",
+            "offset": 1291
+          }
+        ]
+      },
+      "src/sim/spin.ts": {
+        "baselineSha256": "55e4b884a7cb38b7d82e25975dc57ce7a26eae26fd4423fb368eb3e6f29c7d38",
+        "approvedSha256": "a239cb2fbceb0bfc30dc7657c0370f01571d084dfc8bdf3aed1111007348b3f5",
+        "patches": [
+          {
+            "from": " * uniform-face limits: full 2R/3 torque at rest, and torque proportional to\n * omega*R\u00b2/(4v) at high sliding speed. It does not create lateral force.\n",
+            "to": " * uniform-face geometry: 2R/3 arm at rest and omega*R\u00b2/(4v) at high\n * sliding speed. spinFrictionRatio scales only this rotational Coulomb torque\n * to tune axial persistence independently of launch and translational grip.\n * The existing viscous coefficient is unchanged. No lateral force is created.\n",
+            "offset": 455
+          },
+          {
+            "from": "  const torque = TUNE.frictionMu * 386 * (2 * DISC.contactRadius / 3) * support * slipBlend;\n",
+            "to": "  const torque = TUNE.spinFrictionRatio * TUNE.frictionMu * 386 * (2 * DISC.contactRadius / 3) * support * slipBlend;\n",
+            "offset": 1242
+          }
+        ]
+      },
+      "tests/spin-damping-limits.test.ts": {
+        "baselineSha256": "47441edd1cd465f424d2e440bc920141ec9e66acf6c1b7530fb894882fafd4c0",
+        "approvedSha256": "d215a4e038b23bf44e74b28de1ed10a108e142e854fe31e9cf0454e0a1c9e0f5",
+        "patches": [
+          {
+            "from": "        const a = TUNE.frictionMu * 386 * (2 * DISC.contactRadius / 3) / (DISC.radius ** 2 / 2), dt = 0.01;\n",
+            "to": "        const a = TUNE.spinFrictionRatio * TUNE.frictionMu * 386 * (2 * DISC.contactRadius / 3) / (DISC.radius ** 2 / 2), dt = 0.01;\n",
+            "offset": 617
+          },
+          {
+            "from": "        integrateSpin(d, 1); expect(d.spin).toBe(0); expect(Number.isFinite(d.angle)).toBe(true);\n",
+            "to": "        // At the tuned resistance, the exact pure-Coulomb stop occurs later\n        // than one second; integrate past its analytic stopping time.\n        integrateSpin(d, 18 / a); expect(d.spin).toBe(0); expect(Number.isFinite(d.angle)).toBe(true);\n",
+            "offset": 989
+          },
+          {
+            "from": "    const tune = TUNE as { frictionViscous: number; frictionMu: number }, original = { ...tune };\n",
+            "to": "    const tune = TUNE as { frictionViscous: number; frictionMu: number; spinFrictionRatio: number }, original = { ...tune };\n",
+            "offset": 1245
+          },
+          {
+            "from": "      tune.frictionMu = 0;\n      for (const viscous of [0, 0.05]) {\n",
+            "to": "      // Either zero sliding grip or zero rotational ratio removes only the\n      // Coulomb term. The viscous-only and both-zero limits stay unchanged.\n      for (const disable of ['mu', 'ratio']) for (const viscous of [0, 0.05]) {\n        tune.frictionMu = disable === 'mu' ? 0 : original.frictionMu;\n        tune.spinFrictionRatio = disable === 'ratio' ? 0 : original.spinFrictionRatio;\n",
+            "offset": 1353
+          },
+          {
+            "from": "    } finally { tune.frictionMu = original.frictionMu; tune.frictionViscous = original.frictionViscous; }\n",
+            "to": "    } finally {\n      tune.frictionMu = original.frictionMu; tune.frictionViscous = original.frictionViscous;\n      tune.spinFrictionRatio = original.spinFrictionRatio;\n    }\n",
+            "offset": 1755
+          }
+        ]
+      }
+    },
+    "hop": {
+      "src/sim/spin.ts": {
+        "baselineSha256": "55e4b884a7cb38b7d82e25975dc57ce7a26eae26fd4423fb368eb3e6f29c7d38",
+        "approvedSha256": "b172535597a9044593422484f8b7f409beaf8a45f6397f72b34607aa4a72137e",
+        "patches": [
+          {
+            "from": "/** Spend at most the dissipated normal-contact energy on the existing hop model. */\n",
+            "to": "/**\n * Add an upward kick, funded only by dissipated normal-contact energy.\n * Targets are zero-baseline hop speeds, not replacements for signed vz.\n * Charge work against max(vz, 0): falling KE never pays for a free reversal.\n * This conservative pop policy is not a full 3D momentum/contact solver.\n */\n",
+            "offset": 3419
+          },
+          {
+            "from": "  const additions = discs.map((d, i) => Math.max(0, (targets[i] ** 2 - d.vz ** 2) / 2));\n  const requested = additions.reduce((sum, energy) => sum + energy, 0);\n  const fraction = requested > 0 ? Math.min(1, Math.max(0, energyBudget) / requested) : 1;\n",
+            "to": "  const incoming = discs.map(d => d.vz);\n  const bases = incoming.map(v => Math.max(v, 0));\n  const costs = bases.map((u, i) => {\n    const q = Math.max(targets[i] - u, 0);\n    return u * q + q ** 2 / 2;\n  });\n  const requested = costs.reduce((sum, work) => sum + work, 0);\n  const fraction = requested > 0 ? Math.min(1, Math.max(0, energyBudget) / requested) : 0;\n",
+            "offset": 3589
+          },
+          {
+            "from": "    d.vz = additions[i] > 0\n      ? Math.sign(targets[i]) * Math.sqrt(d.vz ** 2 + 2 * additions[i] * fraction)\n      : targets[i];\n",
+            "to": "    const work = fraction * costs[i], u = bases[i];\n    // Rationalized sqrt(u\u00b2 + 2W) - u avoids cancellation for small kicks.\n    const denominator = Math.sqrt(u ** 2 + 2 * work) + u;\n    const kick = denominator > 0 ? 2 * work / denominator : 0;\n    d.vz = incoming[i] + kick;\n",
+            "offset": 3869
+          }
+        ]
+      },
+      "tests/spin.test.ts": {
+        "baselineSha256": "5da623aa622df63be93ea58f67ec46bab8d0fd7bdc0e48bf2eea7d1e4b6c82f1",
+        "approvedSha256": "3589a46ec312a94bb80f7469c47267b97c471e3f6c5f21929b7a94d405b76b2e",
+        "patches": [
+          {
+            "from": "import { BOARD, DISC, TUNE, pegPositions } from '../src/sim/constants';\n",
+            "to": "import { BOARD, DISC, PEGS, TUNE, pegPositions } from '../src/sim/constants';\n",
+            "offset": 47
+          },
+          {
+            "from": "\n",
+            "to": "\ndescribe('signed contact hop', () => {\n  function hop(velocities: number[], targets: number[], budget: number) {\n    const ds = velocities.map((vz, i) => Object.assign(makeDisc(i + 1, i, 0, 7), { vz }));\n    contactHop(ds, targets, budget);\n    return ds.map(d => d.vz);\n  }\n\n  it.each([0, -1, -100])('does not kick falling, grounded, or rising discs with budget %s', budget => {\n    expect(hop([-10, 0, 1, 10], [2, 8, 8, 20], budget)).toEqual([-10, 0, 1, 10]);\n    expect(hop([-10], [20], budget)).toEqual([-10]);\n  });\n\n  it.each([\n    [-10, 2, 1, -10 + Math.SQRT2],\n    [-10, 2, 2, -8],\n    [-10, 20, 50, 0],\n    [-10, 20, 200, 10],\n    [-1, 2, 2, 1],\n  ])('adds a funded kick to incoming %s, target %s, budget %s', (vz, target, budget, expected) => {\n    expect(hop([vz], [target], budget)[0]).toBeCloseTo(expected, 12);\n  });\n\n  it('allocates one common work fraction from the incoming falling/rising snapshot, independent of order', () => {\n    // Costs are 2 and 4; budget 3 funds half of each, not a free\n    // reversal for the falling disc or a budget recalculated after mutation.\n    const forward = hop([-10, 1], [2, 3], 3);\n    expect(forward[0]).toBeCloseTo(-10 + Math.SQRT2, 12);\n    expect(forward[1]).toBeCloseTo(Math.sqrt(5), 12);\n    expect(hop([1, -10], [3, 2], 3).reverse()).toEqual(forward);\n  });\n\n  it('does not lower rising velocity or give negative/zero targets a kick', () => {\n    for (const budget of [0, 1, 1000]) {\n      expect(hop([10, 1, 0, -10], [2, -2, 0, -2], budget)).toEqual([10, 1, 0, -10]);\n    }\n    expect(hop([], [], 10)).toEqual([]);\n  });\n\n  it('preserves the grounded/rising energy allocation for full and partial funding', () => {\n    for (const budget of [0, 1, 100]) {\n      // Old production callers supplied max(vz, hopSpeed). For nonnegative\n      // inputs the additive policy must reproduce that squared-speed model.\n      const fraction = Math.min(1, budget / (32 + 30));\n      const out = hop([0, 2, 10], [8, 8, 2], budget);\n      expect(out[0]).toBeCloseTo(Math.sqrt(64 * fraction), 12);\n      expect(out[1]).toBeCloseTo(Math.sqrt(4 + 60 * fraction), 12);\n      expect(out[2]).toBe(10);\n    }\n  });\n\n  it('sweeps signed kick bounds, synthetic work, actual KE, and nonnegative caller compatibility', () => {\n    let cases = 0, compatible = 0;\n    for (const va of [-40, -10, -1, 0, 1, 10, 40]) for (const vb of [-40, -10, -1, 0, 1, 10, 40])\n      for (const ha of [-2, 0, 2, 20, 60]) for (const hb of [-2, 0, 2, 20, 60])\n        for (const budget of [-10, 0, 0.001, 1, 100, 1000]) {\n          const incoming = [va, vb], targets = [ha, hb], out = hop(incoming, targets, budget);\n          const bases = incoming.map(v => Math.max(v, 0));\n          const caps = targets.map((h, i) => Math.max(0, h - bases[i]));\n          const costs = caps.map((q, i) => bases[i] * q + q ** 2 / 2);\n          const requested = costs[0] + costs[1];\n          const fraction = requested > 0 ? Math.min(1, Math.max(0, budget) / requested) : 0;\n          let syntheticWork = 0, actualAdded = 0;\n          out.forEach((v, i) => {\n            const kick = v - incoming[i];\n            expect(Number.isFinite(v)).toBe(true);\n            expect(kick).toBeGreaterThanOrEqual(-1e-12);\n            expect(kick).toBeLessThanOrEqual(caps[i] + 1e-12);\n            syntheticWork += bases[i] * kick + kick ** 2 / 2;\n            // Sum positive increases too: dissipating one disc's falling KE\n            // must not fund additional energy for its rising partner.\n            actualAdded += Math.max(0, (v ** 2 - incoming[i] ** 2) / 2);\n            if (budget <= 0) expect(v).toBe(incoming[i]);\n            if (va >= 0 && vb >= 0) {\n              expect(v).toBeCloseTo(Math.sqrt(incoming[i] ** 2 + 2 * costs[i] * fraction), 10);\n            }\n          });\n          expect(syntheticWork).toBeLessThanOrEqual(Math.max(0, budget) + 1e-8);\n          expect(actualAdded).toBeLessThanOrEqual(Math.max(0, budget) + 1e-8);\n          cases++;\n          if (va >= 0 && vb >= 0) compatible++;\n        }\n    expect(cases).toBe(7350);\n    expect(compatible).toBe(2400);\n  });\n\n  const dt = 0.00001;\n  function collision(peg: boolean, vz: number, otherVz = vz, airborne = true, speed = 20, z = 0.1) {\n    const p = peg ? pegPositions()[0] : { x: 0, y: 7 };\n    const a = makeDisc(1, 0, p.x + (peg ? 0.8 : 1.24), p.y), b = makeDisc(2, 1, p.x, p.y);\n    a.vx = -speed; a.vz = vz; b.vz = otherVz; a.z = b.z = z;\n    const ds = peg ? [a] : [a, b], s = shot(), events: string[] = [], before = total(ds);\n    step(ds, dt, s, airborne, e => events.push(e.kind));\n    return { ds, s, events, before };\n  }\n\n  it.each([true, false])('adds a bounded kick in real contacts (peg=%s), including strong/mild descent', peg => {\n    for (const vz of [-10, -1, 0, 10]) {\n      const { ds, s, events, before } = collision(peg, vz);\n      const incoming = vz - TUNE.gravityZ * dt;\n      const kicks = peg ? [2] : [1.44, 1.08];\n      ds.forEach((d, i) => {\n        expect(d.vz).toBeCloseTo(incoming + Math.max(0, kicks[i] - Math.max(0, incoming)), 12);\n        if (vz === -10) expect(d.vz).toBeLessThan(0);\n        if (vz === -1) expect(d.vz).toBeGreaterThan(0);\n        expect([d.vy, d.spin, d.state]).toEqual([0, 0, 'board']);\n      });\n      // Horizontal restitution and contact/rules registration are untouched.\n      expect(ds[0].vx).toBeCloseTo(peg ? 20 * TUNE.restitutionPeg : -20 * (1 - TUNE.restitutionDisc) / 2, 12);\n      expect(events).toEqual([peg ? 'peg' : 'disc']);\n      if (!peg) {\n        expect(ds[1].vx).toBeCloseTo(-20 * (1 + TUNE.restitutionDisc) / 2, 12);\n        expect([...s.touched]).toEqual([1, 2]); expect(s.opponentContact).toBe(true);\n      }\n      expect(total(ds)).toBeLessThanOrEqual(before + 1e-8);\n    }\n  });\n\n  it('uses the incoming mixed falling/rising state in the real disc caller', () => {\n    const { ds } = collision(false, -10, 1);\n    expect(ds[0].vz).toBeCloseTo(-10 - TUNE.gravityZ * dt + 1.44, 12);\n    expect(ds[1].vz).toBeCloseTo(1 - TUNE.gravityZ * dt + (1.08 - (1 - TUNE.gravityZ * dt)), 12);\n  });\n\n  it.each([true, false])('leaves grounded pops math-equivalent and disables only the hop when airborne=false (peg=%s)', peg => {\n    const grounded = collision(peg, 0, 0, true, 20, 0);\n    const speed = 20 - (TUNE.frictionMu * 386 + TUNE.frictionViscous * 20) * dt;\n    const impulse = (1 + TUNE.restitutionDisc) * speed / 2;\n    expect(grounded.ds[0].vz).toBeCloseTo(peg ? speed * 0.1 : impulse * 0.08, 12);\n    if (!peg) expect(grounded.ds[1].vz).toBeCloseTo(impulse * 0.06, 12);\n    const enabled = collision(peg, -10), disabled = collision(peg, -10, -10, false);\n    disabled.ds.forEach((d, i) => {\n      expect(d.vz).toBeCloseTo(-10 - TUNE.gravityZ * dt, 12);\n      expect([d.x, d.y, d.vx, d.vy, d.spin]).toEqual([\n        enabled.ds[i].x, enabled.ds[i].y, enabled.ds[i].vx, enabled.ds[i].vy, enabled.ds[i].spin,\n      ]);\n    });\n    expect(disabled.events).toEqual(enabled.events);\n    expect([...disabled.s.touched]).toEqual([...enabled.s.touched]);\n    expect(disabled.s.opponentContact).toBe(enabled.s.opponentContact);\n  });\n\n  it.each([true, false])('does not kick resting/separating overlaps or height-excluded contacts (peg=%s)', peg => {\n    for (const speed of [0, -20]) {\n      const { ds, s, events } = collision(peg, -10, -10, true, speed);\n      ds.forEach(d => expect(d.vz).toBeCloseTo(-10 - TUNE.gravityZ * dt, 12));\n      expect(events).toEqual([]); expect([...s.touched]).toEqual([1]); expect(s.opponentContact).toBe(false);\n    }\n    const p = peg ? pegPositions()[0] : { x: 0, y: 7 };\n    const a = makeDisc(1, 0, p.x + (peg ? 0.8 : 1.24), p.y), b = makeDisc(2, 1, p.x, p.y);\n    a.vx = -20; a.vz = -10; a.z = peg ? PEGS.height + 0.01 : 1; b.z = 0.1; b.vz = -10;\n    const events: string[] = [], s = shot();\n    step(peg ? [a] : [a, b], dt, s, true, e => events.push(e.kind));\n    expect(a.vz).toBeCloseTo(-10 - TUNE.gravityZ * dt, 12); expect(a.vx).toBe(-20);\n    expect(events).toEqual([]); expect([...s.touched]).toEqual([1]);\n  });\n\n  it.each(['sunk', 'out'] as const)('does not kick a non-board disc (%s)', state => {\n    const a = makeDisc(1, 0, 1.24, 7), b = makeDisc(2, 1, 0, 7);\n    a.vx = -20; a.z = 0.1; a.vz = -10; b.state = state;\n    const events: string[] = [], s = shot(); step([a, b], dt, s, true, e => events.push(e.kind));\n    expect(a.vz).toBeCloseTo(-10 - TUNE.gravityZ * dt, 12);\n    expect(events).toEqual([]); expect([...s.touched]).toEqual([1]);\n  });\n\n  it('preserves a legitimate support/landing bounce rather than suppressing every falling reversal', () => {\n    const d = makeDisc(1, 0, 0, 9); d.z = 0.00001; d.vz = -10;\n    const events: string[] = []; step([d], dt, shot(), true, e => events.push(e.kind));\n    expect(events).toEqual(['land']); expect(d.z).toBe(0);\n    expect(d.vz).toBeCloseTo((10 + TUNE.gravityZ * dt) * TUNE.landBounce, 12);\n    expect(d.vz).toBeGreaterThan(0);\n  });\n});\n\n",
+            "offset": 12876
+          }
+        ]
+      }
+    }
+  }
+}

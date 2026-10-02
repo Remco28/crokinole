@@ -1,4 +1,5 @@
 import { DISC } from '../sim/constants';
+import { DISC_SPIN_INERTIA } from '../sim/spin';
 
 export interface FlickSample { x: number; y: number; t: number }
 interface Point { x: number; y: number }
@@ -280,24 +281,23 @@ export function releaseShot(samples: FlickSample[], disc: Point, contact: number
   const normal = { x: direction.x * forward - direction.y * side, y: direction.y * forward + direction.x * side };
   const tangent = { x: -normal.y, y: normal.x };
   const normalImpulse = speed * forward;
-  const inertia = DISC.radius * DISC.radius / 2;
   const amount = Math.max(0, Math.min(1, (Math.abs(offset) - FLICK_SPIN.centerZone) / (FLICK_SPIN.fullGripOffset - FLICK_SPIN.centerZone)));
   const grip = amount * amount * (3 - 2 * amount);
   // Contact-point slip couples tangential translation to axial rotation. Cap the
   // sticking impulse by finger grip and angular speed. No bonus launch energy:
   // jn² + (1 + R²/I)jt² <= speed²; a glancing strike transfers less energy.
-  const stickingImpulse = speed * Math.abs(side) / (1 + DISC.radius ** 2 / inertia);
+  const stickingImpulse = speed * Math.abs(side) / (1 + DISC.radius ** 2 / DISC_SPIN_INERTIA);
   const roundedSide = offset / (1 + FLICK_STRIKE.fingerRadiusRatio);
   const roundedForward = Math.sqrt(1 - roundedSide * roundedSide);
   // As the edge becomes more tangent, reduce its spin-transfer ceiling with
   // normal impulse too; a weak skim must not retain a full powered spin kick.
   const spinTransfer = forward / roundedForward;
   const tangentImpulse = -Math.sign(side) * Math.min(stickingImpulse * grip,
-    FLICK_STRIKE.friction * normalImpulse, FLICK_SPIN.maxSpeed * inertia / DISC.radius * spinTransfer);
+    FLICK_STRIKE.friction * normalImpulse, FLICK_SPIN.maxSpeed * DISC_SPIN_INERTIA / DISC.radius * spinTransfer);
   const shot = {
     x: normal.x * normalImpulse + tangent.x * tangentImpulse,
     y: normal.y * normalImpulse + tangent.y * tangentImpulse,
-    spin: -DISC.radius * tangentImpulse / inertia || 0,
+    spin: -DISC.radius * tangentImpulse / DISC_SPIN_INERTIA || 0,
   };
   if (Math.abs(offset) >= FLICK_AIM.fullDeflectionOffset) return protectDiagonal(shot, direction, disc);
   const t = Math.max(0, (Math.abs(offset) - FLICK_AIM.neutralOffset)
