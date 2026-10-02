@@ -177,7 +177,10 @@ try {
       assert.ok(Math.abs(Math.atan2(d.vx,-d.vy)*180/Math.PI)<options.maxHeadingDegrees, 'Near-contact aim stays within its requested heading bound');
       assert.ok(Math.abs(d.spin)<=18);
     } else {
-      if (Math.abs(offset)<=0.125) assert.ok(Math.abs(Math.atan2(d.vx,-d.vy)*180/Math.PI)<0.1, 'Small central positioning error preserves the incoming heading');
+      if (options.finishHeadingRange) {
+        const heading = Math.atan2(d.vx,-d.vy)*180/Math.PI;
+        assert.ok(heading > options.finishHeadingRange[0] && heading < options.finishHeadingRange[1], 'Meaningful hooked finish controls heading while contact remains registered');
+      } else if (Math.abs(offset)<=0.125) assert.ok(Math.abs(Math.atan2(d.vx,-d.vy)*180/Math.PI)<0.1, 'Small central positioning error preserves the incoming heading');
       else assert.ok(d.vx * offset < 0, 'Side impact deflects away from the finger');
       if (Math.abs(offset) <= 0.05) assert.equal(d.spin, 0, 'Only a small neutral spin zone remains');
       else assert.ok(d.spin * offset < -0.1, 'Deliberate left/right contact produces signed spin');
@@ -327,12 +330,12 @@ try {
   assert.ok(left.discs[0].spin > 0 && right.discs[0].spin < 0);
   const brush = { points: [{x:0,y:12.7},{x:0,y:12.55},{x:0.4,y:12.3},{x:0.4,y:11.5},{x:0.4,y:10.5}], delays:[200,130,20,20] };
   await flick(0.4, false, 'standing', brush);
-  await flick(0.4, false, 'standing', { points:[{x:0.4,y:12.8},{x:0.4,y:12.3},{x:0.4,y:11.7},{x:0.7,y:11.1},{x:1,y:10.5}] });
+  await flick(0.4, false, 'standing', { points:[{x:0.4,y:12.8},{x:0.4,y:12.3},{x:0.4,y:11.7},{x:0.7,y:11.1},{x:1,y:10.5}], finishHeadingRange:[8,27] });
   await flick(0.8, false, 'standing', { miss:true });
   const brushMiss = { miss:true, points:[{x:0,y:12.6},{x:0,y:12.55},{x:1,y:12.55},{x:1,y:10}], delays:[50,200,50] };
   await flick(1, false, 'standing', brushMiss);
   await flick(0, false, 'standing', { miss:true, points:[{x:0,y:12.6},{x:0,y:11.3},{x:0,y:9}], delays:[500,50] });
-  console.log('Desktop: centered/mirrored deflection and spin, slow-brush registration, fixed impact direction, and missed swipes passed.');
+  console.log('Desktop: centered/mirrored deflection and spin, slow-brush registration, refined hooked finish, and missed swipes passed.');
   await call('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await call('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
   await checkWobbles(true,'seated');

@@ -17,6 +17,14 @@ corridor preserves the incoming stroke direction; outside it, directional
 deflection blends smoothly into the existing glancing response. The corridor is
 relative to the stroke, not a fixed region behind the disc or a target on the board.
 Off-center impact can still impart axial spin. Missed swipes do not shoot. A shot gesture holds the view steady until you lift your finger. Your chosen zoom and score layout persist.
+Preview 7 keeps contact eligibility and offset registered, but refines aim from
+the meaningful powered finish of the swipe instead of locking it to a tiny
+first movement. Brief stationary lifts and small endpoint jitter retain that
+finish; the existing release-power rule still rejects held or weak releases.
+A symmetric diagonal-intent guard bounds opposing glancing deflection without
+changing transferred speed or spin. It preserves sharp radial edge glances,
+not exact clock-face heading on every off-center strike. Spin damping, holes,
+scoring, slide friction and maximum power are unchanged.
 Preview 5 also recognizes completed short, fast near-edge clips on lift. Powered
 board-space strikes are no longer discarded as placement taps merely because
 their phone-screen displacement is under five pixels. Central control and outer

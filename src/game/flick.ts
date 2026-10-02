@@ -25,7 +25,11 @@ export function crossesDisc(samples: FlickSample[], disc: Point): boolean {
   return flickContactOffset(samples, disc) !== null;
 }
 
-export interface FlickContact { offset: number; direction: Point; powered: boolean; frontStart?: FlickSample }
+export interface FlickContact {
+  offset: number; direction: Point; powered: boolean; frontStart?: FlickSample;
+  // Release intent is separate from the registered crossing's geometry.
+  finishDirection?: Point;
+}
 
 // Aim history is spatial, independent of the 120 ms release-power history.
 // Retain 2R BEFORE the newest segment: its endpoint may overshoot contact by
@@ -77,8 +81,8 @@ function approachSpan(samples: FlickSample[], disc: Point): [Point, Point] {
   return spatialApproach(samples, { x: segmentStart.x + u * dx, y: segmentStart.y + u * dy });
 }
 
-// A brush or tiny wobble is provisional. Establish direction from a short
-// spatial approach with meaningful travel, then freeze the powered crossing.
+// A brush or tiny wobble is provisional. Establish real powered contact from a
+// short spatial approach, then freeze eligibility and its crossing geometry.
 export function updateFlickContact(previous: FlickContact | null, samples: FlickSample[], disc: Point): FlickContact | null {
   if (previous?.powered) return previous;
   if (samples.length < 2) return previous;
@@ -118,10 +122,61 @@ export function updateFlickContact(previous: FlickContact | null, samples: Flick
     ...(frontStart ? { frontStart } : {}) };
 }
 
-// Finalize only a completed, short edge clip on lift. Ordinary contact keeps
-// its spatial anti-wobble span; already-powered geometry is never rewritten.
+// The last 2R of uninterrupted powered travel express finish intent, not the
+// first tiny contact or the final noisy event. Clip within a segment so adding
+// collinear events cannot change this spatial chord. Slow setup/observed stops
+// are boundaries. A stationary lift or tiny trailing jitter retains the last
+// meaningful run, while releaseVelocity independently decides whether power remains.
+function finishIntent(samples: FlickSample[], disc: Point, registered: Point): Point | null {
+  let index = samples.length - 1;
+  if (index < 1) return null;
+  const last = samples[index];
+  let ignoredTravel = 0;
+  while (index > 0 && last.t - samples[index].t <= FLICK_STRIKE.strokeGapMs) {
+    const end = samples[index];
+    let start: Point = end, travel = 0;
+    for (let i = index; i > 0; i--) {
+      const a = samples[i - 1], b = samples[i];
+      const length = Math.hypot(b.x - a.x, b.y - a.y), seconds = (b.t - a.t) / 1000;
+      if (seconds <= 0 || seconds * 1000 > FLICK_STRIKE.strokeGapMs || !hasContactSpeed(length / seconds)) break;
+      const used = Math.min(length, FLICK_STRIKE.approachDistance - travel);
+      const f = used / length;
+      start = { x: b.x + (a.x - b.x) * f, y: b.y + (a.y - b.y) * f };
+      travel += used;
+      if (travel >= FLICK_STRIKE.approachDistance) break;
+    }
+    const dx = end.x - start.x, dy = end.y - start.y, chord = Math.hypot(dx, dy);
+    if (chord + 1e-9 >= FLICK_STRIKE.minContactTravel) {
+      if (dx * disc.x + dy * disc.y >= 0) return null;
+      const direction = { x: dx / chord, y: dy / chord };
+      // Preserve the complete existing launch bit-for-bit for straight strokes.
+      if (Math.abs(direction.x * registered.y - direction.y * registered.x) < 1e-12
+        && direction.x * registered.x + direction.y * registered.y > 0) return registered;
+      return direction;
+    }
+    // Never bypass a meaningful slow reposition or many small loops. This
+    // allowance is spatial and accumulates through subdivisions, not per event.
+    const before = samples[index - 1];
+    ignoredTravel += Math.hypot(end.x - before.x, end.y - before.y);
+    if (ignoredTravel > DISC.radius * 0.1 + 1e-9) return null;
+    index--;
+  }
+  return null;
+}
+
+// Refine only the finish intent of real powered contact. Crossing offset,
+// direction, eligibility and provisional short-edge registration stay intact.
 export function finalizeFlickContact(previous: FlickContact | null, samples: FlickSample[], disc: Point): FlickContact | null {
-  if (!previous || previous.powered || samples.length < 2) return previous;
+  if (!previous || samples.length < 2) return previous;
+  if (previous.powered) {
+    const finishDirection = finishIntent(samples, disc, previous.direction);
+    if (!finishDirection || finishDirection === previous.direction) {
+      if (!previous.finishDirection) return previous;
+      const { finishDirection: _stale, ...registered } = previous;
+      return registered;
+    }
+    return { ...previous, finishDirection };
+  }
   const path = [...samples], last = path[path.length - 1], before = path[path.length - 2];
   // A brief stationary lift endpoint is normal; an observed stop in the stroke
   // or a held release must not turn a brush into a powered crossing.
@@ -181,12 +236,38 @@ export const FLICK_AIM = { neutralOffset: 0.2, fullDeflectionOffset: 0.5 } as co
 // fingertip rounding smoothly. A small rim radius avoids a zero-energy tangent.
 // This is gameplay contact tuning, not a calibrated physical finger model.
 export const FLICK_GLANCE = { startOffset: 0.7, rimFingerRadiusRatio: 0.02 } as const;
+// Gameplay intent guard, not calibrated finger physics. Preserve radial skims
+// and reinforcing responses; only bound deflection that overwhelms a diagonal.
+export const FLICK_DIAGONAL = { beginDegrees: 8, fullDegrees: 16, freeFraction: 0.5, saturationFraction: 0.15 } as const;
+function protectDiagonal(shot: Point & { spin: number }, direction: Point, disc: Point): Point & { spin: number } {
+  const radius = Math.hypot(disc.x, disc.y);
+  if (!radius) return shot;
+  const radial = { x: -disc.x / radius, y: -disc.y / radius };
+  const alpha = Math.atan2(radial.x * direction.y - radial.y * direction.x,
+    radial.x * direction.x + radial.y * direction.y);
+  const a = Math.abs(alpha), begin = FLICK_DIAGONAL.beginDegrees * Math.PI / 180;
+  if (a <= begin) return shot;
+  const delta = Math.atan2(direction.x * shot.y - direction.y * shot.x,
+    direction.x * shot.x + direction.y * shot.y);
+  const free = FLICK_DIAGONAL.freeFraction * a;
+  if (alpha * delta >= 0 || Math.abs(delta) <= free) return shot;
+  const span = FLICK_DIAGONAL.saturationFraction * a;
+  const bound = free + span * Math.tanh((Math.abs(delta) - free) / span);
+  const full = FLICK_DIAGONAL.fullDegrees * Math.PI / 180;
+  const t = Math.max(0, Math.min(1, (a - begin) / (full - begin)));
+  const weight = t * t * t * (10 + t * (-15 + 6 * t));
+  const adjustment = weight * (Math.sign(delta) * bound - delta);
+  const c = Math.cos(adjustment), s = Math.sin(adjustment);
+  // Rotate only: do not add speed, spin, energy or artificial side force.
+  return { x: shot.x * c - shot.y * s, y: shot.x * s + shot.y * c, spin: shot.spin };
+}
 export function releaseShot(samples: FlickSample[], disc: Point, contact: number | FlickContact = 0): (Point & { spin: number }) | null {
   if (typeof contact !== 'number' && !contact.powered) return null;
   const velocity = releaseVelocity(samples, disc);
   if (!velocity) return null;
   const speed = Math.hypot(velocity.x, velocity.y);
-  const direction = typeof contact === 'number' ? { x: velocity.x / speed, y: velocity.y / speed } : contact.direction;
+  const direction = typeof contact === 'number' ? { x: velocity.x / speed, y: velocity.y / speed }
+    : contact.finishDirection ?? contact.direction;
   const offset = Math.max(-1, Math.min(1, typeof contact === 'number' ? contact : contact.offset));
   if (!offset) return { x: direction.x * speed, y: direction.y * speed, spin: 0 };
   const outer = Math.max(0, Math.min(1, (Math.abs(offset) - FLICK_GLANCE.startOffset)
@@ -218,7 +299,7 @@ export function releaseShot(samples: FlickSample[], disc: Point, contact: number
     y: normal.y * normalImpulse + tangent.y * tangentImpulse,
     spin: -DISC.radius * tangentImpulse / inertia || 0,
   };
-  if (Math.abs(offset) >= FLICK_AIM.fullDeflectionOffset) return shot;
+  if (Math.abs(offset) >= FLICK_AIM.fullDeflectionOffset) return protectDiagonal(shot, direction, disc);
   const t = Math.max(0, (Math.abs(offset) - FLICK_AIM.neutralOffset)
     / (FLICK_AIM.fullDeflectionOffset - FLICK_AIM.neutralOffset));
   const response = t * t * (3 - 2 * t);
@@ -227,8 +308,8 @@ export function releaseShot(samples: FlickSample[], disc: Point, contact: number
   const c = Math.cos(deflection), s = Math.sin(deflection), transferredSpeed = Math.hypot(shot.x, shot.y);
   // Rotate only the launch heading toward the actual stroke, preserving the
   // existing transferred speed, axial spin and energy budget. No target snap.
-  return { x: transferredSpeed * (direction.x * c - direction.y * s) || 0,
-    y: transferredSpeed * (direction.x * s + direction.y * c) || 0, spin: shot.spin };
+  return protectDiagonal({ x: transferredSpeed * (direction.x * c - direction.y * s) || 0,
+    y: transferredSpeed * (direction.x * s + direction.y * c) || 0, spin: shot.spin }, direction, disc);
 }
 
 export function canStartFlick(p: Point, disc: Point) {
