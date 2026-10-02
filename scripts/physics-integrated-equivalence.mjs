@@ -86,14 +86,31 @@ export function profileSource(path, profile) {
   }
   return approved(path, profile === 'isolated-spin-reference' ? ['spin'] : profile === 'isolated-hop-reference' ? ['hop'] : ['spin', 'hop']);
 }
-export function checkSourceNeutrality() {
+export function checkSourceNeutrality(policy = 'integrated-physics') {
+  assert.ok(['integrated-physics', 'disc-appearance'].includes(policy), `Explicit source policy required: ${policy}`);
+  let cosmetic = null;
+  if (policy === 'disc-appearance') {
+    const text = readFileSync(resolve(root, 'docs/disc-design-approved.json'), 'utf8');
+    assert.equal(sha(text), 'e97348d50de795aceaf0fa718caaa75ccb187a8a21d052778fe66fdd11d1615d', 'Reviewed cosmetic manifest must not drift');
+    cosmetic = JSON.parse(text);
+    assert.equal(cosmetic.accepted_physics_release, '425b35eb3a73663e55c1210deda8e0d821c0f827');
+    assert.deepStrictEqual(Object.keys(cosmetic.cosmeticSourceHashes).sort(), [
+      'src/disc-appearance.ts', 'src/disc-settings.ts', 'src/main.ts', 'src/render/disc-design.ts',
+      'src/render/scene.ts', 'src/storage/disc-images.ts', 'src/style.css',
+    ]);
+    for (const [path, expected] of Object.entries(cosmetic.cosmeticSourceHashes))
+      assert.equal(sha(source(path, null)), expected, `Unapproved cosmetic source: ${path}`);
+  }
   for (const [name, files] of Object.entries(manifest.slices)) for (const [path, e] of Object.entries(files)) {
     assert.equal(sha(source(path, BASELINE)), e.baselineSha256, `${name} pinned input ${path}`);
     assert.equal(sha(approved(path, [name])), e.approvedSha256, `${name} approved isolated output ${path}`);
   }
   const files = execFileSync('git', ['ls-tree', '-r', '--name-only', BASELINE, 'src'], { cwd: root, encoding: 'utf8' }).trim().split('\n');
-  for (const path of files) assert.equal(source(path, null), approved(path, ['cleanup', 'spin', 'hop']), `Unapproved candidate source: ${path}`);
-  return { exactSourceFiles: files.length, approvedManifestSha256: sha(manifestText),
+  for (const path of files) {
+    if (cosmetic && Object.hasOwn(cosmetic.cosmeticSourceHashes, path)) continue;
+    assert.equal(source(path, null), approved(path, ['cleanup', 'spin', 'hop']), `Unapproved candidate source: ${path}`);
+  }
+  return { exactSourceFiles: files.length, sourcePolicy: policy, cosmeticSourceFiles: cosmetic ? Object.keys(cosmetic.cosmeticSourceHashes).length : 0, approvedManifestSha256: sha(manifestText),
     currentSourceHashes: Object.fromEntries(files.map(p => [p, sha(source(p,null))])),
     baselineSourceHashes: Object.fromEntries(files.map(p => [p, sha(source(p,BASELINE))])) };
 }
@@ -269,7 +286,7 @@ export function checkSignedHopIntegration() {
   return {cases:rows.length,productionAndFineTimestep:true,allFiniteAndSettled:true,rows};
 }
 export function runEquivalence() {
-  const gates = checkSourceNeutrality(), current = loadHelpers('actual-integrated'), baseline = loadHelpers('pinned-baseline');
+  const gates = checkSourceNeutrality('disc-appearance'), current = loadHelpers('actual-integrated'), baseline = loadHelpers('pinned-baseline');
   const counterfactual = loadHelpers('cleanup-restored-baseline'), reference = loadHelpers('unrefactored-spin-hop-reference');
   return { baseline: BASELINE, head: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: root, encoding: 'utf8'}).trim(),
     branch: execFileSync('git', ['branch', '--show-current'], {cwd: root, encoding: 'utf8'}).trim(), unpublished: true, gates,

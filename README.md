@@ -34,6 +34,12 @@ normal landing rebounds remain. Shared constants/inertia are cleanup only.
 Hole capture, scoring, sliding grip, maximum power and saved-game keys stay
 unchanged. This is gameplay tuning, not measured real-board calibration. See
 [integrated verification and limitations](docs/physics/integrated-followup-verification.md).
+Preview 9 changes playing-disc appearance only. **Settings → Playing discs**
+offers stained wood or poker chips, Classic/Jewel/Pastel/Earth colors, and
+individual printed emblems or pictures for Red, Blue, Yellow and Green.
+Wood grain and printed faces rotate with the disc; the cream indicator dash is
+removed. There is no engraving or raised decoration, and preview 8's accepted
+physics, disc dimensions, input behavior and saved matches are unchanged.
 Preview 5 also recognizes completed short, fast near-edge clips on lift. Powered
 board-space strikes are no longer discarded as placement taps merely because
 their phone-screen displacement is under five pixels. Central control and outer
@@ -52,8 +58,8 @@ Directional forgiveness uses a neutral offset of `0.2` disc radii and reaches
 the unchanged full-deflection response at `0.5` radii. It changes launch heading
 only: transferred speed, launch spin, maximum power, board-spin damping and
 disc/peg/lip collision responses are unchanged. The separate neutral **spin**
-zone remains at `0.1` radii. Contacts can generate and change spin; board friction slows it until rest. A small cream disc
-inlay makes rotation visible. No random misses or artificial curling are added.
+zone remains at `0.1` radii. Contacts can generate and change spin; board friction slows it until rest. Wood grain and printed disc
+faces make rotation visible. No random misses or artificial curling are added.
 See [physics versions and rollback](PHYSICS-VERSIONS.md) for stable checkpoints,
 save compatibility, tuning details, and the GitHub Pages playtest deployment.
 See [input findings](docs/physics/input-findings.md) for near-edge shot-detection
@@ -117,6 +123,16 @@ Images are cropped to a square and resized to 1024 pixels, then saved in Indexed
 Your previously uploaded image is moved into the first slot automatically. Images
 stay local to this browser and are removed if you clear its site data. **Preview sounds** plays soft, medium, and firm wood clicks, then a peg knock, twenty, and ditch
 clatter. The **Sound on/off** button in Settings mutes the table.
+
+Playing-disc pictures are separate from board artwork. Choose a player, add a
+picture, zoom its circular crop (1–4×), and drag or use arrow keys to position it.
+**Reframe** edits the retained source; switching to an emblem keeps the picture
+available through **Use picture**. Removing a picture affects only that player.
+Pictures and crops stay in this browser's IndexedDB and are never uploaded.
+Clearing site data removes them; another device/browser has its own collection.
+PNG, JPEG, WebP, GIF and AVIF inputs are accepted up to 10 MB, with decoded images
+capped at 64 million pixels. Sources are resized to at most 1024px on the long
+edge, with a 256px circular face saved for play. Animated inputs become stills.
 
 ## Implemented
 
@@ -241,6 +257,12 @@ planned individual point totals for free-for-all, rather than tournament round
 match points.
 
 ## Browser verification
+
+`npm run test:browser:discs` checks both styles and all palettes, independent
+emblems/pictures, native keyboard/mouse/touch cropping, reframe/cancel, reload,
+storage failures, removal and corrupt-data preservation at desktop and mobile
+sizes. It uses isolated browser storage, never the player's live table.
+See [disc appearance verification](docs/disc-design-verification.md).
 
 `npm run test:browser` runs artwork, winner, and spin-control flows in fresh headless Chrome
 profile with a local Vite server. It checks migration of the old image, four slots,

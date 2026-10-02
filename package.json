@@ -1,7 +1,7 @@
 {
   "name": "crokinole",
   "private": true,
-  "version": "0.3.0-preview.8",
+  "version": "0.3.0-preview.9",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:browser": "node tests/browser-round.mjs && node tests/browser-spin.mjs",
-    "test:browser:aim": "node tests/browser-intent.mjs"
+    "test:browser:aim": "node tests/browser-intent.mjs",
+    "test:browser:discs": "node tests/browser-discs.mjs && node tests/browser-disc-render.mjs"
   },
   "dependencies": {
     "three": "^0.180.0"

@@ -20,6 +20,7 @@ The strike preview is published from `main` through GitHub Pages at https://crok
 | `crokinole-v0.3.0-strike-preview.6` | `0.3.0-preview.6` | Sharper outer glances beyond 0.70R with reduced transferred speed/spin; central response, registration and board-spin damping unchanged. |
 | `crokinole-v0.3.0-strike-preview.7` | `0.3.0-preview.7` | Refined powered finish intent with bounded lift/jitter retention and symmetric diagonal counter-deflection protection; eligibility, release power, transferred speed/spin and board damping unchanged. |
 | `crokinole-v0.3.0-strike-preview.8` | `0.3.0-preview.8` | Preview-7 input preserved; rotational Coulomb ratio 0.12, budgeted additive falling-contact hops, and neutral constant/inertia cleanup. Hole/scoring/sliding grip/power unchanged. |
+| `crokinole-v0.3.0-disc-designs-preview.9` | `0.3.0-preview.9` | Cosmetic disc release: stained wood/poker chips, palettes, printed emblems and local circular picture crops; cream dash removed. Preview-8 physics/input/save behavior unchanged. |
 
 The original checkpoint passed all 60 unit tests, production build, and artwork/winner browser flows. The friction checkpoint passed 62 unit tests, build, and the same browser flows. Spin preview 1 passed 96 unit tests; spin preview 2 passed 98. Strike preview 1 passed 108; strike preview 2 passed 115. Those releases passed production build and native desktop/mobile browser checks, including legacy-save preservation. Preview 3 passed 133 unit tests, production build and the expanded full browser suite in an isolated immutable release worktree. The earlier interrupted and screenshot-directory-failed attempts remain failures; the corrected isolated run completed with exit code 0. Preview 4 passed 139 unit tests, production build and the expanded full native browser suite in an isolated immutable candidate worktree (exit code 0). Its 24 central native gestures across mouse, laptop touch and emulated phone touch follow the incoming heading within 0.001 degrees at gentle/hard speeds. A separate 24-case native diagonal check on the same placed disc follows each angled stroke within 0.003 degrees instead of snapping to the hole. A separate 7,230-case comparison against preview 3 verifies unchanged launch spin and transferred speed and exact outer-strike response; registration regressions retain geometric misses and slow-brush rejection. Release checkpoints are preserved on GitHub.
 
@@ -46,6 +47,13 @@ The preview writes schema-version-2 matches to `crokinole-match-spin-v2`. If tha
 Returning to an old physics tag therefore restores the pre-spin table on the **same browser origin**, not a spin-version match that the old code cannot understand. Returning to the preview resumes its separate table. Scores/artwork/preferences are otherwise unchanged; artwork remains shared. Start a new game when comparing fresh shot behavior. Different ports/domains have separate browser storage.
 
 ## Current strike and spin model
+
+Preview 9 adds flat printed disc faces and local appearance settings only.
+Preview 8 remains the accepted physics baseline and preserved cosmetic rollback
+checkpoint. Revert `crokinole-v0.3.0-disc-designs-preview.9`, verify and push to
+undo the cosmetic release without undoing preview 8's spin/contact behavior.
+Appearance preferences/pictures have separate storage keys; the match key stays
+`crokinole-match-spin-v2`. See [disc verification](docs/disc-design-verification.md).
 
 Preview 8 is the combined spin/hop/cleanup playtest authorized by Frank for the
 normal public URL. Preview 7 remains the rollback checkpoint. Revert the preview-8
@@ -122,7 +130,7 @@ earlier interruption above remains historical, not the final verification state.
 - Disc, peg, occupied-pocket and exiting-lip contacts use relative contact-point velocity, including axial rim speed, to calculate an energy-dissipating, Coulomb-capped tangent impulse. Coefficients are `0.18` for discs, `0.28` for pegs, and `0.12` for the hole lip. These are gameplay tuning values, not measured material coefficients.
 - Normal restitution remains `0.8` for discs and `0.62` for pegs. Disc/peg impact pops add a conservative, energy-budgeted upward kick to incoming signed vertical velocity; falling kinetic energy cannot fund a free sign replacement. Grounded/rising responses remain mathematically equivalent and genuine landing rebound remains. This is not a momentum-conserving free-air 3D contact solver. The analogous hole-lip reversal is protected and remains unfixed.
 - There is no invented sideways free-slide force, shot randomness, or spin-dependent rejection of twenties. Hole dimensions and capture gates are unchanged. Lip friction can alter a glancing skip, but a centered clean twenty remains possible.
-- A small cream inlay on each disc makes simulated rotation visible without a new control or HUD.
+- Stained wood grain and printed poker/emblem/picture faces replace the cream inlay, following the same simulated rotation without a spin HUD or changed geometry.
 
 This is an intentionally restrained extension of the existing approximate simulation, not a full 3D rigid-body solver or a model calibrated to measured real-board trajectories. Spin adds contact technique; it is **not** intended to secretly make good centered shots miss. Hole difficulty remains a separate tuning decision.
 
@@ -137,6 +145,7 @@ npm test
 npm run build
 npm run test:browser
 npm run test:browser:aim
+npm run test:browser:discs
 ```
 
 For the bounded latest-input regression only, run `CROKINOLE_INPUT_SMOKE=1 node tests/browser-spin.mjs`. That is not a substitute for, or a claimed pass of, the full browser suite.

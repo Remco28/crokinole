@@ -1,0 +1,14 @@
+{
+  "accepted_physics_release": "425b35eb3a73663e55c1210deda8e0d821c0f827",
+  "boundary": "All16otherbaseline source files byte-exact; main only adds disc settings import/init; geometry/camera/picking/tick unchanged. UI/source hashes reviewed independently; no physics golden changed.",
+  "cosmeticSourceHashes": {
+    "src/disc-appearance.ts": "5cb8956a1a6c0070af2577338f578ef138058f5f076b196e953cf10e95b5b7bb",
+    "src/disc-settings.ts": "b985acca27a51fbe724be799646d6df687a283f2ed516dffb545a339f88dceaf",
+    "src/main.ts": "afc70e14d2f1f0238cd042adc0461a3eb339364d80cf403809d39fe0e544fe0b",
+    "src/render/disc-design.ts": "42371284b752851a63fa4f09c1331b304a67ed27a9f959afb337245f3be68368",
+    "src/render/scene.ts": "1d5f069796b7f523aebe65d0f30ee9a827095e5590baa81a63c970e348a8598b",
+    "src/storage/disc-images.ts": "85ba7c6d788f822824864735f68c73a9df6261804ea8dee473f0e685ef9b3037",
+    "src/style.css": "882d4dff3fa199e789f62582babb3e5fc7e8e9739ccb8d4d7687a67c287fb7c5"
+  },
+  "profile": "disc-appearance"
+}

@@ -143,13 +143,14 @@ function zeroSpinTrace(m, centered) {
 
 (async () => {
 const { loadHelpers, checkSourceNeutrality, checkSignedHopIntegration } = await import('./physics-integrated-equivalence.mjs');
-const provenance = checkSourceNeutrality();
+const provenance = checkSourceNeutrality('disc-appearance');
 const loadGraph = profile => { const m = loadHelpers(profile); return { ...m.constants, ...m.physics, ...m.spin, ...m.hole, ...m.flick, verificationProfile: profile, hashes: m.hashes }; };
 assert.ok(process.argv.slice(2).every(a => a === '--write'), 'Only --write is supported');
 const baseline = loadGraph('pinned-baseline'), current = loadGraph('actual-integrated');
 assert.equal(current.TUNE.spinFrictionRatio, selectedFactor, 'probe selection matches shipped tuning');
 const protectedSourceFiles = git(['ls-tree', '-r', '--name-only', baselineCommit, 'src']).split('\n')
-  .filter(file => !['src/sim/constants.ts', 'src/sim/spin.ts', 'src/sim/physics.ts', 'src/game/flick.ts'].includes(file));
+  // Cosmetic files are checked against the independently reviewed manifest above.
+  .filter(file => !['src/sim/constants.ts', 'src/sim/spin.ts', 'src/sim/physics.ts', 'src/game/flick.ts', 'src/main.ts', 'src/style.css', 'src/render/scene.ts'].includes(file));
 for (const file of protectedSourceFiles) assert.equal(sourceAt(null, file), sourceAt(baselineCommit, file), `${file} remains exactly preview7`);
 const { spinFrictionRatio: _ratio, surfaceGravity: _gravity, ...otherTune } = current.TUNE;
 assert.deepEqual(otherTune, baseline.TUNE, 'no other tune changes');

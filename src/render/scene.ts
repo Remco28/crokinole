@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { PLAYER_COLORS } from '../game/players';
+import { defaultDiscAppearance, discColors, type DiscAppearance } from '../disc-appearance';
+import { drawDiscFace } from './disc-design';
 import { discHalfHeight } from '../sim/hole';
 import type { Disc } from '../sim/physics';
 import { BOARD, DISC, PEGS, pegPositions } from '../sim/constants';
@@ -178,11 +179,61 @@ export function createScene(canvas: HTMLCanvasElement) {
 
   const discGeo = makeDiscGeometry();
   const meshes = new Map<number, THREE.Mesh<THREE.LatheGeometry, THREE.MeshStandardMaterial>>();
-  const materials = PLAYER_COLORS.map(color => new THREE.MeshStandardMaterial({ color, roughness: 0.3 }));
-  // A small inlaid dash makes axial rotation readable without changing ownership
-  // colors or introducing a separate spin HUD, even on a phone-sized board.
-  const inlayGeo = new THREE.BoxGeometry(0.22, 0.006, 0.045);
-  const inlayMaterial = new THREE.MeshStandardMaterial({ color: '#fff1d6', roughness: 0.8 });
+  // Ink lies on the unchanged flat part of the lathe. Polygon offset separates
+  // coplanar surfaces without adding raised geometry or changing disc height.
+  const discFaceGeo = new THREE.CircleGeometry(DISC.radius - DISC.edgeRadius, 64);
+  const discFaces = new Map<number, THREE.Mesh<THREE.CircleGeometry, THREE.MeshStandardMaterial>>();
+  let discAppearance = defaultDiscAppearance();
+  let discPhotos: Array<HTMLImageElement | undefined> = [];
+  type DiscLook = { texture: THREE.CanvasTexture; bodyMaterial: THREE.MeshStandardMaterial; faceMaterial: THREE.MeshStandardMaterial };
+  // Exactly four owner slots; never a history of appearance/photo combinations.
+  const discLooks: Array<DiscLook | undefined> = new Array(4);
+  function discLook(owner: number): DiscLook {
+    let look = discLooks[owner];
+    if (!look) {
+      const faceCanvas = document.createElement('canvas');
+      faceCanvas.width = faceCanvas.height = 256;
+      drawDiscFace(faceCanvas.getContext('2d')!, 256, discAppearance, owner, discPhotos[owner]);
+      const texture = new THREE.CanvasTexture(faceCanvas);
+      texture.colorSpace = THREE.SRGBColorSpace; texture.anisotropy = 8;
+      const roughness = discAppearance.style === 'wood' ? 0.3 : 0.38;
+      look = {
+        texture,
+        bodyMaterial: new THREE.MeshStandardMaterial({ color: discColors(discAppearance)[owner], roughness }),
+        faceMaterial: new THREE.MeshStandardMaterial({ map: texture, roughness, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }),
+      };
+      discLooks[owner] = look;
+    }
+    return look;
+  }
+  function disposeDiscLook(look: DiscLook) {
+    look.texture.dispose(); look.faceMaterial.dispose(); look.bodyMaterial.dispose();
+  }
+  function removeDiscMesh(id: number, mesh: THREE.Mesh<THREE.LatheGeometry, THREE.MeshStandardMaterial>) {
+    scene.remove(mesh);
+    // Face geometry/material are owner/shared resources, not disc-local assets.
+    mesh.clear(); discFaces.delete(id); mesh.material.dispose(); meshes.delete(id);
+  }
+  function setDiscAppearance(appearance: DiscAppearance, photos: Array<HTMLImageElement | undefined> = []): void {
+    const previous = discAppearance, previousPhotos = discPhotos;
+    discAppearance = { ...appearance, emblems: appearance.emblems.slice(0, 4) };
+    discPhotos = photos.slice(0, 4);
+    for (let owner = 0; owner < 4; owner++) {
+      const changed = previous.style !== discAppearance.style || previous.palette !== discAppearance.palette
+        || previous.emblems[owner] !== discAppearance.emblems[owner]
+        || (discAppearance.emblems[owner] === 'photo' && previousPhotos[owner] !== discPhotos[owner]);
+      if (!changed) continue;
+      const oldLook = discLooks[owner]; discLooks[owner] = undefined;
+      for (const [id, mesh] of meshes) {
+        if (mesh.userData.owner !== owner) continue;
+        const look = discLook(owner);
+        // Retain the disc-local emissive highlight, transform and motion state.
+        mesh.material.color.copy(look.bodyMaterial.color); mesh.material.roughness = look.bodyMaterial.roughness;
+        discFaces.get(id)!.material = look.faceMaterial;
+      }
+      if (oldLook) disposeDiscLook(oldLook);
+    }
+  }
   let pausedAt: number | null = null, pausedDuration = 0;
   const animationNow = () => (pausedAt ?? performance.now()) - pausedDuration;
   let activeDisc: number | null = null, highlightAt = 0, activeHighlightEnabled = true;
@@ -217,16 +268,18 @@ export function createScene(canvas: HTMLCanvasElement) {
     }
     const removals = new Map(review?.removed.map(d => [d.id, d]) ?? []);
     const visible = new Set(discs.filter(d => d.state !== 'sunk' || !d.holeCleared || removals.has(d.id)).map(d => d.id));
-    for (const [id, mesh] of meshes) if (!visible.has(id)) { scene.remove(mesh); mesh.material.dispose(); meshes.delete(id); }
+    for (const [id, mesh] of meshes) if (!visible.has(id)) removeDiscMesh(id, mesh);
     for (const [id, marker] of markers) if (!removals.has(id)) { scene.remove(marker); marker.material.dispose(); markers.delete(id); }
     for (const d of discs) {
       if (!visible.has(d.id)) continue;
       let mesh = meshes.get(d.id);
       if (!mesh) {
-        mesh = new THREE.Mesh(discGeo, materials[d.owner].clone()); mesh.castShadow = true;
-        const inlay = new THREE.Mesh(inlayGeo, inlayMaterial);
-        inlay.position.set(DISC.radius * 0.58, DISC.height / 2 + 0.003, 0);
-        mesh.add(inlay); meshes.set(d.id, mesh); scene.add(mesh);
+        const look = discLook(d.owner);
+        mesh = new THREE.Mesh(discGeo, look.bodyMaterial.clone()); mesh.castShadow = true;
+        mesh.userData.owner = d.owner;
+        const face = new THREE.Mesh(discFaceGeo, look.faceMaterial);
+        face.rotation.x = -Math.PI / 2; face.position.y = DISC.height / 2; face.receiveShadow = true;
+        mesh.add(face); discFaces.set(d.id, face); meshes.set(d.id, mesh); scene.add(mesh);
       }
       const source = removals.get(d.id) ?? d;
       const tilt = source.hole?.tilt ?? 0, lean = source.hole?.lean ?? 0;
@@ -426,6 +479,7 @@ export function createScene(canvas: HTMLCanvasElement) {
       else if (!paused && pausedAt !== null) { pausedDuration += performance.now() - pausedAt; pausedAt = null; }
     },
     syncDiscs,
+    setDiscAppearance,
     boardPoint,
     getYaw: () => yaw,
     isViewMoving: () => Math.abs(yawTarget - yaw) > 0.003 || Math.abs(polarTarget - polar) > 0.003 || Math.abs(zoomTarget - camera.zoom) > 0.003,
@@ -462,6 +516,27 @@ export function createScene(canvas: HTMLCanvasElement) {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
       resizeObserver.disconnect();
+      for (const [id, mesh] of meshes) removeDiscMesh(id, mesh);
+      for (const look of discLooks) if (look) disposeDiscLook(look);
+      discLooks.fill(undefined); discPhotos = [];
+      discGeo.dispose(); discFaceGeo.dispose();
+      // Release shared board/highlight/marker assets exactly once as well.
+      const geometries = new Set<THREE.BufferGeometry>();
+      const materials = new Set<THREE.Material>();
+      const textures = new Set<THREE.Texture>([markerTexture]);
+      scene.traverse(object => {
+        if (object instanceof THREE.Mesh) {
+          geometries.add(object.geometry);
+          for (const material of Array.isArray(object.material) ? object.material : [object.material]) materials.add(material);
+        } else if (object instanceof THREE.Sprite) materials.add(object.material);
+      });
+      for (const material of materials) {
+        if ('map' in material && material.map instanceof THREE.Texture) textures.add(material.map);
+        material.dispose();
+      }
+      for (const geometry of geometries) geometry.dispose();
+      for (const texture of textures) texture.dispose();
+      markers.clear(); scene.clear();
       renderer.dispose();
     },
   };

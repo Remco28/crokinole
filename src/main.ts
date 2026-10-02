@@ -1,4 +1,5 @@
 import { setupBoardArtwork } from './board-artwork';
+import { setupDiscSettings } from './disc-settings';
 import { BoardSound } from './audio/sound';
 import { appendFlickContactSample, canStartFlick, finalizeFlickContact, releaseShot, shouldRotateInstead, updateFlickContact, type FlickContact } from './game/flick';
 import { pointerMoveSamples } from './game/pointer';
@@ -84,6 +85,7 @@ try { scene = createScene(canvas); } catch {
   throw new Error('WebGL could not initialize');
 }
 scene.setView(view); scene.setZoom(zoom); tablePreferences();
+setupDiscSettings(scene);
 for (const name of ['seated', 'standing'] as const) $(`view-${name}`).addEventListener('click', () => {
   if (!canInspectBoard() || pointer !== null || orbitPointer !== null || pinching) return;
   setBoardView(name);

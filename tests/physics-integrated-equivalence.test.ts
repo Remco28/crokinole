@@ -14,8 +14,12 @@ describe('explicit integrated and neutral counterfactual profiles', () => {
     expect(PEG_COLLISION_MARGIN).toBe(1.02);
     expect(DISC_SPIN_INERTIA).toBe(DISC.radius * DISC.radius / 2);
   });
-  it('allows only the named cleanup substitutions in production source', () => {
-    expect(checkSourceNeutrality().exactSourceFiles).toBe(19);
+  it('allows only approved physics slices and explicitly pinned cosmetic source', () => {
+    const gate = checkSourceNeutrality('disc-appearance');
+    expect(gate.exactSourceFiles).toBe(19);
+    expect(gate.cosmeticSourceFiles).toBe(7);
+    expect(() => checkSourceNeutrality('unknown')).toThrow();
+    expect(() => checkSourceNeutrality()).toThrow(); // Old whole-source policy cannot bless UI changes.
   });
   it('matches real baseline launches exactly across offsets, power, quadrants and diagonal guards', () => {
     expect(compareLaunches(current, baseline)).toBe(34944);
