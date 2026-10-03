@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { defaultDiscAppearance, discColors, type DiscAppearance } from '../disc-appearance';
-import { drawDiscFace } from './disc-design';
+import { drawDiscFace, drawDiscWoodSurface } from './disc-design';
 import { discHalfHeight } from '../sim/hole';
 import type { Disc } from '../sim/physics';
 import { BOARD, DISC, PEGS, pegPositions } from '../sim/constants';
@@ -33,6 +33,25 @@ export function makeDiscGeometry(): THREE.LatheGeometry {
   }
   pts.push(new THREE.Vector2(0, H));
   return new THREE.LatheGeometry(pts, 48);
+}
+
+// Appearance only: softly bowed sides, with the same overall bounds and flat
+// footprints as the accepted physical disc. Do not change collision constants.
+export function makeVisualDiscGeometry(): THREE.LatheGeometry {
+  const R = DISC.radius, H = DISC.height / 2, er = DISC.edgeRadius;
+  const pts = [new THREE.Vector2(0, -H), new THREE.Vector2(R - er, -H)];
+  for (let i = 1; i <= 20; i++) {
+    const a = i * Math.PI / 20;
+    pts.push(new THREE.Vector2(R - er + Math.sin(a) * er, -Math.cos(a) * H));
+  }
+  pts.push(new THREE.Vector2(0, H));
+  const geometry = new THREE.LatheGeometry(pts, 48);
+  // Project grain in the same local plane as the top face, across its shoulder.
+  const position = geometry.getAttribute('position'), uv = geometry.getAttribute('uv');
+  for (let i = 0; i < uv.count; i++) {
+    uv.setXY(i, 0.5 + position.getX(i) / (2 * R), 0.5 - position.getZ(i) / (2 * R));
+  }
+  return geometry;
 }
 
 export function createScene(canvas: HTMLCanvasElement) {
@@ -177,15 +196,21 @@ export function createScene(canvas: HTMLCanvasElement) {
     slot.position.set(p.x, PEGS.height + 0.002, p.y); scene.add(slot);
   }
 
-  const discGeo = makeDiscGeometry();
+  const discGeo = makeVisualDiscGeometry();
   const meshes = new Map<number, THREE.Mesh<THREE.LatheGeometry, THREE.MeshStandardMaterial>>();
   // Ink lies on the unchanged flat part of the lathe. Polygon offset separates
   // coplanar surfaces without adding raised geometry or changing disc height.
   const discFaceGeo = new THREE.CircleGeometry(DISC.radius - DISC.edgeRadius, 64);
+  const woodFaceGeo = discFaceGeo.clone();
+  const woodUV = woodFaceGeo.getAttribute('uv');
+  const faceFraction = (DISC.radius - DISC.edgeRadius) / DISC.radius;
+  for (let i = 0; i < woodUV.count; i++) {
+    woodUV.setXY(i, 0.5 + (woodUV.getX(i) - 0.5) * faceFraction, 0.5 + (woodUV.getY(i) - 0.5) * faceFraction);
+  }
   const discFaces = new Map<number, THREE.Mesh<THREE.CircleGeometry, THREE.MeshStandardMaterial>>();
   let discAppearance = defaultDiscAppearance();
   let discPhotos: Array<HTMLImageElement | undefined> = [];
-  type DiscLook = { texture: THREE.CanvasTexture; bodyMaterial: THREE.MeshStandardMaterial; faceMaterial: THREE.MeshStandardMaterial };
+  type DiscLook = { texture: THREE.CanvasTexture; bodyTexture?: THREE.CanvasTexture; bodyMaterial: THREE.MeshStandardMaterial; faceMaterial: THREE.MeshStandardMaterial };
   // Exactly four owner slots; never a history of appearance/photo combinations.
   const discLooks: Array<DiscLook | undefined> = new Array(4);
   function discLook(owner: number): DiscLook {
@@ -196,10 +221,18 @@ export function createScene(canvas: HTMLCanvasElement) {
       drawDiscFace(faceCanvas.getContext('2d')!, 256, discAppearance, owner, discPhotos[owner]);
       const texture = new THREE.CanvasTexture(faceCanvas);
       texture.colorSpace = THREE.SRGBColorSpace; texture.anisotropy = 8;
+      let bodyTexture: THREE.CanvasTexture | undefined;
+      if (discAppearance.style === 'wood') {
+        const bodyCanvas = document.createElement('canvas');
+        bodyCanvas.width = bodyCanvas.height = 256;
+        drawDiscWoodSurface(bodyCanvas.getContext('2d')!, 256, discColors(discAppearance)[owner], owner);
+        bodyTexture = new THREE.CanvasTexture(bodyCanvas);
+        bodyTexture.colorSpace = THREE.SRGBColorSpace; bodyTexture.anisotropy = 8;
+      }
       const roughness = discAppearance.style === 'wood' ? 0.3 : 0.38;
       look = {
-        texture,
-        bodyMaterial: new THREE.MeshStandardMaterial({ color: discColors(discAppearance)[owner], roughness }),
+        texture, bodyTexture,
+        bodyMaterial: new THREE.MeshStandardMaterial({ color: bodyTexture ? '#ffffff' : discColors(discAppearance)[owner], map: bodyTexture ?? null, roughness }),
         faceMaterial: new THREE.MeshStandardMaterial({ map: texture, roughness, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }),
       };
       discLooks[owner] = look;
@@ -207,7 +240,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     return look;
   }
   function disposeDiscLook(look: DiscLook) {
-    look.texture.dispose(); look.faceMaterial.dispose(); look.bodyMaterial.dispose();
+    look.texture.dispose(); look.bodyTexture?.dispose(); look.faceMaterial.dispose(); look.bodyMaterial.dispose();
   }
   function removeDiscMesh(id: number, mesh: THREE.Mesh<THREE.LatheGeometry, THREE.MeshStandardMaterial>) {
     scene.remove(mesh);
@@ -229,7 +262,12 @@ export function createScene(canvas: HTMLCanvasElement) {
         const look = discLook(owner);
         // Retain the disc-local emissive highlight, transform and motion state.
         mesh.material.color.copy(look.bodyMaterial.color); mesh.material.roughness = look.bodyMaterial.roughness;
-        discFaces.get(id)!.material = look.faceMaterial;
+        const mapChanged = !!mesh.material.map !== !!look.bodyTexture;
+        mesh.material.map = look.bodyTexture ?? null;
+        if (mapChanged) mesh.material.needsUpdate = true;
+        const face = discFaces.get(id)!;
+        face.material = look.faceMaterial;
+        face.geometry = discAppearance.style === 'wood' ? woodFaceGeo : discFaceGeo;
       }
       if (oldLook) disposeDiscLook(oldLook);
     }
@@ -277,7 +315,7 @@ export function createScene(canvas: HTMLCanvasElement) {
         const look = discLook(d.owner);
         mesh = new THREE.Mesh(discGeo, look.bodyMaterial.clone()); mesh.castShadow = true;
         mesh.userData.owner = d.owner;
-        const face = new THREE.Mesh(discFaceGeo, look.faceMaterial);
+        const face = new THREE.Mesh(discAppearance.style === 'wood' ? woodFaceGeo : discFaceGeo, look.faceMaterial);
         face.rotation.x = -Math.PI / 2; face.position.y = DISC.height / 2; face.receiveShadow = true;
         mesh.add(face); discFaces.set(d.id, face); meshes.set(d.id, mesh); scene.add(mesh);
       }
@@ -519,7 +557,7 @@ export function createScene(canvas: HTMLCanvasElement) {
       for (const [id, mesh] of meshes) removeDiscMesh(id, mesh);
       for (const look of discLooks) if (look) disposeDiscLook(look);
       discLooks.fill(undefined); discPhotos = [];
-      discGeo.dispose(); discFaceGeo.dispose();
+      discGeo.dispose(); discFaceGeo.dispose(); woodFaceGeo.dispose();
       // Release shared board/highlight/marker assets exactly once as well.
       const geometries = new Set<THREE.BufferGeometry>();
       const materials = new Set<THREE.Material>();

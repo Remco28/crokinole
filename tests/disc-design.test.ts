@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 import { DISC_PALETTES, DISC_EMBLEMS, defaultDiscAppearance, discColors, type DiscAppearance } from '../src/disc-appearance';
 import { drawDiscFace } from '../src/render/disc-design';
-import { createScene, makeDiscGeometry } from '../src/render/scene';
+import { createScene, makeDiscGeometry, makeVisualDiscGeometry } from '../src/render/scene';
 import { DISC } from '../src/sim/constants';
 import type { Disc } from '../src/sim/physics';
 
@@ -60,7 +60,7 @@ describe('deterministic flat disc face artwork', () => {
     expect(commands).toContainEqual(['clearRect', 0, 0, 256, 256]);
     expect(commands).toContainEqual(['resetTransform']);
     expect(commands).toContainEqual(['arc', 0, 0, 1, 0, Math.PI * 2]);
-    expect(commands.findIndex(c => c[0] === 'clip')).toBeLessThan(commands.findIndex(c => c[0] === 'fill'));
+    expect(commands.findIndex(c => c[0] === 'clip')).toBeLessThan(commands.findIndex(c => c[0] === 'fill' || c[0] === 'fillRect'));
     expect(commands.filter(c => c[0] === 'save').length).toBe(commands.filter(c => c[0] === 'restore').length);
     expect(commands.at(-1)).toEqual(['restore']);
   });
@@ -80,10 +80,18 @@ describe('deterministic flat disc face artwork', () => {
     const widths = new Set(wedges.map(c => (Number(c[5]) - Number(c[4])).toFixed(4)));
     expect(widths.size).toBeGreaterThan(1);
   });
-  it.each(DISC_PALETTES.map(p => p.id))('retains each exact owner color on the outer rim for %s', palette => {
+  it.each(DISC_PALETTES.map(p => p.id))('retains each owner stain without a separate wood rim for %s', palette => {
     for (const style of ['wood', 'poker'] as const) for (let owner = 0; owner < 4; owner++) {
       const a = { ...appearance(style), palette }, commands = record(a, owner);
-      expect(commands.filter(c => c[0] === 'set' && c[1] === 'strokeStyle').at(-1)?.[2]).toBe(discColors(a)[owner]);
+      if (style === 'poker') {
+        expect(commands.filter(c => c[0] === 'set' && c[1] === 'strokeStyle').at(-1)?.[2]).toBe(discColors(a)[owner]);
+      } else {
+        expect(commands).toContainEqual(['set', 'fillStyle', discColors(a)[owner]]);
+        expect(commands.some(c => c[0] === 'arc' && (c[3] === 0.9 || c[3] === 0.965))).toBe(false);
+        expect(commands.some(c => c[0] === 'createRadialGradient' || c[0] === 'ellipse')).toBe(false);
+        const grainOpacity = commands.filter(c => c[0] === 'set' && c[1] === 'globalAlpha').map(c => Number(c[2])).filter(a => a < 1);
+        expect(Math.max(...grainOpacity)).toBeLessThanOrEqual(0.14);
+      }
     }
   });
   it.each(['wood', 'poker'] as const)('gives all built-in %s emblems distinct printed paths', style => {
@@ -126,6 +134,41 @@ function disc(id: number, owner: number, angle = 0): Disc {
 function face(mesh: THREE.Mesh) { return mesh.children[0] as THREE.Mesh<THREE.CircleGeometry, THREE.MeshStandardMaterial>; }
 
 describe('scene cosmetic integration with real Three geometry and materials', () => {
+  it('bows only the visual sidewall while retaining standard bounds and flat footprints', () => {
+    const physical = makeDiscGeometry(), visual = makeVisualDiscGeometry();
+    for (const geometry of [physical, visual]) {
+      const points = geometry.parameters.points;
+      expect(Math.max(...points.map(p => p.x))).toBe(DISC.radius);
+      expect(Math.max(...points.map(p => p.y))).toBe(DISC.height / 2);
+      expect(Math.min(...points.map(p => p.y))).toBe(-DISC.height / 2);
+      expect(points[1].x).toBe(DISC.contactRadius);
+      expect(points.at(-2)?.x).toBe(DISC.radius - DISC.edgeRadius);
+    }
+    const side = visual.parameters.points.slice(1, -1);
+    expect(side.some((p, i) => i > 0 && p.x === DISC.radius && side[i - 1].x === DISC.radius)).toBe(false);
+    expect(side.filter(p => p.x === DISC.radius)).toHaveLength(1);
+    expect(visual.parameters.points).not.toEqual(physical.parameters.points);
+    physical.dispose(); visual.dispose();
+  });
+  it('uses continuous wood grain mapping across the face and body without printing onto the sides', () => {
+    const { api, discs } = makeScene(); api.syncDiscs([disc(1, 0)]);
+    const mesh = discs()[0], printed = face(mesh);
+    expect(mesh.material.map).toBeTruthy();
+    expect(mesh.material.map).not.toBe(printed.material.map);
+    expect(mesh.material.map?.colorSpace).toBe(THREE.SRGBColorSpace);
+    const uv = mesh.geometry.getAttribute('uv'), position = mesh.geometry.getAttribute('position');
+    for (let i = 0; i < uv.count; i++) {
+      expect(uv.getX(i)).toBeCloseTo(0.5 + position.getX(i) / (2 * DISC.radius));
+      expect(uv.getY(i)).toBeCloseTo(0.5 - position.getZ(i) / (2 * DISC.radius));
+    }
+    expect(printed.geometry.getAttribute('uv').getX(1)).toBeCloseTo(0.5 + (DISC.radius - DISC.edgeRadius) / (2 * DISC.radius));
+    const oldBody = mesh.material.map!, disposal = vi.spyOn(oldBody, 'dispose');
+    api.setDiscAppearance(appearance('poker'));
+    expect(mesh.material.map).toBeNull(); expect(disposal).toHaveBeenCalledTimes(1);
+    api.setDiscAppearance(appearance('wood', 'photo'));
+    expect(mesh.material.map).toBeTruthy();
+    api.dispose();
+  });
   it('preserves the physical lathe and attaches a flat upward face to the spin/tilt parent', () => {
     const geometry = makeDiscGeometry();
     expect(geometry.parameters.segments).toBe(48);

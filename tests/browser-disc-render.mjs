@@ -54,8 +54,11 @@ try {
     for(const style of ['wood','poker'])for(const palette of ['classic','jewel','pastel','earth']){
       await evaluate(`window.__faceScene.setDiscAppearance({version:1,style:${JSON.stringify(style)},palette:${JSON.stringify(palette)},emblems:['star','spade','leaf','bolt']});window.__faceDiscs.forEach(d=>d.angle=0);window.__faceScene.syncDiscs(window.__faceDiscs)`);
       await sleep(100);
-      const initial=await evaluate(`(()=>{const meshes=window.__faceRender.scene.children.filter(o=>o.userData.owner!==undefined);return{count:meshes.length,textures:new Set(meshes.map(m=>m.children[0].material.map.uuid)).size,memory:window.__faceRender.renderer.info.memory.textures,faces:meshes.map(m=>({owner:m.userData.owner,textureSize:m.children[0].material.map.image.width,flat:m.children[0].position.y,offset:m.children[0].material.polygonOffset}))}})()`);
+      // Direct Canvas probes across all palettes show up to two bytes of
+      // clipped/unclipped grain compositing rounding, not a different stain.
+      const initial=await evaluate(`(()=>{const meshes=window.__faceRender.scene.children.filter(o=>o.userData.owner!==undefined);return{count:meshes.length,textures:new Set(meshes.map(m=>m.children[0].material.map.uuid)).size,memory:window.__faceRender.renderer.info.memory.textures,faces:meshes.map(m=>({owner:m.userData.owner,textureSize:m.children[0].material.map.image.width,flat:m.children[0].position.y,offset:m.children[0].material.polygonOffset,bodyMap:!!m.material.map,grainMatches:!m.material.map||[[128,20],[20,128],[230,128],[128,230]].every(([x,y])=>{const a=m.material.map.image.getContext('2d').getImageData(x,y,1,1).data,b=m.children[0].material.map.image.getContext('2d').getImageData(x,y,1,1).data;return a[3]===255&&b[3]===255&&a.every((v,i)=>Math.abs(v-b[i])<=2)})}))}})()`);
       assert.equal(initial.count,4);assert.equal(initial.textures,4);assert.ok(initial.faces.every(f=>f.textureSize===256&&f.offset&&f.flat>0));assert.ok(initial.memory<=10,'GPU texture allocation remains bounded');
+      assert.ok(initial.faces.every(f=>f.bodyMap===(style==='wood')&&f.grainMatches),`Wood face/body share identical stain and grain without side printing: ${JSON.stringify(initial)}`);
       await evaluate('window.__faceDiscs.forEach(d=>d.angle=.63);window.__faceScene.syncDiscs(window.__faceDiscs)');await sleep(100);
       const rotation=await evaluate(`(()=>{const meshes=window.__faceRender.scene.children.filter(o=>o.userData.owner!==undefined),T=window.__three;return meshes.map(m=>({owner:m.userData.owner,error:m.quaternion.angleTo(new T.Quaternion().setFromAxisAngle(new T.Vector3(0,1,0),-.63)),parent:m.children[0].parent===m}))})()`);
       assert.ok(rotation.every(r=>r.parent&&r.error<1e-7),'Actual WebGL face follows disc axial rotation');
@@ -68,10 +71,17 @@ try {
       await evaluate("window.__faceScene.setView('standing')");await until('!window.__faceScene.isViewMoving()');
     }
   }
-  assert.equal(rows.length,20);assert.deepEqual(exceptions,[]);
+  // Low-angle closeups reveal sidewall shape and material seams hidden overhead.
+  await call('Emulation.setDeviceMetricsOverride',{width:1280,height:720,deviceScaleFactor:1,mobile:false});await sleep(200);
+  await evaluate(`(()=>{window.__faceScene.setPaused(true);const T=window.__three;window.__closeCamera=new T.PerspectiveCamera(35,1280/720,.1,200);window.__closeCamera.position.set(0,2.3,12.5);window.__closeCamera.lookAt(0,.12,8);window.__closeDiscs=window.__faceDiscs.slice(0,2).map((d,i)=>({...d,x:i?1.1:-1.1,y:8,angle:0}));window.__faceScene.syncDiscs(window.__closeDiscs);})()`);
+  for(const style of ['wood','poker'])for(const photo of [false,true]){
+    await evaluate(`window.__faceScene.setDiscAppearance({version:1,style:${JSON.stringify(style)},palette:'classic',emblems:${JSON.stringify(photo?['photo','star','none','none']:['none','none','none','none'])}},[window.__facePhoto]);window.__faceRender.renderer.render(window.__faceRender.scene,window.__closeCamera)`);await sleep(100);
+    const shot=await call('Page.captureScreenshot',{format:'png'});await writeFile(join(screenshots,`disc-closeup-${style}${photo?'-photo':''}.png`),Buffer.from(shot.data,'base64'));rows.push({width:1280,height:720,style,photo,closeup:true});
+  }
+  assert.equal(rows.length,24);assert.deepEqual(exceptions,[]);
   await writeFile(join(screenshots,'disc-render-results.json'),JSON.stringify({count:rows.length,rows,exceptions},null,2)+'\n');
   await evaluate('window.__faceScene.dispose();window.__faceCanvas.remove()');
-  console.log('COMPLETE 20 actual WebGL disc checks: desktop/phone, wood/poker, all palettes, owner faces, axial rotation, seated photos and bounded texture allocation.');
+  console.log('COMPLETE 24 actual WebGL disc checks: desktop/phone, wood/poker, all palettes, matching face/body grain, axial rotation, seated photos, low-angle closeups and bounded texture allocation.');
 }catch(error){console.error('DISC RENDER FAILURE:',error);throw error;}
 finally{
   if(socket)socket.close();

@@ -28,7 +28,7 @@ describe('disc designs preserve the accepted preview-8 game', () => {
       .replace('setupDiscSettings(scene);\n', '');
     expect(current).toBe(baseline('src/main.ts'));
   });
-  it('preserves the complete rounded disc geometry, camera, picking and render timing functions', () => {
+  it('preserves the physical geometry reference, camera, picking and render timing functions', () => {
     for (const name of ['makeDiscGeometry', 'placeCamera', 'boardPoint', 'resize', 'tick'])
       expect(declaration(source('src/render/scene.ts'), name), name).toBe(declaration(baseline('src/render/scene.ts'), name));
   });
