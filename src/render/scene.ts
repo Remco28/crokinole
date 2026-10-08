@@ -88,27 +88,20 @@ export function createScene(canvas: HTMLCanvasElement) {
   const shotAnchor = { x: 0, y: 0 };
   const closenessTarget = () => shotDisc ? shotCloseness(zoomTarget) : 0;
 
-  function poseCamera(target: THREE.PerspectiveCamera, near: number) {
-    const pose = cameraPose({ yaw, polar, polarOffset: polar - centeredOrbit(orbitView).polar, distance: camDist, disc: shotAnchor, closeness: near });
-    target.position.set(pose.eye.x, pose.eye.y, pose.eye.z);
-    target.lookAt(pose.target.x, pose.target.y, pose.target.z);
-    target.updateMatrixWorld();
+  function placeCamera() {
+    const pose = cameraPose({ yaw, polar, polarOffset: polar - centeredOrbit(orbitView).polar, distance: camDist, disc: shotAnchor, closeness });
+    camera.position.set(pose.eye.x, pose.eye.y, pose.eye.z);
+    camera.lookAt(pose.target.x, pose.target.y, pose.target.z);
+    camera.updateMatrixWorld();
   }
-  function placeCamera() { poseCamera(camera, closeness); }
 
   // Screen pixels covered by one board inch at a point, along a direction, on
-  // the visible top face. The reference view is this one at default zoom and
-  // overview distance, used to keep zoom from changing flick power.
+  // the visible top face.
   const projected = new THREE.Vector3();
-  function pixelsPerInch(point: BoardPoint, direction: BoardPoint, reference = false) {
-    let view = camera;
-    if (reference) {
-      view = camera.clone(); view.zoom = SHOT_VIEW.startZoom; view.updateProjectionMatrix();
-      poseCamera(view, 0);
-    }
+  function pixelsPerInch(point: BoardPoint, direction: BoardPoint) {
     const rect = canvas.getBoundingClientRect(), step = 0.1;
     const screen = (x: number, y: number) => {
-      projected.set(x, DISC.height, y).project(view);
+      projected.set(x, DISC.height, y).project(camera);
       return { x: projected.x * rect.width / 2, y: projected.y * rect.height / 2 };
     };
     const a = screen(point.x, point.y), b = screen(point.x + direction.x * step, point.y + direction.y * step);
@@ -528,7 +521,6 @@ export function createScene(canvas: HTMLCanvasElement) {
     polar += (polarTarget - polar) * blend;
     const zoom = shownZoom(zoomTarget, !!shotDisc);
     if (camera.zoom !== zoom) {
-      // Settle exactly so a resting view measures exactly like its reference.
       camera.zoom = Math.abs(zoom - camera.zoom) > 0.0001 ? camera.zoom + (zoom - camera.zoom) * blend : zoom;
       camera.updateProjectionMatrix();
     }

@@ -37,7 +37,7 @@ describe('disc designs preserve the accepted preview-8 game', () => {
       .replace('Math.min(SHOT_VIEW.maxZoom, value)', 'Math.min(2.5, value)')
       .replace(/\/\/ Flicks are measured[\s\S]*?\n};\n/, '')
       .replace(/, flickSpeedScale\((?:inward\(staged\)|flickContact\.finishDirection \?\? flickContact\.direction)\)\)/g, ')')
-      .replace("  scene.setShotDisc(phase === 'pass' ? staged : null);\n", '');
+      .replace(/  \/\/ Hold the shooter view[\s\S]*?scene\.setShotDisc\(null\);\n/, '');
     expect(current).toBe(baseline('src/main.ts'));
   });
   it('preserves the physical geometry reference, picking and resize functions', () => {

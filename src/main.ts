@@ -23,17 +23,13 @@ const sound = new BoardSound();
 const DEFAULT_ZOOM = 1.2;
 let volume = 0.65, muted = false, view: BoardView = 'standing', zoom = DEFAULT_ZOOM, theme: 'light' | 'dark' = 'light', activeDiscHighlight = true;
 const clampZoom = (value: number) => Math.max(0.75, Math.min(SHOT_VIEW.maxZoom, value));
-// Flicks are measured in board inches, so the same finger movement would shoot
-// harder on a small screen and softer when zoomed in. Touch screens convert
-// finger speed by screen pixels, matching a desktop board at default zoom.
-// Fine pointers keep their own default view as the reference, unchanged there.
-const touchScreen = window.matchMedia('(pointer: coarse)').matches;
+// Flicks are measured in board inches, so the same finger or mouse movement
+// would shoot harder on a small screen or in a foreshortened view and softer
+// when zoomed in. Convert by screen pixels per board inch at the disc instead,
+// so every device, view and zoom gives the same power for the same movement.
 const REFERENCE_PIXELS_PER_INCH = 30;
 function flickSpeedScale(direction: { x: number; y: number }) {
-  if (!staged) return 1;
-  const pixels = scene.pixelsPerInch(staged, direction);
-  if (touchScreen) return pixels / REFERENCE_PIXELS_PER_INCH;
-  return Math.max(1, pixels / scene.pixelsPerInch(staged, direction, true));
+  return staged ? scene.pixelsPerInch(staged, direction) / REFERENCE_PIXELS_PER_INCH : 1;
 }
 const inward = (disc: { x: number; y: number }) => {
   const radius = Math.hypot(disc.x, disc.y) || 1;
@@ -501,7 +497,10 @@ function tick(now: number) {
   $<HTMLButtonElement>('view-center').disabled = controlsLocked;
   for (const name of ['seated', 'standing']) $<HTMLButtonElement>(`view-${name}`).disabled = controlsLocked;
   assignDitchSlots(discs);
-  scene.setShotDisc(phase === 'pass' ? staged : null);
+  // Hold the shooter view through the shot and its review; the next turn
+  // moves it to the new disc, and round results return to the overview.
+  if (phase === 'pass') scene.setShotDisc(staged);
+  else if (phase !== 'moving' && phase !== 'review') scene.setShotDisc(null);
   scene.syncDiscs(discs, review); requestAnimationFrame(tick);
 }
 try {

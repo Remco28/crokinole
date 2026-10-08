@@ -118,11 +118,11 @@ drag or shot attempt.
 Pinching in past the default during your turn moves into the shooter view: the
 eye comes down and in behind your disc, aimed at the center, so the disc grows
 while the board ahead stays in view (full at 4×). Drags orbit around your disc and
-tilt the view. After release the camera returns to the overview, where pinch is
-an ordinary lens zoom capped at 2.5×. On touch screens flick power follows screen
-pixels, matched to a desktop board at default zoom, so a phone flick is neither
-stronger on a small screen nor different at any zoom. Mouse and pen play is
-unchanged at the default view and zoom-neutral in the shooter view.
+tilt the view. The view holds through the shot and its review, glides to the
+next player's disc at handover, and returns to the overview for round results,
+where pinch is an ordinary lens zoom capped at 2.5×. Flick power follows screen
+pixels (30 px per board inch at the disc), so the same finger or mouse movement
+shoots with the same power on every device, view and zoom.
 
 Use **Settings** for rules, board finishes, saved artwork, new matches, and sound
 volume. The artwork gallery holds four images in this browser. Tap an empty slot to
