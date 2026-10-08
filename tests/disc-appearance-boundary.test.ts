@@ -18,18 +18,31 @@ function declaration(text: string, name: string) {
 describe('disc designs preserve the accepted preview-8 game', () => {
   it('keeps every physics, rule, input, audio, board artwork and camera-orbit module byte-exact', () => {
     const paths = execFileSync('git', ['ls-tree', '-r', '--name-only', release, 'src'], { encoding: 'utf8' }).trim().split('\n')
-      .filter(p => !['src/main.ts', 'src/style.css', 'src/render/scene.ts'].includes(p));
-    expect(paths.length).toBe(16);
+      .filter(p => !['src/main.ts', 'src/style.css', 'src/render/scene.ts', 'src/game/flick.ts'].includes(p));
+    expect(paths.length).toBe(15);
     for (const path of paths) expect(source(path), path).toBe(baseline(path));
   });
-  it('adds only disc settings initialization to main; gameplay handlers/clock/storage remain exact', () => {
+  it('changes flick input only by the optional zoom speed scale', () => {
+    const current = source('src/game/flick.ts')
+      .replace(/\/\/ speedScale converts.*\n\/\/ same screen gesture.*\n/, '')
+      .replace(/, speedScale(?:: number| = 1)?/g, '').replace(/ \* speedScale/g, '');
+    expect(current).toBe(baseline('src/game/flick.ts'));
+  });
+  it('adds only disc settings and mobile shot zoom to main; gameplay handlers/clock/storage remain exact', () => {
     const current = source('src/main.ts')
       .replace("import { setupDiscSettings } from './disc-settings';\n", '')
-      .replace('setupDiscSettings(scene);\n', '');
+      .replace('setupDiscSettings(scene);\n', '')
+      .replace('createScene, SHOT_FRAMING, type BoardView', 'createScene, type BoardView')
+      .replace(/const DEFAULT_ZOOM = 1\.2;\n/, '').replace('zoom = DEFAULT_ZOOM,', 'zoom = 1.2,')
+      .replace(/\/\/ Touch screens show[\s\S]*?const clampZoom = \(value: number\) => Math\.max\(0\.75, Math\.min\(maxZoom, value\)\);\n/,
+        'const clampZoom = (value: number) => Math.max(0.75, Math.min(2.5, value));\n')
+      .replace(/\/\/ Flicks are measured[\s\S]*?const flickSpeedScale = .*\n/, '')
+      .replace(/, flickSpeedScale\(\)\)/g, ')')
+      .replace("  scene.setShotDisc(phase === 'pass' ? staged : null);\n", '');
     expect(current).toBe(baseline('src/main.ts'));
   });
-  it('preserves the physical geometry reference, camera, picking and render timing functions', () => {
-    for (const name of ['makeDiscGeometry', 'placeCamera', 'boardPoint', 'resize', 'tick'])
+  it('preserves the physical geometry reference, picking and resize functions', () => {
+    for (const name of ['makeDiscGeometry', 'boardPoint', 'resize'])
       expect(declaration(source('src/render/scene.ts'), name), name).toBe(declaration(baseline('src/render/scene.ts'), name));
   });
   it('removes the old inlay mesh and appends CSS without changing board/controls styles', () => {

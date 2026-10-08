@@ -6,8 +6,10 @@ interface Point { x: number; y: number }
 
 // Collinear subdivision can round an exact threshold speed slightly downward.
 // This absolute tolerance is numerical only, not a lower gameplay threshold.
-function hasContactSpeed(speed: number): boolean {
-  return speed + 1e-9 >= FLICK_STRIKE.minContactSpeed;
+// speedScale converts finger speed at the current camera zoom to the speed the
+// same screen gesture would have at the reference zoom; 1 leaves input exact.
+function hasContactSpeed(speed: number, speedScale = 1): boolean {
+  return speed * speedScale + 1e-9 >= FLICK_STRIKE.minContactSpeed;
 }
 
 // A swept finger segment catches fast flicks even when no event lands on the disc.
@@ -84,13 +86,13 @@ function approachSpan(samples: FlickSample[], disc: Point): [Point, Point] {
 
 // A brush or tiny wobble is provisional. Establish real powered contact from a
 // short spatial approach, then freeze eligibility and its crossing geometry.
-export function updateFlickContact(previous: FlickContact | null, samples: FlickSample[], disc: Point): FlickContact | null {
+export function updateFlickContact(previous: FlickContact | null, samples: FlickSample[], disc: Point, speedScale = 1): FlickContact | null {
   if (previous?.powered) return previous;
   if (samples.length < 2) return previous;
   const end = samples[samples.length - 1], segmentStart = samples[samples.length - 2];
   const sx = end.x - segmentStart.x, sy = end.y - segmentStart.y, segmentLength = Math.hypot(sx, sy);
   const segmentSeconds = (end.t - segmentStart.t) / 1000;
-  const poweredSegment = segmentSeconds > 0 && hasContactSpeed(segmentLength / segmentSeconds);
+  const poweredSegment = segmentSeconds > 0 && hasContactSpeed(segmentLength / segmentSeconds, speedScale);
   const continuous = poweredSegment && segmentSeconds * 1000 <= FLICK_STRIKE.strokeGapMs && sx * disc.x + sy * disc.y < 0;
   const offset = flickContactOffset(samples, disc);
   if (offset === null) {
@@ -128,7 +130,7 @@ export function updateFlickContact(previous: FlickContact | null, samples: Flick
 // collinear events cannot change this spatial chord. Slow setup/observed stops
 // are boundaries. A stationary lift or tiny trailing jitter retains the last
 // meaningful run, while releaseVelocity independently decides whether power remains.
-function finishIntent(samples: FlickSample[], disc: Point, registered: Point): Point | null {
+function finishIntent(samples: FlickSample[], disc: Point, registered: Point, speedScale: number): Point | null {
   let index = samples.length - 1;
   if (index < 1) return null;
   const last = samples[index];
@@ -139,7 +141,7 @@ function finishIntent(samples: FlickSample[], disc: Point, registered: Point): P
     for (let i = index; i > 0; i--) {
       const a = samples[i - 1], b = samples[i];
       const length = Math.hypot(b.x - a.x, b.y - a.y), seconds = (b.t - a.t) / 1000;
-      if (seconds <= 0 || seconds * 1000 > FLICK_STRIKE.strokeGapMs || !hasContactSpeed(length / seconds)) break;
+      if (seconds <= 0 || seconds * 1000 > FLICK_STRIKE.strokeGapMs || !hasContactSpeed(length / seconds, speedScale)) break;
       const used = Math.min(length, FLICK_STRIKE.approachDistance - travel);
       const f = used / length;
       start = { x: b.x + (a.x - b.x) * f, y: b.y + (a.y - b.y) * f };
@@ -167,10 +169,10 @@ function finishIntent(samples: FlickSample[], disc: Point, registered: Point): P
 
 // Refine only the finish intent of real powered contact. Crossing offset,
 // direction, eligibility and provisional short-edge registration stay intact.
-export function finalizeFlickContact(previous: FlickContact | null, samples: FlickSample[], disc: Point): FlickContact | null {
+export function finalizeFlickContact(previous: FlickContact | null, samples: FlickSample[], disc: Point, speedScale = 1): FlickContact | null {
   if (!previous || samples.length < 2) return previous;
   if (previous.powered) {
-    const finishDirection = finishIntent(samples, disc, previous.direction);
+    const finishDirection = finishIntent(samples, disc, previous.direction, speedScale);
     if (!finishDirection || finishDirection === previous.direction) {
       if (!previous.finishDirection) return previous;
       const { finishDirection: _stale, ...registered } = previous;
@@ -200,7 +202,7 @@ export function finalizeFlickContact(previous: FlickContact | null, samples: Fli
     const a = path[i - 1], b = path[i], sx = b.x - a.x, sy = b.y - a.y;
     const travel = Math.hypot(sx, sy), seconds = (b.t - a.t) / 1000;
     if (seconds <= 0 || seconds * 1000 > FLICK_STRIKE.strokeGapMs
-      || !hasContactSpeed(travel / seconds)
+      || !hasContactSpeed(travel / seconds, speedScale)
       || (sx * dx + sy * dy) < 0.98 * travel * length) return previous;
     // Dense sampling exposes outside approach/tail pieces hidden inside sparse
     // intersecting segments. Require real powered contact somewhere, while all
@@ -212,13 +214,13 @@ export function finalizeFlickContact(previous: FlickContact | null, samples: Fli
 }
 
 // Measure the finish of the gesture, including follow-through, on release.
-export function releaseVelocity(samples: FlickSample[], disc: Point): Point | null {
+export function releaseVelocity(samples: FlickSample[], disc: Point, speedScale = 1): Point | null {
   const end = samples[samples.length - 1];
   if (!end) return null;
   const first = samples.find(s => end.t - s.t <= 120 && s.t < end.t);
   if (!first) return null;
   const seconds = Math.max(0.016, (end.t - first.t) / 1000);
-  const vx = (end.x - first.x) / seconds, vy = (end.y - first.y) / seconds;
+  const vx = (end.x - first.x) / seconds * speedScale, vy = (end.y - first.y) / seconds * speedScale;
   const speed = Math.hypot(vx, vy);
   if (!hasContactSpeed(speed) || vx * disc.x + vy * disc.y >= 0) return null;
   const power = Math.min(105, speed * 0.8 + 12) / speed;
@@ -262,9 +264,9 @@ function protectDiagonal(shot: Point & { spin: number }, direction: Point, disc:
   // Rotate only: do not add speed, spin, energy or artificial side force.
   return { x: shot.x * c - shot.y * s, y: shot.x * s + shot.y * c, spin: shot.spin };
 }
-export function releaseShot(samples: FlickSample[], disc: Point, contact: number | FlickContact = 0): (Point & { spin: number }) | null {
+export function releaseShot(samples: FlickSample[], disc: Point, contact: number | FlickContact = 0, speedScale = 1): (Point & { spin: number }) | null {
   if (typeof contact !== 'number' && !contact.powered) return null;
-  const velocity = releaseVelocity(samples, disc);
+  const velocity = releaseVelocity(samples, disc, speedScale);
   if (!velocity) return null;
   const speed = Math.hypot(velocity.x, velocity.y);
   const direction = typeof contact === 'number' ? { x: velocity.x / speed, y: velocity.y / speed }

@@ -115,6 +115,13 @@ Use the seated/standing icons to choose your view. A shot gesture holds the came
 Two-finger pinch adjusts zoom. Handover preserves your zoom. Pinching cancels a view
 drag or shot attempt.
 
+Zooming in past the default frames your waiting disc instead of the board center,
+leaving room behind it for your finger. Touch screens can zoom to 5× (others 2.5×)
+for fine aim on small discs. While a shot is in motion the view returns to the
+centered overview, capped at 2.5×. Above the default zoom, flick speed is scaled
+back to the default's feel, so the same finger movement shoots with the same power
+at any zoom; aim and spin still come from where your finger crosses the disc.
+
 Use **Settings** for rules, board finishes, saved artwork, new matches, and sound
 volume. The artwork gallery holds four images in this browser. Tap an empty slot to
 upload, tap a preview to use it, or choose **Replace** or **Delete** for that slot.

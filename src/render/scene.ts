@@ -7,7 +7,9 @@ import { BOARD, DISC, PEGS, pegPositions } from '../sim/constants';
 import { DITCH_SLOTS, REVIEW_TIMING, type ShotReview } from '../game/review';
 
 import { centeredOrbit, dragOrbit, type BoardView } from './orbit';
+import { SHOT_FRAMING, shotFocus, shownZoom, type BoardPoint } from './shot-framing';
 export type { BoardView } from './orbit';
+export { SHOT_FRAMING } from './shot-framing';
 
 // Disc cross-section with a real round-over on top/bottom edges
 // (see reference photo: flat faces, softly rounded rim, ~1/16" radius).
@@ -78,14 +80,26 @@ export function createScene(canvas: HTMLCanvasElement) {
   let playerYaw = 0;
   let orbitView: BoardView = 'standing';
   let orbitAngle = centeredOrbit(orbitView);
+  // Shot framing: zooming in while a disc waits to be shot slides the view
+  // from the board center toward that disc, keeping room behind it for the
+  // finger. Away from a shot the view returns to the centered overview.
+  let shotDisc: BoardPoint | null = null;
+  const focus = new THREE.Vector3();
+  const focusTarget = new THREE.Vector3();
 
   function placeCamera() {
     camera.position.set(
-      Math.sin(polar) * Math.sin(yaw) * camDist,
+      focus.x + Math.sin(polar) * Math.sin(yaw) * camDist,
       Math.cos(polar) * camDist,
-      Math.sin(polar) * Math.cos(yaw) * camDist,
+      focus.z + Math.sin(polar) * Math.cos(yaw) * camDist,
     );
-    camera.lookAt(0, 0, 0);
+    camera.lookAt(focus);
+  }
+  function updateFocusTarget() {
+    // Approximate board depth from the view center to the screen edge.
+    const halfDepth = camDist * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / camera.zoom / Math.cos(polar);
+    const point = shotFocus(shotDisc, camera.zoom, halfDepth);
+    focusTarget.set(point.x, 0, point.y);
   }
 
   // Lights
@@ -499,10 +513,13 @@ export function createScene(canvas: HTMLCanvasElement) {
     const blend = reducedMotion.matches ? 1 : 1 - Math.exp(-dt * 9);
     yaw += (yawTarget - yaw) * blend;
     polar += (polarTarget - polar) * blend;
-    if (Math.abs(camera.zoom - zoomTarget) > 0.0001) {
-      camera.zoom += (zoomTarget - camera.zoom) * blend;
+    const zoom = shownZoom(zoomTarget, !!shotDisc);
+    if (Math.abs(camera.zoom - zoom) > 0.0001) {
+      camera.zoom += (zoom - camera.zoom) * blend;
       camera.updateProjectionMatrix();
     }
+    updateFocusTarget();
+    focus.lerp(focusTarget, blend);
     placeCamera();
     renderer.render(scene, camera);
     raf = requestAnimationFrame(tick);
@@ -520,8 +537,16 @@ export function createScene(canvas: HTMLCanvasElement) {
     setDiscAppearance,
     boardPoint,
     getYaw: () => yaw,
-    isViewMoving: () => Math.abs(yawTarget - yaw) > 0.003 || Math.abs(polarTarget - polar) > 0.003 || Math.abs(zoomTarget - camera.zoom) > 0.003,
-    setZoom: (zoom: number) => { zoomTarget = THREE.MathUtils.clamp(zoom, 0.75, 2.5); },
+    isViewMoving: () => Math.abs(yawTarget - yaw) > 0.003 || Math.abs(polarTarget - polar) > 0.003
+      || Math.abs(shownZoom(zoomTarget, !!shotDisc) - camera.zoom) > 0.003
+      || focus.distanceTo(focusTarget) > 0.01,
+    getZoom: () => camera.zoom,
+    setZoom: (zoom: number) => { zoomTarget = THREE.MathUtils.clamp(zoom, 0.75, SHOT_FRAMING.maxZoom); },
+    // The disc waiting to be shot, or null when no shot is being lined up.
+    setShotDisc: (disc: BoardPoint | null) => {
+      shotDisc = disc ? { x: disc.x, y: disc.y } : null;
+      updateFocusTarget();
+    },
     setTheme: (theme: 'light' | 'dark') => { scene.background = new THREE.Color(theme === 'light' ? '#f3efe5' : '#171d1c'); },
     setView: (view: BoardView) => {
       // Seated: about 22 inches above the surface, 42 inches from center
