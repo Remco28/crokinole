@@ -3,7 +3,7 @@ import { setupDiscSettings } from './disc-settings';
 import { BoardSound } from './audio/sound';
 import { appendFlickContactSample, canStartFlick, finalizeFlickContact, releaseShot, shouldRotateInstead, updateFlickContact, type FlickContact } from './game/flick';
 import { pointerMoveSamples } from './game/pointer';
-import { createScene, SHOT_FRAMING, type BoardView } from './render/scene';
+import { createScene, SHOT_VIEW, type BoardView } from './render/scene';
 import { makeDisc, moving, step, type Disc, type Shot } from './sim/physics';
 import { completeRound, inspectShot, sideOf, type Mode, type RoundResult } from './game/rules';
 import { assignDitchSlots, beginReview, reviewDuration, type ShotReview } from './game/review';
@@ -22,13 +22,23 @@ let paused = false, pausedRemaining: number | null = null;
 const sound = new BoardSound();
 const DEFAULT_ZOOM = 1.2;
 let volume = 0.65, muted = false, view: BoardView = 'standing', zoom = DEFAULT_ZOOM, theme: 'light' | 'dark' = 'light', activeDiscHighlight = true;
-// Touch screens show small discs under a large fingertip, so they may zoom in
-// further; shot framing keeps the disc on screen with room behind it.
-const maxZoom = window.matchMedia('(pointer: coarse)').matches ? SHOT_FRAMING.maxZoom : SHOT_FRAMING.overviewMaxZoom;
-const clampZoom = (value: number) => Math.max(0.75, Math.min(maxZoom, value));
-// Flicks are measured in board inches, so zooming in would slow the same finger
-// movement. Above the default zoom, scale speeds back to the default's feel.
-const flickSpeedScale = () => Math.max(1, scene.getZoom() / DEFAULT_ZOOM);
+const clampZoom = (value: number) => Math.max(0.75, Math.min(SHOT_VIEW.maxZoom, value));
+// Flicks are measured in board inches, so the same finger movement would shoot
+// harder on a small screen and softer when zoomed in. Touch screens convert
+// finger speed by screen pixels, matching a desktop board at default zoom.
+// Fine pointers keep their own default view as the reference, unchanged there.
+const touchScreen = window.matchMedia('(pointer: coarse)').matches;
+const REFERENCE_PIXELS_PER_INCH = 30;
+function flickSpeedScale(direction: { x: number; y: number }) {
+  if (!staged) return 1;
+  const pixels = scene.pixelsPerInch(staged, direction);
+  if (touchScreen) return pixels / REFERENCE_PIXELS_PER_INCH;
+  return Math.max(1, pixels / scene.pixelsPerInch(staged, direction, true));
+}
+const inward = (disc: { x: number; y: number }) => {
+  const radius = Math.hypot(disc.x, disc.y) || 1;
+  return { x: -disc.x / radius, y: -disc.y / radius };
+};
 try {
   const prefs = JSON.parse(localStorage.getItem('crokinole-table') || '{}');
   if (typeof prefs.volume === 'number' && Number.isFinite(prefs.volume)) volume = Math.max(0, Math.min(1, prefs.volume));
@@ -356,13 +366,13 @@ function sampleFlick(p: { x: number; y: number }, t: number) {
   if (deadline !== null && Date.now() >= deadline) { expireShot(); return; }
   trail.push({ ...p, t });
   contactTrail = appendFlickContactSample(contactTrail, { ...p, t });
-  flickContact = updateFlickContact(flickContact, contactTrail, staged, flickSpeedScale());
+  flickContact = updateFlickContact(flickContact, contactTrail, staged, flickSpeedScale(inward(staged)));
   discCrossed = flickContact !== null;
   trail = trail.filter(sample => t - sample.t <= 120);
 }
 function releaseFlick() {
   if (phase !== 'pass' || !staged || !flickContact?.powered) return;
-  const velocity = releaseShot(trail, staged, flickContact, flickSpeedScale());
+  const velocity = releaseShot(trail, staged, flickContact, flickSpeedScale(flickContact.finishDirection ?? flickContact.direction));
   if (!velocity) return;
   cancel();
   hadOpponent = discs.some(d => d.state === 'board' && side(d.owner) !== side(player));
@@ -403,7 +413,7 @@ canvas.addEventListener('pointerup', e => {
   const p = scene.boardPoint(e.clientX, e.clientY);
   if (p) {
     sampleFlick(p, e.timeStamp);
-    flickContact = finalizeFlickContact(flickContact, contactTrail, staged, flickSpeedScale());
+    flickContact = finalizeFlickContact(flickContact, contactTrail, staged, flickSpeedScale(inward(staged)));
   }
   // A board-space powered strike takes precedence over a screen-space tap.
   // A hold can still cancel release power; it must not relocate the struck disc.

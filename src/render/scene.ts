@@ -7,9 +7,9 @@ import { BOARD, DISC, PEGS, pegPositions } from '../sim/constants';
 import { DITCH_SLOTS, REVIEW_TIMING, type ShotReview } from '../game/review';
 
 import { centeredOrbit, dragOrbit, type BoardView } from './orbit';
-import { SHOT_FRAMING, shotFocus, shownZoom, type BoardPoint } from './shot-framing';
+import { SHOT_VIEW, cameraPose, shotCloseness, shownZoom, type BoardPoint } from './shot-framing';
 export type { BoardView } from './orbit';
-export { SHOT_FRAMING } from './shot-framing';
+export { SHOT_VIEW } from './shot-framing';
 
 // Disc cross-section with a real round-over on top/bottom edges
 // (see reference photo: flat faces, softly rounded rim, ~1/16" radius).
@@ -80,26 +80,39 @@ export function createScene(canvas: HTMLCanvasElement) {
   let playerYaw = 0;
   let orbitView: BoardView = 'standing';
   let orbitAngle = centeredOrbit(orbitView);
-  // Shot framing: zooming in while a disc waits to be shot slides the view
-  // from the board center toward that disc, keeping room behind it for the
-  // finger. Away from a shot the view returns to the centered overview.
+  // Shooter view: zooming in while a disc waits to be shot moves the eye down
+  // and in behind that disc, keeping the board ahead in view. The anchor
+  // follows the disc and stays put while the view eases back to the overview.
   let shotDisc: BoardPoint | null = null;
-  const focus = new THREE.Vector3();
-  const focusTarget = new THREE.Vector3();
+  let closeness = 0;
+  const shotAnchor = { x: 0, y: 0 };
+  const closenessTarget = () => shotDisc ? shotCloseness(zoomTarget) : 0;
 
-  function placeCamera() {
-    camera.position.set(
-      focus.x + Math.sin(polar) * Math.sin(yaw) * camDist,
-      Math.cos(polar) * camDist,
-      focus.z + Math.sin(polar) * Math.cos(yaw) * camDist,
-    );
-    camera.lookAt(focus);
+  function poseCamera(target: THREE.PerspectiveCamera, near: number) {
+    const pose = cameraPose({ yaw, polar, polarOffset: polar - centeredOrbit(orbitView).polar, distance: camDist, disc: shotAnchor, closeness: near });
+    target.position.set(pose.eye.x, pose.eye.y, pose.eye.z);
+    target.lookAt(pose.target.x, pose.target.y, pose.target.z);
+    target.updateMatrixWorld();
   }
-  function updateFocusTarget() {
-    // Approximate board depth from the view center to the screen edge.
-    const halfDepth = camDist * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / camera.zoom / Math.cos(polar);
-    const point = shotFocus(shotDisc, camera.zoom, halfDepth);
-    focusTarget.set(point.x, 0, point.y);
+  function placeCamera() { poseCamera(camera, closeness); }
+
+  // Screen pixels covered by one board inch at a point, along a direction, on
+  // the visible top face. The reference view is this one at default zoom and
+  // overview distance, used to keep zoom from changing flick power.
+  const projected = new THREE.Vector3();
+  function pixelsPerInch(point: BoardPoint, direction: BoardPoint, reference = false) {
+    let view = camera;
+    if (reference) {
+      view = camera.clone(); view.zoom = SHOT_VIEW.startZoom; view.updateProjectionMatrix();
+      poseCamera(view, 0);
+    }
+    const rect = canvas.getBoundingClientRect(), step = 0.1;
+    const screen = (x: number, y: number) => {
+      projected.set(x, DISC.height, y).project(view);
+      return { x: projected.x * rect.width / 2, y: projected.y * rect.height / 2 };
+    };
+    const a = screen(point.x, point.y), b = screen(point.x + direction.x * step, point.y + direction.y * step);
+    return Math.hypot(b.x - a.x, b.y - a.y) / step;
   }
 
   // Lights
@@ -514,12 +527,16 @@ export function createScene(canvas: HTMLCanvasElement) {
     yaw += (yawTarget - yaw) * blend;
     polar += (polarTarget - polar) * blend;
     const zoom = shownZoom(zoomTarget, !!shotDisc);
-    if (Math.abs(camera.zoom - zoom) > 0.0001) {
-      camera.zoom += (zoom - camera.zoom) * blend;
+    if (camera.zoom !== zoom) {
+      // Settle exactly so a resting view measures exactly like its reference.
+      camera.zoom = Math.abs(zoom - camera.zoom) > 0.0001 ? camera.zoom + (zoom - camera.zoom) * blend : zoom;
       camera.updateProjectionMatrix();
     }
-    updateFocusTarget();
-    focus.lerp(focusTarget, blend);
+    const near = closenessTarget();
+    closeness = Math.abs(near - closeness) > 0.0005 ? closeness + (near - closeness) * blend : near;
+    if (shotDisc) {
+      shotAnchor.x += (shotDisc.x - shotAnchor.x) * blend; shotAnchor.y += (shotDisc.y - shotAnchor.y) * blend;
+    }
     placeCamera();
     renderer.render(scene, camera);
     raf = requestAnimationFrame(tick);
@@ -539,13 +556,14 @@ export function createScene(canvas: HTMLCanvasElement) {
     getYaw: () => yaw,
     isViewMoving: () => Math.abs(yawTarget - yaw) > 0.003 || Math.abs(polarTarget - polar) > 0.003
       || Math.abs(shownZoom(zoomTarget, !!shotDisc) - camera.zoom) > 0.003
-      || focus.distanceTo(focusTarget) > 0.01,
-    getZoom: () => camera.zoom,
-    setZoom: (zoom: number) => { zoomTarget = THREE.MathUtils.clamp(zoom, 0.75, SHOT_FRAMING.maxZoom); },
+      || Math.abs(closenessTarget() - closeness) > 0.003
+      || (!!shotDisc && closeness > 0 && Math.hypot(shotDisc.x - shotAnchor.x, shotDisc.y - shotAnchor.y) > 0.01),
+    pixelsPerInch,
+    setZoom: (zoom: number) => { zoomTarget = THREE.MathUtils.clamp(zoom, 0.75, SHOT_VIEW.maxZoom); },
     // The disc waiting to be shot, or null when no shot is being lined up.
     setShotDisc: (disc: BoardPoint | null) => {
+      if (disc && !shotDisc && closeness === 0) { shotAnchor.x = disc.x; shotAnchor.y = disc.y; }
       shotDisc = disc ? { x: disc.x, y: disc.y } : null;
-      updateFocusTarget();
     },
     setTheme: (theme: 'light' | 'dark') => { scene.background = new THREE.Color(theme === 'light' ? '#f3efe5' : '#171d1c'); },
     setView: (view: BoardView) => {

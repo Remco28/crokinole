@@ -32,12 +32,11 @@ describe('disc designs preserve the accepted preview-8 game', () => {
     const current = source('src/main.ts')
       .replace("import { setupDiscSettings } from './disc-settings';\n", '')
       .replace('setupDiscSettings(scene);\n', '')
-      .replace('createScene, SHOT_FRAMING, type BoardView', 'createScene, type BoardView')
+      .replace('createScene, SHOT_VIEW, type BoardView', 'createScene, type BoardView')
       .replace(/const DEFAULT_ZOOM = 1\.2;\n/, '').replace('zoom = DEFAULT_ZOOM,', 'zoom = 1.2,')
-      .replace(/\/\/ Touch screens show[\s\S]*?const clampZoom = \(value: number\) => Math\.max\(0\.75, Math\.min\(maxZoom, value\)\);\n/,
-        'const clampZoom = (value: number) => Math.max(0.75, Math.min(2.5, value));\n')
-      .replace(/\/\/ Flicks are measured[\s\S]*?const flickSpeedScale = .*\n/, '')
-      .replace(/, flickSpeedScale\(\)\)/g, ')')
+      .replace('Math.min(SHOT_VIEW.maxZoom, value)', 'Math.min(2.5, value)')
+      .replace(/\/\/ Flicks are measured[\s\S]*?\n};\n/, '')
+      .replace(/, flickSpeedScale\((?:inward\(staged\)|flickContact\.finishDirection \?\? flickContact\.direction)\)\)/g, ')')
       .replace("  scene.setShotDisc(phase === 'pass' ? staged : null);\n", '');
     expect(current).toBe(baseline('src/main.ts'));
   });

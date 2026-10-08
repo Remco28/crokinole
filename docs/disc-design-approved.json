@@ -1,13 +1,13 @@
 {
   "accepted_physics_release": "425b35eb3a73663e55c1210deda8e0d821c0f827",
-  "boundary": "All16otherbaseline source files byte-exact; main only adds disc settings import/init; physical geometry reference/camera/picking/tick unchanged. Visual sidewall bowed within the same radius/height/flat footprints; wood stain/grain continuous. UI/source hashes reviewed independently; no physics golden changed. 2026-10-08 mobile shot zoom (user-approved): flick.ts adds only an optional speedScale (default 1, bit-identical); main/scene add shot framing and zoom-normalized flick speed. Pinned here alongside the cosmetic sources.",
+  "boundary": "All16otherbaseline source files byte-exact; main only adds disc settings import/init; physical geometry reference/camera/picking/tick unchanged. Visual sidewall bowed within the same radius/height/flat footprints; wood stain/grain continuous. UI/source hashes reviewed independently; no physics golden changed. 2026-10-08 mobile shot zoom (user-approved): flick.ts adds only an optional speedScale (default 1, bit-identical); main/scene add the pinch shooter view and screen-pixel flick speed on touch screens (zoom-neutral on fine pointers). Pinned here alongside the cosmetic sources.",
   "cosmeticSourceHashes": {
     "src/disc-appearance.ts": "5cb8956a1a6c0070af2577338f578ef138058f5f076b196e953cf10e95b5b7bb",
     "src/disc-settings.ts": "b985acca27a51fbe724be799646d6df687a283f2ed516dffb545a339f88dceaf",
     "src/game/flick.ts": "647e1fc76e226298bed171a2c432b55596a4a065d9bcd351d0113018f6515d99",
-    "src/main.ts": "ad6d379761c47a1eb4ccae915450e2a89e0bdbc06d41d27c81702f1513674296",
+    "src/main.ts": "9bbd77380b3b469d57000bcea2f1c328c0be795b480d2a17bc3c6a4a62f74759",
     "src/render/disc-design.ts": "200fa7fb52cdc33c347dad36f66e9a65e17d838ba5487da5be1f5a36235d9f4e",
-    "src/render/scene.ts": "93d158fd72729125234a7ccc1d8acecc27bb55792cdbbe8d678202320a3ac67a",
+    "src/render/scene.ts": "9f20b3dc6436e472432dd95602a50cb24b68203637bcb5b4a658f2b3555a040e",
     "src/storage/disc-images.ts": "85ba7c6d788f822824864735f68c73a9df6261804ea8dee473f0e685ef9b3037",
     "src/style.css": "882d4dff3fa199e789f62582babb3e5fc7e8e9739ccb8d4d7687a67c287fb7c5"
   },
