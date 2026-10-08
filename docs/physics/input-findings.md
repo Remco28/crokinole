@@ -1,5 +1,7 @@
 # Input findings and remaining physics work
 
+> **Note (2026-10-08):** the evidence JSON files and per-preview verification notes linked below were removed from the tree; read them at commit `21c9a86` (`git show 21c9a86:docs/physics/<file>`). Preview 8 is now live; see [project history](../history.md) for the summary.
+
 > Current status: published/live preview7 remains exact `8c719b46e195b3ba80bea6268bc2aa2562b7a744`. Older preview3–5 sections/tables below are historical. The parent reports current preview7 main-browser pass (79 frozen files hash-exact, `npm run test:browser` exit 0). Separate spin-only trusted-CDP aiming also passed 46 cases; neither verifies the combined candidate or physical devices. Cleanup + spin0.12 + signed contactHop below are unpublished integration only; combined native main/aim verification remains pending.
 
 Baseline: `0.3.0-preview.4`, commit `e3e7d6ec2351f864041499819209a42efdc4a4ed`, tag `crokinole-v0.3.0-strike-preview.4`. See [versions/rollback](../../PHYSICS-VERSIONS.md). The baseline evidence below remains historical; preview 5 adds the separate registration correction described next.

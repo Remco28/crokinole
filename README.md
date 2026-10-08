@@ -33,7 +33,7 @@ an explicitly budgeted upward kick instead of replacing signed vertical speed;
 normal landing rebounds remain. Shared constants/inertia are cleanup only.
 Hole capture, scoring, sliding grip, maximum power and saved-game keys stay
 unchanged. This is gameplay tuning, not measured real-board calibration. See
-[integrated verification and limitations](docs/physics/integrated-followup-verification.md).
+[project history](docs/history.md) for the verification summary and limitations.
 Preview 9 changes playing-disc appearance only. **Settings → Playing discs**
 offers stained wood or poker chips, Classic/Jewel/Pastel/Earth colors, and
 individual printed emblems or pictures for Red, Blue, Yellow and Green.
