@@ -1,7 +1,7 @@
 # Crokinole · Around the board
 
 Desktop screens use a left control sidebar and a separate board on the right.
-Phones keep compact scores above the board, with vertical view icons at its upper left. Each turn starts with a highlighted disc on the shooting line. Tap the line to move it, drag elsewhere to adjust the view, or flick through the disc to shoot. Center is a secondary view action. Sound controls
+Phones keep compact scores above the board. Two small icons sit at the board's upper left: the seat badge and the camera icon (tap it to reset the view). Each turn starts seated with a highlighted disc on the shooting line. Tap the line to move it, drag elsewhere to adjust the view, pinch to move closer, or flick through the disc to shoot. Sound controls
 live in Settings, with game mode and **Start a new game** at the top.
 Players are named Red, Blue, Yellow, and Green; opposite colors partner in teams.
 
@@ -47,7 +47,10 @@ deflection physics are unchanged; this fixes registration, not glance strength.
 Framing shifts upward slightly to leave more room below the rim.
 
 Flick strength uses the original power response (speed × 0.8 + 12, capped at
-105), after rejecting stationary gestures. Surface friction is set to 0.1175,
+105), after rejecting stationary gestures. Since 2026-10-08 the speed is converted
+from screen pixels per board inch at the disc (30 px reference, touch screens
+×1.15), so the same finger or mouse movement gives the same power on any screen,
+view or zoom. Surface friction is set to 0.1175,
 a small easing from 0.120 toward the original 0.115. The speed-dependent drag
 remains 0.05; power ceiling and normal collision bounce are unchanged.
 
@@ -211,7 +214,8 @@ to catch the lip and deflect rather than being forced into the hole.
 - Opponent-contact and open-board shot validation, foul removal, line-aware
   scoring, rounds and matches to 100, including tied-match continuation.
 - Rotating player views, mouse/touch flicks, responsive scores and pass screen.
-- Seated and standing cameras, smooth transitions, and reduced-motion support.
+- One continuous camera path (Overview, Table, Shooter) with the one-cheek seat rule,
+  smooth transitions, and reduced-motion support.
 - Physics-driven stereo sound: wooden disc clicks, damped peg knocks, landings,
   and hole/ditch clatter. Volume, mute, and view preferences persist.
 - Three procedural board finishes and persisted custom artwork (1024px), with
@@ -301,7 +305,7 @@ and hard speeds, long gentle preparations and their collinear subdivisions,
 coarse overshoots versus collinear subdivisions, front-face
 touch starts, raw/coalesced sample extraction, post-impact follow-through,
 misses, cancellation, and event timestamps. Independent projection of the
-rendered top face checks picking across standing/seated views, shooting
+rendered top face checks picking at the seated Table view, shooting
 positions and player quadrants. Native CDP input carries explicit
 gesture timestamps; real rendering and physics loops remain running. `npm test` runs the
 unit suite; `npm run build` checks TypeScript and

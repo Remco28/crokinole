@@ -67,6 +67,16 @@ change some rebounds. Complex multi-contact timestep sensitivity and the
 protected, unfixed hole-lip sign replacement remain disclosed. No power-freeze
 experiment or physical-device acceptance is included.
 
+## Input scale and camera (2026-10-08, untagged, on `main`)
+
+Flick speed is converted from screen pixels per board inch at the disc (30 px
+reference; ×1.15 on coarse-pointer devices) before the unchanged power curve,
+so phones are no longer about 2× desktop power and zoom or camera angle no
+longer changes power. `src/game/flick.ts` only gained an optional `speedScale`
+(default 1, bit-identical to preview 8 per the equivalence tests). Camera stops,
+the shooter view and the one-cheek seat rule are described in the README and
+[project history](docs/history.md). Commits `8cafc0e` through `be19e20`.
+
 Investigation results, human playtest feedback, reproducible near-edge diagnostics
 and the ordered remaining work are recorded in
 [input findings and remaining physics work](docs/physics/input-findings.md).
