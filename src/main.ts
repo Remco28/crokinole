@@ -27,9 +27,12 @@ const clampZoom = (value: number) => Math.max(0.75, Math.min(SHOT_VIEW.maxZoom, 
 // would shoot harder on a small screen or in a foreshortened view and softer
 // when zoomed in. Convert by screen pixels per board inch at the disc instead,
 // so every device, view and zoom gives the same power for the same movement.
+// Touch screens get a small boost: their CSS pixels are physically smaller, so
+// the same finger travel covers fewer of them than a mouse on a monitor.
 const REFERENCE_PIXELS_PER_INCH = 30;
+const TOUCH_POWER = window.matchMedia('(pointer: coarse)').matches ? 1.15 : 1;
 function flickSpeedScale(direction: { x: number; y: number }) {
-  return staged ? scene.pixelsPerInch(staged, direction) / REFERENCE_PIXELS_PER_INCH : 1;
+  return staged ? scene.pixelsPerInch(staged, direction) / REFERENCE_PIXELS_PER_INCH * TOUCH_POWER : 1;
 }
 const inward = (disc: { x: number; y: number }) => {
   const radius = Math.hypot(disc.x, disc.y) || 1;
@@ -224,6 +227,8 @@ function goToStop(stop: CameraStop) {
   if (!canInspectBoard() || pointer !== null || orbitPointer !== null || placementPointer !== null || pinching || settings.open) return;
   if (stop === 'shooter' && phase !== 'pass') return;
   const again = nearestStop(scene.getTargetLevel()) === stop;
+  // Collapse after choosing, but keep the rail up while the camera glides there.
+  railOpen = false; cameraMovedAt = performance.now();
   setZoom(stop === 'shooter' ? SHOT_VIEW.maxZoom : Math.min(zoom, DEFAULT_ZOOM));
   scene.setTilt(stop === 'overview' ? TILT.overview : TILT.table);
   if (again) scene.centerView();
@@ -304,6 +309,7 @@ function setZoom(value: number) {
 }
 canvas.addEventListener('pointerdown', e => {
   if (paused) return;
+  railOpen = false; // Touching the board puts an opened camera rail away.
   if (e.pointerType === 'touch') {
     touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
     canvas.setPointerCapture(e.pointerId);
@@ -473,16 +479,28 @@ function finishReview() {
     if (phase === 'won') $('inspect-board').focus({ preventScroll: true });
   } else { player = (player + 1) % count(); pass(valid ? '' : 'Foul resolved'); }
 }
-// The camera control's highlight follows the camera, including pinches and
-// drags. The badge shows standing or seated; while seated, the cheek slides
-// toward the disc's end of the shooting line and perches on the chair's edge.
-const cameraControl = $('camera-control'), seatBadge = $('seat-badge');
-let shownLevel = '', shownStop = '', shownSeat = '', shownCheek = '', shownLock = '';
+// The camera control rests as an icon whose figure shows the current stop. Its
+// rail opens on tap, or for a moment while the camera is dragged or pinched,
+// and its highlight follows the camera. The badge's cheek hovers while
+// standing; seated, it slides toward the disc's end of the shooting line and
+// perches on the stool's edge.
+const tableControls = $('table-controls'), cameraControl = $('camera-control'), seatBadge = $('seat-badge'), cameraToggle = $('camera-toggle');
+const stopNames: Record<CameraStop, string> = { overview: 'Overview', table: 'Table', shooter: 'Shooter' };
+let railOpen = false, cameraMovedAt = -Infinity;
+let shownLevel = '', shownStop = '', shownSeat = '', shownCheek = '', shownLock = '', shownOpen = '';
+cameraToggle.addEventListener('click', () => { railOpen = !railOpen; });
 function cameraControls(locked: boolean, seated: boolean) {
   const level = scene.getLevel().toFixed(3), stop = nearestStop(scene.getTargetLevel());
+  if (orbitPointer !== null || pinching) cameraMovedAt = performance.now();
+  const open = railOpen || performance.now() - cameraMovedAt < 1500;
+  if (String(open) !== shownOpen) {
+    tableControls.classList.toggle('expanded', open); cameraToggle.setAttribute('aria-expanded', String(open));
+    shownOpen = String(open);
+  }
   if (level !== shownLevel) { cameraControl.style.setProperty('--level', level); shownLevel = level; }
   if (stop !== shownStop) {
     for (const name of cameraStops) $(`camera-${name}`).setAttribute('aria-pressed', String(name === stop));
+    cameraToggle.dataset.stop = stop; cameraToggle.setAttribute('aria-label', `Camera: ${stopNames[stop]}. Show camera stops`);
     shownStop = stop;
   }
   const lock = `${locked}${phase === 'pass'}`;

@@ -257,3 +257,29 @@ body[data-theme=light] #table-controls .camera-control button{color:#4a514b;back
 body[data-theme=light] #table-controls .camera-control button[aria-pressed=true]{color:#25271f}
 body[data-theme=light] #seat-badge .crack{stroke:#6b5420aa}
 @media (prefers-reduced-motion:reduce){#seat-badge .cheek{transition:none}#seat-badge.plop .cheek-body{animation:none}}
+
+/* Collapsed camera control: the seat badge and a same-size camera icon whose
+   figure shows the current stop. The stop rail opens on tap, or briefly while
+   the camera is being dragged or pinched. The cheek always shows: it hovers
+   above the stool while standing and sits on it while seated. */
+#table-controls{position:absolute}
+#table-controls #camera-toggle{width:38px;height:38px;padding:0;border-radius:10px;display:grid;place-items:center;background:#20292580;border:1px solid #a5afa730;color:#ecebdf}
+#table-controls #camera-toggle svg{width:30px;height:30px;fill:currentColor;opacity:1}
+#camera-toggle g{display:none}
+#camera-toggle[data-stop=overview] .pose-overview,#camera-toggle[data-stop=table] .pose-table,#camera-toggle[data-stop=shooter] .pose-shooter{display:inline}
+#table-controls .camera-control{position:absolute;left:44px;top:44px;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s,visibility 0s .2s}
+#table-controls.expanded .camera-control{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .15s}
+#seat-badge[data-seat=standing] .cheek{display:inline}
+#seat-badge[data-seat=standing] .stool{opacity:.55;transform:none}
+#seat-badge .cheek{transform-origin:16px 24px}
+#seat-badge .cheek-body{transform-origin:16px 24px}
+#seat-badge[data-seat=standing] .cheek-body{animation:cheek-hover 1.6s ease-in-out infinite}
+@keyframes cheek-hover{0%,100%{transform:translateY(-6px)}50%{transform:translateY(-8px)}}
+body[data-theme=light] #table-controls #camera-toggle{background:#fffdf7cc;border-color:#62686230;color:#3a403b}
+@media (prefers-reduced-motion:reduce){#seat-badge[data-seat=standing] .cheek-body{animation:none;transform:translateY(-6px)}#table-controls .camera-control{transition:none}}
+#table-controls #camera-toggle g{display:revert}
+#table-controls #camera-toggle svg>g{display:none}
+#table-controls #camera-toggle[data-stop=overview] svg>.pose-overview,#table-controls #camera-toggle[data-stop=table] svg>.pose-table,#table-controls #camera-toggle[data-stop=shooter] svg>.pose-shooter{display:inline}
+@keyframes cheek-hover{0%,100%{transform:translateY(-8px)}50%{transform:translateY(-10.5px)}}
+/* The phone status line can wrap to two lines; clear it. */
+@media(max-width:899px){#table-controls{top:52px}}

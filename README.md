@@ -110,15 +110,18 @@ your angle within your shooting quadrant (45° either side). Vertical dragging
 tilts the camera continuously from a high overview down to seated eye level.
 Each turn starts facing the next player's side.
 
-The camera control at the board's upper left has three stops on one path:
-**Overview** (standing, looking down), **Table** (seated) and **Shooter** (down
-behind your disc). Its gold highlight follows the camera as you drag and pinch;
-tapping a stop glides there, and tapping the stop you are at re-centers it.
+Two icons sit at the board's upper left: the seat badge and the camera icon,
+whose figure stands, sits or leans to show the current stop. Tapping the camera
+icon opens its three stops on one path: **Overview** (standing, looking down),
+**Table** (seated) and **Shooter** (down behind your disc). The stops also appear
+briefly while you drag or pinch, with a gold highlight that follows the camera.
+Tapping a stop glides there and closes them; tapping the stop you are at
+re-centers it.
 Crokinole's one-cheek rule applies: you shoot seated. Overview is standing, and
 touching your disc while standing sits you down instead of shooting. Turns start
-seated. The badge above the control shows a standing figure or, when seated, a
-cheek that slides along the stool toward your end of the shooting line and perches
-on the edge for shots from the quadrant lines. A shot gesture holds the camera
+seated. On the badge the cheek hovers over the stool while you stand; seated, it
+slides along the stool toward your end of the shooting line and perches on the
+edge for shots from the quadrant lines. A shot gesture holds the camera
 steady until release; camera transitions finish before accepting a flick.
 
 Two-finger pinch adjusts zoom. Handover preserves your zoom. Pinching cancels a view
@@ -130,8 +133,9 @@ while the board ahead stays in view (full at 4×). Drags orbit around your disc 
 tilt the view. The view holds through the shot and its review, glides to the
 next player's disc at handover, and returns to the overview for round results,
 where pinch is an ordinary lens zoom capped at 2.5×. Flick power follows screen
-pixels (30 px per board inch at the disc), so the same finger or mouse movement
-shoots with the same power on every device, view and zoom.
+pixels (30 px per board inch at the disc), so the same movement shoots with the
+same power in every view and zoom. Touch screens add 15%, because their pixels are
+physically smaller than a monitor's.
 
 Use **Settings** for rules, board finishes, saved artwork, new matches, and sound
 volume. The artwork gallery holds four images in this browser. Tap an empty slot to
