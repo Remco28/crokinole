@@ -258,6 +258,7 @@ function route(samples: FlickSample[], coalesced: boolean) {
   const staged = { ...disc, id: 1, owner: 0, state: 'board' };
   const context = {
     ...flick, ...pointerHelpers, window: { addEventListener: () => {} },
+    practice: false, practiceLog: null, beginLog: () => ({}),
     paused: false, flickSpeedScale: () => 1, inward: () => ({ x: 0, y: -1 }), isSeated: () => true, sitDown: () => {}, settings: { open: false }, phase: 'pass', readyAt: 0, performance: { now: () => 1000 }, deadline: null,
     canvas: { clientWidth: 800, clientHeight: 800, addEventListener: (name: string, cb: (event: object) => void) => { handlers[name] = cb; }, setPointerCapture: () => {} },
     pointer: null, placementPointer: null, placementPress: { x: 0, y: 0 }, orbitPointer: null, orbitLast: { x: 0, y: 0 },

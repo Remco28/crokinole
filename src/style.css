@@ -287,3 +287,20 @@ body[data-theme=light] .tutorial-art .t-label{fill:#3a2d17}
 .tutorial-art .t-lead{stroke:#b9a679;stroke-width:1;stroke-dasharray:2 2}
 body[data-theme=light] .tutorial-art .t-lead{stroke:#7a6232}
 #tutorial p{min-height:6.4em}
+
+.practice-entry{margin:16px 0 4px}.practice-entry button{width:100%}.practice-entry small{display:block;color:#a5afa7;font-size:11px;line-height:1.4;margin-top:6px}
+body[data-theme=light] .practice-entry small{color:#667267}
+#practice-panel[hidden]{display:none}
+#practice-panel{border:1px solid #48504a;border-radius:12px;padding:12px 14px;background:#202925;font-size:12px}
+#practice-panel .practice-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}#practice-panel .practice-head strong{font:700 15px Manrope,sans-serif}
+#practice-panel .practice-head span{font-size:11px;color:#a5afa7}
+#practice-live{margin:8px 0;min-height:1.4em}
+.practice-actions{display:flex;flex-wrap:wrap;gap:6px}.practice-actions button{padding:8px 10px;font-size:12px;flex:1 1 auto}
+#practice-panel details{margin-top:12px;padding-top:10px}#practice-panel summary{font-size:12px;font-weight:600}
+#practice-panel dl{margin:8px 0 0;display:grid;gap:4px}#practice-panel dl div{display:flex;justify-content:space-between;gap:10px}
+#practice-panel dt{color:#a5afa7}#practice-panel dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+#practice-panel #practice-tune-rows{max-height:180px;overflow:auto;scrollbar-width:thin}
+#practice-panel #practice-copy{margin-top:10px;padding:7px 10px;font-size:12px;width:100%}.practice-empty{margin:0;color:#a5afa7}
+body[data-theme=light] #practice-panel{background:#fffdf7;border-color:#b7b5aa}body[data-theme=light] #practice-panel dt,body[data-theme=light] #practice-panel .practice-head span,body[data-theme=light] .practice-empty{color:#667267}
+body[data-practice] #match-panel,body[data-practice] #round-summary{display:none}
+@media(max-width:899px){#practice-panel{order:2}}

@@ -11,6 +11,7 @@ import { PLAYER_NAMES as names, PLAYER_COLORS as colors } from './game/players';
 import { remainingTime, resumeDeadline } from './game/clock';
 import { CLASSIC, TOURNAMENT_ROUNDS, completeTournamentRound, discsPerPlayer, discsPerSide, formatAllowsMode, formatKey, isGameOver, parseFormatKey, readFormat, startingPlayer, type FormatRoundResult, type MatchFormat } from './game/format';
 import { isFreshVisit, setupTutorial } from './tutorial';
+import { beginLog, createPracticePanel, liveText, recordEvent, recordStep, summarize, type ShotLog } from './practice';
 import { MATCH_STORAGE_KEY, readMatch, type Phase, type SavedMatch } from './game/session';
 const firstVisit = isFreshVisit(localStorage);
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -164,6 +165,10 @@ const tutorial = setupTutorial({
     if (tutorialRemaining !== null) { deadline = resumeDeadline(tutorialRemaining, Date.now()); tutorialRemaining = null; save(); }
   },
 });
+// Practice: free shooting that never touches the saved match. The match is
+// saved on entry, no save happens while practising, and leaving reloads it.
+let practice = false, practiceRemaining: number | null = null, practiceLog: ShotLog | null = null;
+const practicePanel = createPracticePanel({ onSwitchSide: () => practiceSwitchSide(), onClear: () => practiceClear(), onExit: () => exitPractice() });
 let shot: Shot | null = null, hadOpponent = false, staged: Disc | null = null, readyAt = 0;
 const count = () => mode === 'duel' ? 2 : 4;
 const allowance = () => discsPerPlayer(mode, format);
@@ -171,6 +176,7 @@ const yaw = () => player * Math.PI * 2 / count();
 const side = (owner: number) => sideOf(mode, owner);
 const label = (i: number) => mode === 'teams' ? [`${names[0]} + ${names[2]}`, `${names[1]} + ${names[3]}`][i] : names[i];
 function save() {
+  if (practice) return;
   const snapshot: SavedMatch & { scoring: string; game: number; gamesWon: number[] } = { scoring: formatKey(format), game, gamesWon, version: 2, mode, player, round, id, discs, scores, used, phase, review, roundResult, winnerDismissed, deadline, paused, remaining: pausedRemaining, stagedId: staged?.id ?? null, hadOpponent, shot: shot ? { touched: [...shot.touched], opponentContact: shot.opponentContact, side: shot.side } : null };
   try { localStorage.setItem(MATCH_STORAGE_KEY, JSON.stringify(snapshot)); } catch { /* Storage is optional. */ }
 }
@@ -193,6 +199,7 @@ window.addEventListener('pagehide', save);
 let scoreboardExpanded = false, roundBoardFocus = false;
 const eyeIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.2 12s3.6-6 9.8-6 9.8 6 9.8 6-3.6 6-9.8 6-9.8-6-9.8-6Z"></path><circle cx="12" cy="12" r="2.6"></circle></svg>';
 function roundLabel() {
+  if (practice) return 'PRACTICE';
   if (format.scoring === 'classic') return `ROUND ${round} · FIRST TO 100`;
   const prefix = format.games === 3 ? `GAME ${game} OF 3 · ` : '';
   return round > TOURNAMENT_ROUNDS ? `${prefix}EXTRA ROUND ${round - TOURNAMENT_ROUNDS}` : `${prefix}ROUND ${round} OF ${TOURNAMENT_ROUNDS}`;
@@ -250,10 +257,10 @@ function pass(message = '', restoreClock = false) {
     staged = makeDisc(++id, player, Math.sin(angle) * 12, Math.cos(angle) * 12);
     discs.push(staged);
   }
-  if (!restoreClock) deadline = shotSeconds ? Date.now() + 850 + shotSeconds * 1000 : null;
+  if (!restoreClock) deadline = shotSeconds && !practice ? Date.now() + 850 + shotSeconds * 1000 : null;
   sitDown(); scene.setYawTarget(yaw()); readyAt = performance.now() + 850;
-  banner.textContent = `${message ? message + ' · ' : ''}It's ${names[player]}'s turn`;
-  hint.textContent = 'Tap the shooting line to move your disc. Drag elsewhere to look around; flick through your disc to shoot.';
+  banner.textContent = practice ? `Practice · ${names[player]}` : `${message ? message + ' · ' : ''}It's ${names[player]}'s turn`;
+  hint.textContent = practice ? 'Shoot freely; nothing is scored. Switch side to place a target in the other color.' : 'Tap the shooting line to move your disc. Drag elsewhere to look around; flick through your disc to shoot.';
   next.hidden = true; scene.highlightDisc(staged.id); hud(); save();
 }
 function start() {
@@ -270,6 +277,59 @@ function nextRound() {
   if (isGameOver(roundResult)) { game++; round = 1; scores = scores.map(() => 0); } else round++;
   discs = []; used.fill(0); player = startingPlayer(round, game, count());
   roundResult = null; roundBoardFocus = false; pass();
+}
+function practiceReset() {
+  cancel(); cancelOrbit(); placementPointer = null; touches.clear(); pinching = false; pinchDistance = 0;
+  mode = 'duel'; format = CLASSIC; game = 1; gamesWon = [0, 0]; round = 1; id = 0; discs = []; scores = [0, 0]; used = [0, 0];
+  review = null; roundResult = null; shot = null; practiceLog = null; staged = null; roundBoardFocus = false; winnerDismissed = false; deadline = null;
+  practicePanel.reset(); pass();
+}
+function enterPractice() {
+  if (practice || paused) return;
+  save();
+  practiceRemaining = remainingTime(deadline, Date.now());
+  // Leave the saved match paused, so closing the tab mid-practice reopens it at
+  // the Resume dialog instead of with a shot clock that kept running.
+  try {
+    const raw = localStorage.getItem(MATCH_STORAGE_KEY), saved = raw ? JSON.parse(raw) : null;
+    if (saved && saved.phase === 'pass' && practiceRemaining !== null) {
+      saved.paused = true; saved.remaining = practiceRemaining; localStorage.setItem(MATCH_STORAGE_KEY, JSON.stringify(saved));
+    }
+  } catch { /* Practice still works; the match just is not marked paused. */ }
+  practice = true; document.body.dataset.practice = 'on';
+  settings.close(); practicePanel.show(true); practiceReset();
+  scene.snapView();
+}
+function practiceSwitchSide() {
+  if (!practice || phase !== 'pass') return;
+  cancel(); discs = discs.filter(d => d !== staged); staged = null;
+  player = 1 - player; pass();
+}
+function practiceClear() {
+  if (!practice || phase !== 'pass') return;
+  practiceReset();
+}
+function finishPracticeShot() {
+  if (practiceLog) practicePanel.summary(summarize(practiceLog, discs, shot));
+  practiceLog = null; shot = null;
+  // Keep what is still on the board; ditched and sunk discs leave.
+  discs = discs.filter(d => d.state === 'board');
+  pass();
+}
+function exitPractice() {
+  if (!practice) return;
+  try {
+    const raw = localStorage.getItem(MATCH_STORAGE_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      // The shot clock paused for the whole practice session.
+      if (saved.phase === 'pass' && practiceRemaining !== null) { saved.deadline = resumeDeadline(practiceRemaining, Date.now()); saved.paused = false; saved.remaining = null; }
+      localStorage.setItem(MATCH_STORAGE_KEY, JSON.stringify(saved));
+    }
+  } catch { /* The saved match loads as it was when practice began. */ }
+  // Stay in practice (saves stay off) until the page is gone: pagehide saves
+  // the current state, which must not overwrite the restored match.
+  location.reload();
 }
 // Back to the view each turn starts with: seated at Table, default zoom,
 // centered on the player's quadrant.
@@ -309,6 +369,7 @@ $('show-winner').addEventListener('click', () => {
 });
 $('winner-new-game').addEventListener('click', start);
 $('settings-button').addEventListener('click', () => settings.showModal());
+$('enter-practice').addEventListener('click', enterPractice);
 $('new-game').addEventListener('click', start);
 const skin = $<HTMLSelectElement>('skin');
 let pointer: number | null = null;
@@ -438,6 +499,7 @@ function releaseFlick() {
   shot = { touched: new Set([staged.id]), opponentContact: false, side: side(player), sideOf: side };
   sound.play('flick', Math.hypot(velocity.x, velocity.y), staged.x, staged.y);
   staged.vx = velocity.x; staged.vy = velocity.y; staged.spin = velocity.spin; used[player]++; phase = 'moving';
+  if (practice) practiceLog = beginLog(staged);
   next.hidden = true;
   scene.highlightDisc(null);
   banner.textContent = 'Let it slide'; hint.textContent = 'Waiting for the board to settle…'; hud(); save();
@@ -483,6 +545,7 @@ canvas.addEventListener('pointerup', e => {
   cancel();
 });
 function finishShot() {
+  if (practice) { finishPracticeShot(); return; }
   review = beginReview(discs, inspectShot(discs, shot!, hadOpponent)); shot = null;
   phase = 'review'; next.hidden = true;
   reviewMessage(); hud(); save();
@@ -562,8 +625,8 @@ function cameraControls(locked: boolean, seated: boolean) {
 let last = performance.now(), accumulator = 0;
 function tick(now: number) {
   if (paused) { last = now; requestAnimationFrame(tick); return; }
-  $<HTMLButtonElement>('pause-button').disabled = phase === 'won';
-  const modeLabel = phase === 'pass' ? 'Place and shoot' : phase === 'moving' ? 'Shot in motion' : phase === 'review' ? 'Shot review' : phase === 'won' ? 'Game complete' : 'Round complete';
+  $<HTMLButtonElement>('pause-button').disabled = phase === 'won' || practice;
+  const modeLabel = practice ? (phase === 'pass' ? 'Practice · place and shoot' : 'Practice · shot in motion') : phase === 'pass' ? 'Place and shoot' : phase === 'moving' ? 'Shot in motion' : phase === 'review' ? 'Shot review' : phase === 'won' ? 'Game complete' : 'Round complete';
   if ($('board-mode').textContent !== modeLabel) $('board-mode').textContent = modeLabel;
   canvas.parentElement!.dataset.mode = phase === 'pass' ? 'play' : 'view';
   const seated = isSeated(scene.getTargetLevel());
@@ -572,7 +635,7 @@ function tick(now: number) {
   if ($('board-guidance').textContent !== guidance) $('board-guidance').textContent = guidance;
   const awaitingShot = phase === 'pass';
   if (awaitingShot && deadline !== null && Date.now() >= deadline) expireShot();
-  clockLabel.hidden = !awaitingShot;
+  clockLabel.hidden = !awaitingShot || practice;
   const remaining = deadline === null ? null : Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
   clockLabel.textContent = remaining === null ? ' · Clock off' : ` · ${remaining}s`;
   clockLabel.classList.toggle('urgent', remaining !== null && remaining <= 10);
@@ -584,7 +647,8 @@ function tick(now: number) {
   accumulator += dt;
   while (accumulator >= 1 / 120) {
     if (phase === 'moving' && shot) {
-      step(discs, 1 / 120, shot, true, sound.impact);
+      step(discs, 1 / 120, shot, true, practice && practiceLog ? event => { sound.impact(event); recordEvent(practiceLog!, event); } : sound.impact);
+      if (practice && practiceLog) recordStep(practiceLog, discs, 1 / 120);
       if (!discs.some(moving)) finishShot();
     }
     accumulator -= 1 / 120;
@@ -595,6 +659,7 @@ function tick(now: number) {
       if (review.elapsed >= reviewDuration(review)) finishReview();
     }
   }
+  if (practice) { practicePanel.busy(phase !== 'pass'); if (phase === 'moving' && practiceLog) practicePanel.live(liveText(practiceLog, discs)); }
   sound.setListenerYaw(scene.getYaw());
   const controlsLocked = !canInspectBoard() || pointer !== null || orbitPointer !== null || placementPointer !== null || pinching;
   canvas.classList.toggle('can-orbit', canInspectBoard());
