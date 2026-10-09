@@ -5,8 +5,8 @@ import { BOARD } from '../sim/constants';
 // tilt or zoom changes, so the horizon never rolls. All motion is slow and
 // capped, because a camera chasing a fast disc is what made earlier tracking
 // feel sickening.
-export type ShotCamera = 'off' | 'gentle';
-export const SHOT_CAMERAS: ShotCamera[] = ['off', 'gentle'];
+export type ShotCamera = 'off' | 'gentle' | 'follow';
+export const SHOT_CAMERAS: ShotCamera[] = ['off', 'gentle', 'follow'];
 export const parseShotCamera = (value: unknown): ShotCamera => SHOT_CAMERAS.includes(value as ShotCamera) ? value as ShotCamera : 'off';
 
 export interface Point { x: number; y: number }
@@ -21,6 +21,10 @@ export interface FocusState extends Point { vx: number; vy: number }
 export const atRest = (p: Point = { x: 0, y: 0 }): FocusState => ({ x: p.x, y: p.y, vx: 0, vy: 0 });
 // After a shot settles: a slow glide to where the shooter's disc finished.
 export const GENTLE: FocusTuning = { tau: 0.8, maxSpeed: 6, maxAccel: 8, deadZone: 0, maxPan: 10 };
+// While discs are moving (Follow): slower and heavier, with a dead zone so the
+// camera ignores small movements near the middle and only drifts once the
+// action leaves it. It tracks the speed-weighted centre of the moving discs.
+export const FOLLOW: FocusTuning = { tau: 1.1, maxSpeed: 4, maxAccel: 5, deadZone: 3, maxPan: 8 };
 // The glide back out when the next turn starts: quicker, still ramped.
 export const RETURN: FocusTuning = { tau: 0.35, maxSpeed: 40, maxAccel: 160, deadZone: 0, maxPan: 99 };
 // How long a settled shot rests before the camera starts to glide.
@@ -56,4 +60,16 @@ export function limitFocus(focus: Point, origin: Point, tuning: FocusTuning): Po
 export function settleFocus(discs: Disc[], shooterId: number): Point | null {
   const shooter = discs.find(d => d.id === shooterId);
   return shooter && shooter.state === 'board' ? { x: shooter.x, y: shooter.y } : null;
+}
+// Centre of the discs that are still moving, weighted by speed, so a fast disc
+// pulls the view more than a slow one. Null when nothing is moving quickly.
+export function movingFocus(discs: Disc[], minSpeed = 1): Point | null {
+  let weight = 0, x = 0, y = 0;
+  for (const d of discs) {
+    if (d.state !== 'board') continue;
+    const speed = Math.hypot(d.vx, d.vy);
+    if (speed < minSpeed) continue;
+    weight += speed; x += d.x * speed; y += d.y * speed;
+  }
+  return weight > 0 ? { x: x / weight, y: y / weight } : null;
 }

@@ -7,7 +7,7 @@ import { BOARD, DISC, PEGS, pegPositions } from '../sim/constants';
 import { DITCH_SLOTS, REVIEW_TIMING, type ShotReview } from '../game/review';
 
 import { TILT, cameraLevel, centeredOrbit, dragOrbit } from './orbit';
-import { GENTLE, RETURN, atRest, limitFocus, stepFocus, type FocusState, type Point } from './shot-camera';
+import { GENTLE, RETURN, atRest, limitFocus, stepFocus, type FocusState, type FocusTuning, type Point } from './shot-camera';
 import { SHOT_VIEW, cameraPose, shotCloseness, shownZoom, type BoardPoint } from './shot-framing';
 export type { BoardView, CameraStop } from './orbit';
 export { TILT, isSeated, nearestStop } from './orbit';
@@ -92,6 +92,7 @@ export function createScene(canvas: HTMLCanvasElement) {
   // anchor instead. focusStart is in clock seconds, so the glide waits for rest.
   let focusTarget: Point | null = null, focusStart = 0, focusPan: FocusState = atRest();
   const FAR_PAN = 0.3;
+  let focusTuning: FocusTuning = GENTLE;
   const closenessTarget = () => shotDisc ? shotCloseness(zoomTarget) : 0;
 
   function placeCamera() {
@@ -537,8 +538,8 @@ export function createScene(canvas: HTMLCanvasElement) {
     const gliding = focusTarget !== null && !reducedMotion.matches && clock.elapsedTime >= focusStart;
     if (gliding) {
       // limitFocus keeps the target on the board; the glide itself is slow and speed-capped.
-      const goal = limitFocus(focusTarget!, shotDisc ?? { x: 0, y: 0 }, GENTLE);
-      focusPan = stepFocus(focusPan, goal, dt, GENTLE);
+      const goal = limitFocus(focusTarget!, shotDisc ?? { x: 0, y: 0 }, focusTuning);
+      focusPan = stepFocus(focusPan, goal, dt, focusTuning);
       // At the shooter view the anchor rides the same glide instead of panning the lens.
       if (shotDisc && closeness > 0) { shotAnchor.x = focusPan.x; shotAnchor.y = focusPan.y; }
     } else if (focusTarget === null) {
@@ -581,7 +582,8 @@ export function createScene(canvas: HTMLCanvasElement) {
     // Table is about 22 inches above the surface, 42 inches from center at the
     // base framing distance. Overview preserves the original standing look.
     // Glide toward a settled shot after delaySeconds; null returns the view.
-    setFocus: (point: Point | null, delaySeconds = 0) => {
+    setFocus: (point: Point | null, delaySeconds = 0, tuning: FocusTuning = GENTLE) => {
+      focusTuning = tuning;
       // A new glide starts from where the view already is, so nothing snaps.
       if (point && focusTarget === null) focusPan = atRest(closeness > 0 ? shotAnchor : focusPan);
       focusTarget = point ? { ...point } : null; focusStart = clock.elapsedTime + delaySeconds;

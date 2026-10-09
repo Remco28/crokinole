@@ -10,7 +10,7 @@ import { assignDitchSlots, beginReview, reviewDuration, type ShotReview } from '
 import { PLAYER_NAMES as names, PLAYER_COLORS as colors } from './game/players';
 import { remainingTime, resumeDeadline } from './game/clock';
 import { CLASSIC, TOURNAMENT_ROUNDS, completeTournamentRound, discsPerPlayer, discsPerSide, formatAllowsMode, formatKey, isGameOver, parseFormatKey, readFormat, startingPlayer, type FormatRoundResult, type MatchFormat } from './game/format';
-import { SETTLE_DELAY_MS, parseShotCamera, settleFocus, type ShotCamera } from './render/shot-camera';
+import { FOLLOW, GENTLE, SETTLE_DELAY_MS, movingFocus, parseShotCamera, settleFocus, type ShotCamera } from './render/shot-camera';
 import { isFreshVisit, setupTutorial } from './tutorial';
 import { beginLog, createPracticePanel, liveText, recordEvent, recordStep, summarize, type ShotLog } from './practice';
 import { MATCH_STORAGE_KEY, readMatch, type Phase, type SavedMatch } from './game/session';
@@ -557,7 +557,7 @@ canvas.addEventListener('pointerup', e => {
 });
 function finishShot() {
   // Optionally glide, slowly, to where the shot ended once everything has rested.
-  if (shotCamera === 'gentle' && staged) scene.setFocus(settleFocus(discs, staged.id), SETTLE_DELAY_MS / 1000);
+  if (shotCamera !== 'off' && staged) scene.setFocus(settleFocus(discs, staged.id), SETTLE_DELAY_MS / 1000, GENTLE);
   if (practice) { finishPracticeShot(); return; }
   review = beginReview(discs, inspectShot(discs, shot!, hadOpponent)); shot = null;
   phase = 'review'; next.hidden = true;
@@ -635,7 +635,7 @@ function cameraControls(locked: boolean, seated: boolean) {
   const cheek = reach.toFixed(2);
   if (cheek !== shownCheek) { seatBadge.style.setProperty('--reach', cheek); shownCheek = cheek; }
 }
-let last = performance.now(), accumulator = 0;
+let last = performance.now(), accumulator = 0, followPoint: { x: number; y: number } | null = null;
 function tick(now: number) {
   if (paused) { last = now; requestAnimationFrame(tick); return; }
   $<HTMLButtonElement>('pause-button').disabled = phase === 'won' || practice;
@@ -662,6 +662,7 @@ function tick(now: number) {
     if (phase === 'moving' && shot) {
       step(discs, 1 / 120, shot, true, practice && practiceLog ? event => { sound.impact(event); recordEvent(practiceLog!, event); } : sound.impact);
       if (practice && practiceLog) recordStep(practiceLog, discs, 1 / 120);
+      if (shotCamera === 'follow') followPoint = movingFocus(discs);
       if (!discs.some(moving)) finishShot();
     }
     accumulator -= 1 / 120;
@@ -672,6 +673,7 @@ function tick(now: number) {
       if (review.elapsed >= reviewDuration(review)) finishReview();
     }
   }
+  if (shotCamera === 'follow' && phase === 'moving' && followPoint) scene.setFocus(followPoint, 0, FOLLOW);
   if (practice) { practicePanel.busy(phase !== 'pass'); if (phase === 'moving' && practiceLog) practicePanel.live(liveText(practiceLog, discs)); }
   sound.setListenerYaw(scene.getYaw());
   const controlsLocked = !canInspectBoard() || pointer !== null || orbitPointer !== null || placementPointer !== null || pinching;
