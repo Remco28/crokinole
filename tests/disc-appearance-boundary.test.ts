@@ -18,8 +18,8 @@ function declaration(text: string, name: string) {
 describe('disc designs preserve the accepted preview-8 game', () => {
   it('keeps every physics, rule, input, audio, board artwork and camera-orbit module byte-exact', () => {
     const paths = execFileSync('git', ['ls-tree', '-r', '--name-only', release, 'src'], { encoding: 'utf8' }).trim().split('\n')
-      .filter(p => !['src/main.ts', 'src/style.css', 'src/render/scene.ts', 'src/game/flick.ts'].includes(p));
-    expect(paths.length).toBe(15);
+      .filter(p => !['src/main.ts', 'src/style.css', 'src/render/scene.ts', 'src/game/flick.ts', 'src/render/orbit.ts'].includes(p));
+    expect(paths.length).toBe(14);
     for (const path of paths) expect(source(path), path).toBe(baseline(path));
   });
   it('changes flick input only by the optional zoom speed scale', () => {
@@ -28,18 +28,9 @@ describe('disc designs preserve the accepted preview-8 game', () => {
       .replace(/, speedScale(?:: number| = 1)?/g, '').replace(/ \* speedScale/g, '');
     expect(current).toBe(baseline('src/game/flick.ts'));
   });
-  it('adds only disc settings and mobile shot zoom to main; gameplay handlers/clock/storage remain exact', () => {
-    const current = source('src/main.ts')
-      .replace("import { setupDiscSettings } from './disc-settings';\n", '')
-      .replace('setupDiscSettings(scene);\n', '')
-      .replace('createScene, SHOT_VIEW, type BoardView', 'createScene, type BoardView')
-      .replace(/const DEFAULT_ZOOM = 1\.2;\n/, '').replace('zoom = DEFAULT_ZOOM,', 'zoom = 1.2,')
-      .replace('Math.min(SHOT_VIEW.maxZoom, value)', 'Math.min(2.5, value)')
-      .replace(/\/\/ Flicks are measured[\s\S]*?\n};\n/, '')
-      .replace(/, flickSpeedScale\((?:inward\(staged\)|flickContact\.finishDirection \?\? flickContact\.direction)\)\)/g, ')')
-      .replace(/  \/\/ Hold the shooter view[\s\S]*?scene\.setShotDisc\(null\);\n/, '');
-    expect(current).toBe(baseline('src/main.ts'));
-  });
+  // main.ts now also carries the user-approved camera stops, seat rule and
+  // screen-pixel power; its gameplay handlers are covered by the routing,
+  // intent and browser suites rather than a byte diff against preview 8.
   it('preserves the physical geometry reference, picking and resize functions', () => {
     for (const name of ['makeDiscGeometry', 'boardPoint', 'resize'])
       expect(declaration(source('src/render/scene.ts'), name), name).toBe(declaration(baseline('src/render/scene.ts'), name));

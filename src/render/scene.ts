@@ -6,9 +6,10 @@ import type { Disc } from '../sim/physics';
 import { BOARD, DISC, PEGS, pegPositions } from '../sim/constants';
 import { DITCH_SLOTS, REVIEW_TIMING, type ShotReview } from '../game/review';
 
-import { centeredOrbit, dragOrbit, type BoardView } from './orbit';
+import { TILT, cameraLevel, centeredOrbit, dragOrbit } from './orbit';
 import { SHOT_VIEW, cameraPose, shotCloseness, shownZoom, type BoardPoint } from './shot-framing';
-export type { BoardView } from './orbit';
+export type { BoardView, CameraStop } from './orbit';
+export { TILT, isSeated, nearestStop } from './orbit';
 export { SHOT_VIEW } from './shot-framing';
 
 // Disc cross-section with a real round-over on top/bottom edges
@@ -71,15 +72,14 @@ export function createScene(canvas: HTMLCanvasElement) {
   rig.add(camera);
 
   let camDist = 48;
-  let polar = THREE.MathUtils.degToRad(25);
+  let polar: number = TILT.overview;
   let polarTarget = polar;
   let zoomTarget = 1;
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let yaw = 0;
   let yawTarget = 0;
   let playerYaw = 0;
-  let orbitView: BoardView = 'standing';
-  let orbitAngle = centeredOrbit(orbitView);
+  let orbitAngle = centeredOrbit(TILT.overview);
   // Shooter view: zooming in while a disc waits to be shot moves the eye down
   // and in behind that disc, keeping the board ahead in view. The anchor
   // follows the disc and stays put while the view eases back to the overview.
@@ -89,7 +89,7 @@ export function createScene(canvas: HTMLCanvasElement) {
   const closenessTarget = () => shotDisc ? shotCloseness(zoomTarget) : 0;
 
   function placeCamera() {
-    const pose = cameraPose({ yaw, polar, polarOffset: polar - centeredOrbit(orbitView).polar, distance: camDist, disc: shotAnchor, closeness });
+    const pose = cameraPose({ yaw, polar, polarOffset: polar - TILT.table, distance: camDist, disc: shotAnchor, closeness });
     camera.position.set(pose.eye.x, pose.eye.y, pose.eye.z);
     camera.lookAt(pose.target.x, pose.target.y, pose.target.z);
     camera.updateMatrixWorld();
@@ -558,14 +558,22 @@ export function createScene(canvas: HTMLCanvasElement) {
       shotDisc = disc ? { x: disc.x, y: disc.y } : null;
     },
     setTheme: (theme: 'light' | 'dark') => { scene.background = new THREE.Color(theme === 'light' ? '#f3efe5' : '#171d1c'); },
-    setView: (view: BoardView) => {
-      // Seated: about 22 inches above the surface, 42 inches from center
-      // at the base framing distance. Standing preserves the original overview.
-      if (view !== orbitView) {
-        orbitView = view; orbitAngle.polar = centeredOrbit(view).polar;
-        polarTarget = orbitAngle.polar;
-      }
+    // Table is about 22 inches above the surface, 42 inches from center at the
+    // base framing distance. Overview preserves the original standing look.
+    setTilt: (radians: number) => {
+      orbitAngle = { ...orbitAngle, polar: Math.max(TILT.min, Math.min(TILT.max, radians)) };
+      polarTarget = orbitAngle.polar;
     },
+    getTilt: () => polarTarget,
+    snapView: () => {
+      yaw = yawTarget; polar = polarTarget; closeness = closenessTarget();
+      if (shotDisc) { shotAnchor.x = shotDisc.x; shotAnchor.y = shotDisc.y; }
+      camera.zoom = shownZoom(zoomTarget, !!shotDisc); camera.updateProjectionMatrix();
+      placeCamera();
+    },
+    // Where the camera is (shown) and where it is heading (rules and stops).
+    getLevel: () => cameraLevel(polar, closeness),
+    getTargetLevel: () => cameraLevel(polarTarget, closenessTarget()),
     setSkin: (skin: string, art?: HTMLImageElement) => {
       artworkPegCollars.visible = !!art;
       surfaceTopMat.map?.dispose(); surfaceTopMat.map = makeSurfaceTexture(skin, art); surfaceTopMat.needsUpdate = true;
@@ -574,15 +582,15 @@ export function createScene(canvas: HTMLCanvasElement) {
       // Travel to the next player's side by the shortest route, then constrain
       // subsequent orbit offsets relative to that side, including across 0°.
       playerYaw = yaw + Math.atan2(Math.sin(radians - yaw), Math.cos(radians - yaw));
-      orbitAngle = centeredOrbit(orbitView);
+      orbitAngle = centeredOrbit(orbitAngle.polar);
       yawTarget = playerYaw; polarTarget = orbitAngle.polar;
     },
     dragView: (horizontal: number, vertical: number) => {
-      orbitAngle = dragOrbit(orbitAngle, horizontal, vertical, orbitView);
+      orbitAngle = dragOrbit(orbitAngle, horizontal, vertical);
       yawTarget = playerYaw + orbitAngle.offset; polarTarget = orbitAngle.polar;
     },
     centerView: () => {
-      orbitAngle = centeredOrbit(orbitView);
+      orbitAngle = centeredOrbit(orbitAngle.polar);
       yawTarget = playerYaw; polarTarget = orbitAngle.polar;
     },
     dispose: () => {

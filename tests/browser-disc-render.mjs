@@ -66,9 +66,9 @@ try {
       rows.push({width,height,style,palette,initial,rotation});
     }
     for(const style of ['wood','poker']){
-      await evaluate(`window.__faceScene.setDiscAppearance({version:1,style:${JSON.stringify(style)},palette:'classic',emblems:['photo','spade','leaf','bolt']},[window.__facePhoto]);window.__faceScene.setView('seated')`);await until('!window.__faceScene.isViewMoving()');await sleep(100);
+      await evaluate(`window.__faceScene.setDiscAppearance({version:1,style:${JSON.stringify(style)},palette:'classic',emblems:['photo','spade','leaf','bolt']},[window.__facePhoto]);window.__faceScene.setTilt(62*Math.PI/180)`);await until('!window.__faceScene.isViewMoving()');await sleep(100);
       const shot=await call('Page.captureScreenshot',{format:'png'});await writeFile(join(screenshots,`disc-board-photo-${style}-${mobile?'phone':'desktop'}.png`),Buffer.from(shot.data,'base64'));rows.push({width,height,style,photo:true,seated:true});
-      await evaluate("window.__faceScene.setView('standing')");await until('!window.__faceScene.isViewMoving()');
+      await evaluate("window.__faceScene.setTilt(25*Math.PI/180)");await until('!window.__faceScene.isViewMoving()');
     }
   }
   // Low-angle closeups reveal sidewall shape and material seams hidden overhead.

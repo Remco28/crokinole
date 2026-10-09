@@ -258,13 +258,13 @@ function route(samples: FlickSample[], coalesced: boolean) {
   const staged = { ...disc, id: 1, owner: 0, state: 'board' };
   const context = {
     ...flick, ...pointerHelpers, window: { addEventListener: () => {} },
-    paused: false, flickSpeedScale: () => 1, inward: () => ({ x: 0, y: -1 }), settings: { open: false }, phase: 'pass', readyAt: 0, performance: { now: () => 1000 }, deadline: null,
+    paused: false, flickSpeedScale: () => 1, inward: () => ({ x: 0, y: -1 }), isSeated: () => true, sitDown: () => {}, settings: { open: false }, phase: 'pass', readyAt: 0, performance: { now: () => 1000 }, deadline: null,
     canvas: { clientWidth: 800, clientHeight: 800, addEventListener: (name: string, cb: (event: object) => void) => { handlers[name] = cb; }, setPointerCapture: () => {} },
     pointer: null, placementPointer: null, placementPress: { x: 0, y: 0 }, orbitPointer: null, orbitLast: { x: 0, y: 0 },
     pinching: false, pinchDistance: 0, touches: new Map(), touchDistance: () => 0, setZoom: () => {}, zoom: 1,
     press: { x: 0, y: 0 }, flickStart: { x: 0, y: 0 }, discCrossed: false, flickContact: null, trail: [], contactTrail: [], staged,
     canInspectBoard: () => true, linePosition: () => null, placeAt: () => {}, expireShot: () => {}, cancelOrbit: () => {},
-    scene: { boardPoint: (x: number, y: number) => ({ x: x / 100, y: y / 100 }), isViewMoving: () => false, dragView: () => {}, highlightDisc: () => {} },
+    scene: { boardPoint: (x: number, y: number) => ({ x: x / 100, y: y / 100 }), isViewMoving: () => false, getTargetLevel: () => 1, dragView: () => {}, highlightDisc: () => {} },
     discs: [staged], player: 0, side: () => 0, hadOpponent: false, shot: null, sound: { play: () => {} }, used: [0], next: {}, banner: {}, hint: {}, hud: () => {}, save: () => {},
     releaseShot: (history: FlickSample[], target: { x: number; y: number }, contact: FlickContact) => {
       const shot = flick.releaseShot(history, target, contact); shots.push(shot); return shot;

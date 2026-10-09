@@ -232,3 +232,28 @@ body[data-theme=light] .disc-settings{border-color:#d8d5ca}
 body[data-theme=light] .disc-settings button[aria-pressed=true]{border-color:#a68038;box-shadow:0 0 0 1px #a6803844;background:#f3ead3}
 body[data-theme=light] .disc-face-heading>span{color:#667267}
 body[data-theme=light] #disc-crop-editor{background:#f3efe5;border-color:#b7b5aa}
+
+/* Camera stops and the one-cheek seat badge. The gold thumb follows the
+   camera level (0 Overview, 1 Table, 2 Shooter), set from script. */
+#table-controls{gap:6px;align-items:flex-start}
+#seat-badge{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;background:#20292580;border:1px solid #a5afa730;color:#ecebdf}
+#seat-badge svg{width:30px;height:30px;overflow:visible;fill:currentColor}
+#seat-badge .stool{opacity:.55}
+#seat-badge .crack{fill:none;stroke:#20292599;stroke-width:1;stroke-linecap:round}
+#seat-badge .cheek{transform:translateX(calc(var(--reach,0) * 9px)) rotate(calc(var(--reach,0) * 14deg));transform-origin:16px 20px;transform-box:view-box;transition:transform .35s cubic-bezier(.3,1.4,.5,1)}
+#seat-badge .cheek-body{fill:#e2c48a;stroke:#8a6a2c;stroke-width:.8;stroke-linejoin:round;transform-origin:16px 20px;transform-box:view-box}
+#seat-badge[data-seat=seated] .figure,#seat-badge[data-seat=standing] .cheek{display:none}
+#seat-badge[data-seat=standing] .stool{opacity:.3;transform:translateX(7px) scale(.7);transform-origin:16px 30px;transform-box:view-box}
+#seat-badge[data-seat=standing] .figure{transform:translateX(-5px)}
+#seat-badge.plop .cheek-body{animation:cheek-plop .45s cubic-bezier(.3,1.5,.5,1)}
+@keyframes cheek-plop{0%{transform:translateY(-9px) scaleY(1.1)}60%{transform:translateY(0) scale(1.12,.82)}100%{transform:none}}
+#table-controls .camera-control{position:relative;display:flex;flex-direction:column;gap:2px;padding:3px;border-radius:10px;background:#20292580;border:1px solid #a5afa730}
+#table-controls .camera-control button{position:relative;z-index:1;width:auto;min-width:66px;height:30px;padding:0 9px;border:0;border-radius:7px;background:transparent;color:#d6dad6;font-size:11px;font-weight:600;letter-spacing:.2px;display:flex;align-items:center;justify-content:center}
+#table-controls .camera-control button[aria-pressed=true]{color:#25271f;background:transparent}
+#table-controls .camera-control button:disabled{opacity:.45}
+.camera-thumb{position:absolute;z-index:0;left:3px;right:3px;top:calc(3px + var(--level,0) * 32px);height:30px;border-radius:7px;background:#d8bc80;box-shadow:0 1px 3px #0004}
+body[data-theme=light] #seat-badge,body[data-theme=light] #table-controls .camera-control{background:#fffdf7cc;border-color:#62686230;color:#3a403b}
+body[data-theme=light] #table-controls .camera-control button{color:#4a514b;background:transparent}
+body[data-theme=light] #table-controls .camera-control button[aria-pressed=true]{color:#25271f}
+body[data-theme=light] #seat-badge .crack{stroke:#6b5420aa}
+@media (prefers-reduced-motion:reduce){#seat-badge .cheek{transition:none}#seat-badge.plop .cheek-body{animation:none}}

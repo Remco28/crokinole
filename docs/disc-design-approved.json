@@ -1,15 +1,16 @@
 {
   "accepted_physics_release": "425b35eb3a73663e55c1210deda8e0d821c0f827",
-  "boundary": "All16otherbaseline source files byte-exact; main only adds disc settings import/init; physical geometry reference/camera/picking/tick unchanged. Visual sidewall bowed within the same radius/height/flat footprints; wood stain/grain continuous. UI/source hashes reviewed independently; no physics golden changed. 2026-10-08 mobile shot zoom (user-approved): flick.ts adds only an optional speedScale (default 1, bit-identical); main/scene add the pinch shooter view and screen-pixel flick speed for every input (30 px per board inch reference). Pinned here alongside the cosmetic sources.",
+  "boundary": "All16otherbaseline source files byte-exact; main only adds disc settings import/init; physical geometry reference/camera/picking/tick unchanged. Visual sidewall bowed within the same radius/height/flat footprints; wood stain/grain continuous. UI/source hashes reviewed independently; no physics golden changed. 2026-10-08 mobile shot zoom (user-approved): flick.ts adds only an optional speedScale (default 1, bit-identical); main/scene add the pinch shooter view and screen-pixel flick speed for every input (30 px per board inch reference). Pinned here alongside the cosmetic sources. 2026-10-08 camera stops (user-approved): orbit.ts tilts continuously between Overview and Table; main/scene/style add the three-stop camera control and one-cheek seat rule.",
   "cosmeticSourceHashes": {
     "src/disc-appearance.ts": "5cb8956a1a6c0070af2577338f578ef138058f5f076b196e953cf10e95b5b7bb",
     "src/disc-settings.ts": "b985acca27a51fbe724be799646d6df687a283f2ed516dffb545a339f88dceaf",
     "src/game/flick.ts": "647e1fc76e226298bed171a2c432b55596a4a065d9bcd351d0113018f6515d99",
-    "src/main.ts": "bbc64e0fd243b00d1b425365baa9f1fada9d2249c6ec05880ef32d60cdd238db",
+    "src/main.ts": "26eb2fbc583f6a5f6eb06479b7939a7530c6aa4fd08346b4e46a0e654131924b",
     "src/render/disc-design.ts": "200fa7fb52cdc33c347dad36f66e9a65e17d838ba5487da5be1f5a36235d9f4e",
-    "src/render/scene.ts": "8343baa83fbc5a8f24191b1ebce61119035e73d3d16c5ca69d30ecef5aa9d86f",
+    "src/render/orbit.ts": "7493cae78452fda94fd057c09b6de7baf3e7ebf068ac1958001e90a677b70593",
+    "src/render/scene.ts": "775bbc08aa8796ded6f4f5bb9480cb8049c21be1a0fd8ec2f48cbc780efae7f8",
     "src/storage/disc-images.ts": "85ba7c6d788f822824864735f68c73a9df6261804ea8dee473f0e685ef9b3037",
-    "src/style.css": "882d4dff3fa199e789f62582babb3e5fc7e8e9739ccb8d4d7687a67c287fb7c5"
+    "src/style.css": "a6096617b48dc13cb6f724d1cacc67e98f26e39b2f82bafd97c5efbf98a4ed27"
   },
   "profile": "disc-appearance"
 }

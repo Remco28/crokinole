@@ -45,8 +45,15 @@ production must be served over HTTP(S) because file:// can't load ES modules.
 - **Ditch:** out-of-play discs lie flat in a 1.75-inch ditch, in the nearest free
   slot.
 - **Pegs:** 0.8 inches of exposed rubber with brass caps.
-- **Views:** standing (25 degree polar overview) and seated (62 degrees). Drag
-  orbits within +/-45 degrees of the active player's side.
+- **Camera (2026-10-08):** one continuous path with three stops replaced the
+  seated/standing views: Overview (25 degrees from vertical, standing), Table
+  (62 degrees, seated) and Shooter (pinch in: the eye moves down behind the
+  disc). The one-cheek rule is enforced: shots only while seated, and a standing
+  touch on the disc sits the player down. The seat badge's cheek tracks the
+  disc's position on the shooting line, a joke the user asked for.
+- **Flick power (2026-10-08):** screen pixels per board inch at the disc, 30 px
+  reference, for every input. Phones had been about 2x desktop power; the user
+  found the softer, uniform power much easier to control.
 - **Sound:** synthesized Web Audio, not recordings. The **Preview sounds** button
   in Settings is a testing tool; the user asked to keep it for now and revisit
   before the UI is final.

@@ -3,7 +3,7 @@ import { setupDiscSettings } from './disc-settings';
 import { BoardSound } from './audio/sound';
 import { appendFlickContactSample, canStartFlick, finalizeFlickContact, releaseShot, shouldRotateInstead, updateFlickContact, type FlickContact } from './game/flick';
 import { pointerMoveSamples } from './game/pointer';
-import { createScene, SHOT_VIEW, type BoardView } from './render/scene';
+import { createScene, SHOT_VIEW, TILT, isSeated, nearestStop, type CameraStop } from './render/scene';
 import { makeDisc, moving, step, type Disc, type Shot } from './sim/physics';
 import { completeRound, inspectShot, sideOf, type Mode, type RoundResult } from './game/rules';
 import { assignDitchSlots, beginReview, reviewDuration, type ShotReview } from './game/review';
@@ -21,7 +21,7 @@ const pauseDialog = $<HTMLDialogElement>('pause-dialog');
 let paused = false, pausedRemaining: number | null = null;
 const sound = new BoardSound();
 const DEFAULT_ZOOM = 1.2;
-let volume = 0.65, muted = false, view: BoardView = 'standing', zoom = DEFAULT_ZOOM, theme: 'light' | 'dark' = 'light', activeDiscHighlight = true;
+let volume = 0.65, muted = false, tilt: number = TILT.overview, zoom = DEFAULT_ZOOM, theme: 'light' | 'dark' = 'light', activeDiscHighlight = true;
 const clampZoom = (value: number) => Math.max(0.75, Math.min(SHOT_VIEW.maxZoom, value));
 // Flicks are measured in board inches, so the same finger or mouse movement
 // would shoot harder on a small screen or in a foreshortened view and softer
@@ -41,7 +41,8 @@ try {
   if (typeof prefs.zoom === 'number' && Number.isFinite(prefs.zoom)) zoom = clampZoom(prefs.zoom);
   muted = prefs.muted === true;
   if (typeof prefs.activeDiscHighlight === 'boolean') activeDiscHighlight = prefs.activeDiscHighlight;
-  if (prefs.view === 'seated') view = 'seated';
+  if (typeof prefs.tilt === 'number' && Number.isFinite(prefs.tilt)) tilt = Math.max(TILT.min, Math.min(TILT.max, prefs.tilt * Math.PI / 180));
+  else if (prefs.view === 'seated') tilt = TILT.table;
   if (prefs.theme === 'dark') theme = 'dark';
 } catch { /* Preferences are optional. */ }
 document.body.dataset.theme = theme;
@@ -57,8 +58,10 @@ function tablePreferences() {
   $<HTMLInputElement>('theme-toggle').checked = theme === 'dark';
   $<HTMLInputElement>('active-disc-highlight').checked = activeDiscHighlight;
   scene?.setActiveDiscHighlight(activeDiscHighlight);
-  for (const name of ['seated', 'standing']) $(`view-${name}`).setAttribute('aria-pressed', String(view === name));
-  try { localStorage.setItem('crokinole-table', JSON.stringify({ volume, muted, view, zoom, theme, activeDiscHighlight })); } catch { /* optional */ }
+  if (scene) tilt = scene.getTilt();
+  // view is kept for older builds that only know standing and seated.
+  const view = tilt >= TILT.table - 0.01 ? 'seated' : 'standing', tiltDegrees = Math.round(tilt * 1800 / Math.PI) / 10;
+  try { localStorage.setItem('crokinole-table', JSON.stringify({ volume, muted, view, tilt: tiltDegrees, zoom, theme, activeDiscHighlight })); } catch { /* optional */ }
 }
 const activeDiscHighlightSetting = document.createElement('label');
 activeDiscHighlightSetting.className = 'theme-setting';
@@ -97,12 +100,10 @@ try { scene = createScene(canvas); } catch {
   banner.textContent = 'This table needs WebGL'; hint.textContent = 'Try a browser with hardware acceleration enabled.'; next.hidden = true;
   throw new Error('WebGL could not initialize');
 }
-scene.setView(view); scene.setZoom(zoom); tablePreferences();
+scene.setTilt(tilt); scene.setZoom(zoom); tablePreferences();
 setupDiscSettings(scene);
-for (const name of ['seated', 'standing'] as const) $(`view-${name}`).addEventListener('click', () => {
-  if (!canInspectBoard() || pointer !== null || orbitPointer !== null || pinching) return;
-  setBoardView(name);
-});
+const cameraStops = ['overview', 'table', 'shooter'] as const;
+for (const stop of cameraStops) $(`camera-${stop}`).addEventListener('click', () => goToStop(stop));
 let mode: Mode = 'duel', player = 0, round = 1, id = 0;
 let discs: Disc[] = [], scores = [0, 0], used = [0, 0], phase: Phase = 'pass';
 let restored = false, winnerDismissed = false;
@@ -202,7 +203,7 @@ function pass(message = '', restoreClock = false) {
     discs.push(staged);
   }
   if (!restoreClock) deadline = shotSeconds ? Date.now() + 850 + shotSeconds * 1000 : null;
-  scene.setYawTarget(yaw()); readyAt = performance.now() + 850;
+  sitDown(); scene.setYawTarget(yaw()); readyAt = performance.now() + 850;
   banner.textContent = `${message ? message + ' · ' : ''}It's ${names[player]}'s turn`;
   hint.textContent = 'Tap the shooting line to move your disc. Drag elsewhere to look around; flick through your disc to shoot.';
   next.hidden = true; scene.highlightDisc(staged.id); hud(); save();
@@ -217,9 +218,21 @@ function nextRound() {
   round++; discs = []; used.fill(0); player = (round - 1) % count();
   roundResult = null; roundBoardFocus = false; pass();
 }
-function setBoardView(nextView: BoardView) {
-  view = nextView; scene.setView(view); tablePreferences();
-  if (phase === 'pass') hint.textContent = 'Tap the shooting line to move your disc. Drag elsewhere to look around; flick through your disc to shoot.';
+// Stops are shortcuts on one continuous camera path. Tapping the stop you are
+// already at re-centers it on your quadrant.
+function goToStop(stop: CameraStop) {
+  if (!canInspectBoard() || pointer !== null || orbitPointer !== null || placementPointer !== null || pinching || settings.open) return;
+  if (stop === 'shooter' && phase !== 'pass') return;
+  const again = nearestStop(scene.getTargetLevel()) === stop;
+  setZoom(stop === 'shooter' ? SHOT_VIEW.maxZoom : Math.min(zoom, DEFAULT_ZOOM));
+  scene.setTilt(stop === 'overview' ? TILT.overview : TILT.table);
+  if (again) scene.centerView();
+  tablePreferences();
+}
+// The one-cheek rule: shots are taken seated. Standing players sit down first.
+function sitDown() {
+  if (isSeated(scene.getTargetLevel())) return;
+  scene.setTilt(TILT.table); tablePreferences();
 }
 next.addEventListener('click', () => {
   if (paused) return;
@@ -240,7 +253,7 @@ function winnerPresentation() {
 }
 $('inspect-board').addEventListener('click', () => {
   winnerDismissed = true; roundBoardFocus = true; hud(); save();
-  requestAnimationFrame(() => $('view-center').focus({ preventScroll: true }));
+  requestAnimationFrame(() => $('camera-table').focus({ preventScroll: true }));
 });
 $('show-winner').addEventListener('click', () => {
   winnerDismissed = false; hud(); save(); $('inspect-board').focus({ preventScroll: true });
@@ -289,7 +302,6 @@ function setZoom(value: number) {
   if (paused || !canInspectBoard() || pointer !== null || orbitPointer !== null || settings.open) return;
   zoom = clampZoom(value); scene.setZoom(zoom); tablePreferences();
 }
-$('view-center').addEventListener('click', () => { if (canInspectBoard() && orbitPointer === null && !pinching) scene.centerView(); });
 canvas.addEventListener('pointerdown', e => {
   if (paused) return;
   if (e.pointerType === 'touch') {
@@ -304,6 +316,8 @@ canvas.addEventListener('pointerdown', e => {
   if (canInspectBoard() && !settings.open && (phase !== 'pass' || performance.now() >= readyAt) && orbitPointer === null && pointer === null && (e.pointerType === 'touch' || e.button === 0)) {
     const p = scene.boardPoint(e.clientX, e.clientY);
     if (phase === 'pass' && staged && p && !scene.isViewMoving() && canStartFlick(p, staged)) {
+      // A standing player reaching for the disc sits down; the next touch shoots.
+      if (!isSeated(scene.getTargetLevel())) { sitDown(); return; }
       pointer = e.pointerId; press = { x: e.clientX, y: e.clientY }; flickStart = p;
       discCrossed = false; flickContact = null;
       trail = [{ ...p, t: e.timeStamp }];
@@ -384,7 +398,7 @@ function endPointer(e: PointerEvent) {
   touches.delete(e.pointerId);
   if (touches.size === 0) { pinching = false; pinchDistance = 0; }
   if (pointer === e.pointerId) cancel();
-  if (orbitPointer === e.pointerId) cancelOrbit();
+  if (orbitPointer === e.pointerId) { cancelOrbit(); tablePreferences(); }
   if (placementPointer === e.pointerId) placementPointer = null;
 }
 canvas.addEventListener('pointercancel', endPointer);
@@ -459,6 +473,38 @@ function finishReview() {
     if (phase === 'won') $('inspect-board').focus({ preventScroll: true });
   } else { player = (player + 1) % count(); pass(valid ? '' : 'Foul resolved'); }
 }
+// The camera control's highlight follows the camera, including pinches and
+// drags. The badge shows standing or seated; while seated, the cheek slides
+// toward the disc's end of the shooting line and perches on the chair's edge.
+const cameraControl = $('camera-control'), seatBadge = $('seat-badge');
+let shownLevel = '', shownStop = '', shownSeat = '', shownCheek = '', shownLock = '';
+function cameraControls(locked: boolean, seated: boolean) {
+  const level = scene.getLevel().toFixed(3), stop = nearestStop(scene.getTargetLevel());
+  if (level !== shownLevel) { cameraControl.style.setProperty('--level', level); shownLevel = level; }
+  if (stop !== shownStop) {
+    for (const name of cameraStops) $(`camera-${name}`).setAttribute('aria-pressed', String(name === stop));
+    shownStop = stop;
+  }
+  const lock = `${locked}${phase === 'pass'}`;
+  if (lock !== shownLock) {
+    for (const name of cameraStops) $<HTMLButtonElement>(`camera-${name}`).disabled = locked || (name === 'shooter' && phase !== 'pass');
+    shownLock = lock;
+  }
+  const seat = seated ? 'seated' : 'standing';
+  if (seat !== shownSeat) {
+    // Sitting down drops the cheek onto the chair.
+    if (seated && shownSeat) { seatBadge.classList.remove('plop'); void seatBadge.offsetWidth; seatBadge.classList.add('plop'); }
+    seatBadge.dataset.seat = seat; seatBadge.setAttribute('aria-label', seated ? 'Seated: you may shoot' : 'Standing: sit down to shoot');
+    shownSeat = seat;
+  }
+  let reach = 0;
+  if (staged && phase === 'pass') {
+    const delta = Math.atan2(Math.sin(Math.atan2(staged.x, staged.y) - yaw()), Math.cos(Math.atan2(staged.x, staged.y) - yaw()));
+    reach = Math.max(-1, Math.min(1, delta / (Math.PI / 4)));
+  }
+  const cheek = reach.toFixed(2);
+  if (cheek !== shownCheek) { seatBadge.style.setProperty('--reach', cheek); shownCheek = cheek; }
+}
 let last = performance.now(), accumulator = 0;
 function tick(now: number) {
   if (paused) { last = now; requestAnimationFrame(tick); return; }
@@ -466,7 +512,9 @@ function tick(now: number) {
   const modeLabel = phase === 'pass' ? 'Place and shoot' : phase === 'moving' ? 'Shot in motion' : phase === 'review' ? 'Shot review' : phase === 'won' ? 'Game complete' : 'Round complete';
   if ($('board-mode').textContent !== modeLabel) $('board-mode').textContent = modeLabel;
   canvas.parentElement!.dataset.mode = phase === 'pass' ? 'play' : 'view';
-  const guidance = phase === 'pass' ? 'Tap line to place · drag to look · flick through disc to shoot' : '';
+  const seated = isSeated(scene.getTargetLevel());
+  const guidance = phase !== 'pass' ? '' : seated ? 'Tap line to place · drag to look · flick through disc to shoot'
+    : 'Standing to look · touch your disc to sit down and shoot';
   if ($('board-guidance').textContent !== guidance) $('board-guidance').textContent = guidance;
   const awaitingShot = phase === 'pass';
   if (awaitingShot && deadline !== null && Date.now() >= deadline) expireShot();
@@ -494,8 +542,7 @@ function tick(now: number) {
   const controlsLocked = !canInspectBoard() || pointer !== null || orbitPointer !== null || placementPointer !== null || pinching;
   canvas.classList.toggle('can-orbit', canInspectBoard());
   canvas.classList.toggle('is-orbiting', orbitPointer !== null);
-  $<HTMLButtonElement>('view-center').disabled = controlsLocked;
-  for (const name of ['seated', 'standing']) $<HTMLButtonElement>(`view-${name}`).disabled = controlsLocked;
+  cameraControls(controlsLocked, seated);
   assignDitchSlots(discs);
   // Hold the shooter view through the shot and its review; the next turn
   // moves it to the new disc, and round results return to the overview.
@@ -522,6 +569,7 @@ try {
 } catch { /* Start fresh if storage is unavailable. */ }
 setupBoardArtwork(scene, skin);
 if (restored) {
+  if (phase === 'pass') sitDown();
   scene.setYawTarget(yaw()); hud();
   if (phase === 'review') { next.hidden = true; reviewMessage(); }
   else if (phase === 'moving') { next.hidden = true; banner.textContent = 'Let it slide'; hint.textContent = 'Waiting for the board to settle…'; }
@@ -533,6 +581,9 @@ if (restored) {
     pass('', true);
   }
 } else pass();
+// Open the page with the camera already in place, not gliding into it.
+if (phase === 'pass') scene.setShotDisc(staged);
+scene.snapView();
 winnerPresentation();
 if (paused) { scene.setPaused(true); pauseDialog.showModal(); }
 requestAnimationFrame(tick);

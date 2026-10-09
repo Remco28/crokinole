@@ -17,7 +17,7 @@ describe('explicit integrated and neutral counterfactual profiles', () => {
   it('allows only approved physics slices and explicitly pinned cosmetic source', () => {
     const gate = checkSourceNeutrality('disc-appearance');
     expect(gate.exactSourceFiles).toBe(19);
-    expect(gate.cosmeticSourceFiles).toBe(8);
+    expect(gate.cosmeticSourceFiles).toBe(9);
     expect(() => checkSourceNeutrality('unknown')).toThrow();
     expect(() => checkSourceNeutrality()).toThrow(); // Old whole-source policy cannot bless UI changes.
   });

@@ -107,10 +107,19 @@ npm run dev
 
 Open the URL printed by Vite. Tap anywhere on your shooting arc to reposition the highlighted disc. Start behind it and flick through it to shoot toward the center. Drag elsewhere on the board with a mouse or one finger to adjust
 your angle within your shooting quadrant (45° either side). Vertical dragging
-adjusts your elevation within the selected seated or standing view. **Center**
-resets the angle. Each turn starts facing the next player's side.
+tilts the camera continuously from a high overview down to seated eye level.
+Each turn starts facing the next player's side.
 
-Use the seated/standing icons to choose your view. A shot gesture holds the camera angle and zoom steady until release. Camera transitions finish before accepting a flick.
+The camera control at the board's upper left has three stops on one path:
+**Overview** (standing, looking down), **Table** (seated) and **Shooter** (down
+behind your disc). Its gold highlight follows the camera as you drag and pinch;
+tapping a stop glides there, and tapping the stop you are at re-centers it.
+Crokinole's one-cheek rule applies: you shoot seated. Overview is standing, and
+touching your disc while standing sits you down instead of shooting. Turns start
+seated. The badge above the control shows a standing figure or, when seated, a
+cheek that slides along the stool toward your end of the shooting line and perches
+on the edge for shots from the quadrant lines. A shot gesture holds the camera
+steady until release; camera transitions finish before accepting a flick.
 
 Two-finger pinch adjusts zoom. Handover preserves your zoom. Pinching cancels a view
 drag or shot attempt.

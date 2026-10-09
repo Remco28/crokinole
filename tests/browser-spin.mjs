@@ -87,10 +87,11 @@ try {
       try { window.__calibration = createScene(canvas); }
       finally { THREE.Object3D.prototype.lookAt = lookAt; }
       window.__discHeight = (await import('/src/sim/constants.ts')).DISC.height;
-      window.__calibration.setView(${JSON.stringify(view)}); window.__calibration.setZoom(1.2);
+      // Turns start seated (one-cheek rule), so shots always use the Table tilt.
+      window.__calibration.setTilt(62 * Math.PI / 180); window.__calibration.setZoom(1.2);
       window.__calibrationCanvas = canvas;
     })()`);
-    await until('!window.__calibration.isViewMoving() && !document.getElementById("view-center").disabled');
+    await until('!window.__calibration.isViewMoving() && !document.getElementById("camera-table").disabled');
     await sleep(900); // The actual turn's gesture-readiness delay also has to expire.
   }
   async function project(points) {
@@ -114,7 +115,12 @@ try {
   async function flick(offset, touch, view = 'standing', options = {}) {
     await reset(view);
     const points = options.points || [12.8, 12.3, 11.7, 11.1, 10.5].map(y => ({ x: offset, y }));
-    const positions = await project(points);
+    // Flick power follows screen pixels per board inch at the disc (30 px
+    // reference). Keep each board-space fixture at its original effective
+    // speed by scaling its movement timing; holds and lift delays stay real.
+    const projected = await project([...points, { x: 0, y: 12 }, { x: 0, y: 11.9 }]);
+    const [discAt, inward] = projected.splice(-2), positions = projected;
+    const timeScale = Math.hypot(inward.x - discAt.x, inward.y - discAt.y) / 0.1 / 30;
     const rect = await evaluate('document.getElementById("board-canvas").getBoundingClientRect().toJSON()');
     for (const p of positions) assert.ok(p.x >= rect.x && p.x <= rect.right && p.y >= rect.y && p.y <= rect.bottom, 'Swipe stays on the visible canvas');
     await evaluate(`window.__gestureEvents=[]; for(const type of ['pointerdown','pointermove','pointerup','pointercancel']) document.getElementById('board-canvas').addEventListener(type,e=>window.__gestureEvents.push({type:e.type,t:e.timeStamp,x:e.clientX,y:e.clientY,id:e.pointerId,pointerType:e.pointerType,raw:(e.getCoalescedEvents?.()??[]).map(p=>({t:p.timeStamp,x:p.clientX,y:p.clientY}))}),true)`);
@@ -125,7 +131,7 @@ try {
     await evaluate(`window.__initialLaunch=null;const original=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k==='crokinole-match-spin-v2'&&!window.__initialLaunch){const s=JSON.parse(v);if(s.phase==='moving')window.__initialLaunch=s;}return original.call(this,k,v);}`);
     const inputs = [], timestamp = Date.now() / 1000;
     let elapsed = 0;
-    const delays = options.delays || positions.slice(1).map(() => 20);
+    const delays = (options.delays || positions.slice(1).map(() => 20)).map(d => d * timeScale);
     if (touch) {
       inputs.push(call('Input.dispatchTouchEvent', { type: 'touchStart', timestamp, touchPoints: [{ ...positions[0], id: 1 }] }));
       for (const [i, p] of positions.slice(1).entries()) {

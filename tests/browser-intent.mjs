@@ -88,10 +88,11 @@ try {
       try { window.__calibration = createScene(canvas); }
       finally { THREE.Object3D.prototype.lookAt = lookAt; }
       window.__discHeight = (await import('/src/sim/constants.ts')).DISC.height;
-      window.__calibration.setView(${JSON.stringify(view)}); window.__calibration.setZoom(1.2);
+      // Turns start seated (one-cheek rule), so shots always use the Table tilt.
+      window.__calibration.setTilt(62 * Math.PI / 180); window.__calibration.setZoom(1.2);
       window.__calibrationCanvas = canvas;
     })()`);
-    await until('!window.__calibration.isViewMoving() && !document.getElementById("view-center").disabled');
+    await until('!window.__calibration.isViewMoving() && !document.getElementById("camera-table").disabled');
     await sleep(900); // The actual turn's gesture-readiness delay also has to expire.
   }
 
@@ -111,15 +112,18 @@ try {
       const first=prep?{x:start.x+(prep==='leftup'?-${spec.prepLeft||.15}*${spec.mirror || 1}*rx:0),y:start.y-${spec.prepUp||.15}*ry}:start;
       const positions=prep?[start,first,...Array.from({length:8},(_,i)=>({x:first.x+dir.x*length*(i+1)/8,y:first.y+dir.y*length*(i+1)/8}))]:Array.from({length:9},(_,i)=>({x:start.x+dir.x*length*i/8,y:start.y+dir.y*length*i/8}));
       const picks=positions.map(p=>s.boardPoint(p.x,p.y));
-      return{center:c,rx,ry,positions,picks,rect:r.toJSON()};
+      return{center:c,rx,ry,positions,picks,rect:r.toJSON(),inwardPixels:Math.hypot(z.x-c.x,z.y-c.y)/.625};
     })()`);
     for(const p of geom.positions) assert.ok(p.x>=geom.rect.x&&p.x<=geom.rect.right&&p.y>=geom.rect.y&&p.y<=geom.rect.bottom,'Canvas bounds');
     await evaluate(`window.__probe=[];window.__gestureEvents=[];for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])document.getElementById('board-canvas').addEventListener(type,e=>window.__gestureEvents.push({type:e.type,t:e.timeStamp,x:e.clientX,y:e.clientY,id:e.pointerId,pointerType:e.pointerType,trusted:e.isTrusted,raw:(e.getCoalescedEvents?.()??[]).map(p=>({t:p.timeStamp,x:p.clientX,y:p.clientY}))}),true);window.__initialLaunch=null;const original=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k==='crokinole-match-spin-v2'&&!window.__initialLaunch){const s=JSON.parse(v);if(s.phase==='moving')window.__initialLaunch=s;}return original.call(this,k,v);}`);
+    // Flick power follows screen pixels per board inch (30 px reference); keep
+    // each disc-sized case at its original effective speed. Lift delays stay real.
+    const step=12*geom.inwardPixels/30;
     const inputs=[],timestamp=Date.now()/1000;let elapsed=0;
     const positions=geom.positions;
     if(touch){
       inputs.push(call('Input.dispatchTouchEvent',{type:'touchStart',timestamp,touchPoints:[{...positions[0],id:1}]}));
-      for(const p of positions.slice(1)){await sleep(12);elapsed+=12;inputs.push(call('Input.dispatchTouchEvent',{type:'touchMove',timestamp:timestamp+elapsed/1000,touchPoints:[{...p,id:1}]}));}
+      for(const p of positions.slice(1)){await sleep(step);elapsed+=step;inputs.push(call('Input.dispatchTouchEvent',{type:'touchMove',timestamp:timestamp+elapsed/1000,touchPoints:[{...p,id:1}]}));}
       if (spec.noise) {
         await sleep(5); elapsed += 5;
         const end=positions.at(-1);
@@ -128,7 +132,7 @@ try {
       inputs.push(call('Input.dispatchTouchEvent',{type:'touchEnd',timestamp:timestamp+(elapsed+(spec.liftMs||5))/1000,touchPoints:[]}));
     }else{
       inputs.push(call('Input.dispatchMouseEvent',{type:'mousePressed',timestamp,...positions[0],button:'left',buttons:1,clickCount:1}));
-      for(const p of positions.slice(1)){await sleep(12);elapsed+=12;inputs.push(call('Input.dispatchMouseEvent',{type:'mouseMoved',timestamp:timestamp+elapsed/1000,...p,button:'left',buttons:1}));}
+      for(const p of positions.slice(1)){await sleep(step);elapsed+=step;inputs.push(call('Input.dispatchMouseEvent',{type:'mouseMoved',timestamp:timestamp+elapsed/1000,...p,button:'left',buttons:1}));}
       inputs.push(call('Input.dispatchMouseEvent',{type:'mouseReleased',timestamp:timestamp+(elapsed+(spec.liftMs||5))/1000,...positions.at(-1),button:'left',buttons:0,clickCount:1}));
     }
     await Promise.all(inputs);await until(`window.__gestureEvents.some(e=>e.type==='pointerup')`);
