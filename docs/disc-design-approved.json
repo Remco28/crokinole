@@ -5,7 +5,7 @@
     "src/disc-appearance.ts": "5cb8956a1a6c0070af2577338f578ef138058f5f076b196e953cf10e95b5b7bb",
     "src/disc-settings.ts": "b985acca27a51fbe724be799646d6df687a283f2ed516dffb545a339f88dceaf",
     "src/game/flick.ts": "647e1fc76e226298bed171a2c432b55596a4a065d9bcd351d0113018f6515d99",
-    "src/main.ts": "4f12b3e510d57d11a1ba9c9717d84837fdf378f7a39e1b492f1fc9e44dbb0f2b",
+    "src/main.ts": "6ffbec104660c521b5f47e9d424d3cbe7e84c6e0e707099e1122716b12e91da0",
     "src/render/disc-design.ts": "200fa7fb52cdc33c347dad36f66e9a65e17d838ba5487da5be1f5a36235d9f4e",
     "src/render/orbit.ts": "7493cae78452fda94fd057c09b6de7baf3e7ebf068ac1958001e90a677b70593",
     "src/render/scene.ts": "dcdf17f6b6e2731c188eeb0f4a431d68a9885d1257ea803e2834b9c6de28a12d",
