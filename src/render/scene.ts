@@ -7,6 +7,7 @@ import { BOARD, DISC, PEGS, pegPositions } from '../sim/constants';
 import { DITCH_SLOTS, REVIEW_TIMING, type ShotReview } from '../game/review';
 
 import { TILT, cameraLevel, centeredOrbit, dragOrbit } from './orbit';
+import { GENTLE, RETURN, atRest, limitFocus, stepFocus, type FocusState, type Point } from './shot-camera';
 import { SHOT_VIEW, cameraPose, shotCloseness, shownZoom, type BoardPoint } from './shot-framing';
 export type { BoardView, CameraStop } from './orbit';
 export { TILT, isSeated, nearestStop } from './orbit';
@@ -86,12 +87,19 @@ export function createScene(canvas: HTMLCanvasElement) {
   let shotDisc: BoardPoint | null = null;
   let closeness = 0;
   const shotAnchor = { x: 0, y: 0 };
+  // Optional shot camera: a slow pan toward where a shot settled. It translates
+  // the whole view (no yaw, tilt or zoom), and at the shooter view moves the
+  // anchor instead. focusStart is in clock seconds, so the glide waits for rest.
+  let focusTarget: Point | null = null, focusStart = 0, focusPan: FocusState = atRest();
+  const FAR_PAN = 0.3;
   const closenessTarget = () => shotDisc ? shotCloseness(zoomTarget) : 0;
 
   function placeCamera() {
     const pose = cameraPose({ yaw, polar, polarOffset: polar - TILT.table, distance: camDist, disc: shotAnchor, closeness });
-    camera.position.set(pose.eye.x, pose.eye.y, pose.eye.z);
-    camera.lookAt(pose.target.x, pose.target.y, pose.target.z);
+    const pan = 1 - Math.min(1, closeness);
+    const px = focusPan.x * FAR_PAN * pan, pz = focusPan.y * FAR_PAN * pan;
+    camera.position.set(pose.eye.x + px, pose.eye.y, pose.eye.z + pz);
+    camera.lookAt(pose.target.x + px, pose.target.y, pose.target.z + pz);
     camera.updateMatrixWorld();
   }
 
@@ -526,7 +534,18 @@ export function createScene(canvas: HTMLCanvasElement) {
     }
     const near = closenessTarget();
     closeness = Math.abs(near - closeness) > 0.0005 ? closeness + (near - closeness) * blend : near;
-    if (shotDisc) {
+    const gliding = focusTarget !== null && !reducedMotion.matches && clock.elapsedTime >= focusStart;
+    if (gliding) {
+      // limitFocus keeps the target on the board; the glide itself is slow and speed-capped.
+      const goal = limitFocus(focusTarget!, shotDisc ?? { x: 0, y: 0 }, GENTLE);
+      focusPan = stepFocus(focusPan, goal, dt, GENTLE);
+      // At the shooter view the anchor rides the same glide instead of panning the lens.
+      if (shotDisc && closeness > 0) { shotAnchor.x = focusPan.x; shotAnchor.y = focusPan.y; }
+    } else if (focusTarget === null) {
+      // Ease the pan back out once the next turn begins.
+      focusPan = stepFocus(focusPan, { x: 0, y: 0 }, dt, RETURN);
+    }
+    if (shotDisc && focusTarget === null) {
       shotAnchor.x += (shotDisc.x - shotAnchor.x) * blend; shotAnchor.y += (shotDisc.y - shotAnchor.y) * blend;
     }
     placeCamera();
@@ -549,6 +568,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     isViewMoving: () => Math.abs(yawTarget - yaw) > 0.003 || Math.abs(polarTarget - polar) > 0.003
       || Math.abs(shownZoom(zoomTarget, !!shotDisc) - camera.zoom) > 0.003
       || Math.abs(closenessTarget() - closeness) > 0.003
+      || (focusTarget === null && Math.hypot(focusPan.x, focusPan.y) > 0.05)
       || (!!shotDisc && closeness > 0 && Math.hypot(shotDisc.x - shotAnchor.x, shotDisc.y - shotAnchor.y) > 0.01),
     pixelsPerInch,
     setZoom: (zoom: number) => { zoomTarget = THREE.MathUtils.clamp(zoom, 0.75, SHOT_VIEW.maxZoom); },
@@ -560,6 +580,12 @@ export function createScene(canvas: HTMLCanvasElement) {
     setTheme: (theme: 'light' | 'dark') => { scene.background = new THREE.Color(theme === 'light' ? '#f3efe5' : '#171d1c'); },
     // Table is about 22 inches above the surface, 42 inches from center at the
     // base framing distance. Overview preserves the original standing look.
+    // Glide toward a settled shot after delaySeconds; null returns the view.
+    setFocus: (point: Point | null, delaySeconds = 0) => {
+      // A new glide starts from where the view already is, so nothing snaps.
+      if (point && focusTarget === null) focusPan = atRest(closeness > 0 ? shotAnchor : focusPan);
+      focusTarget = point ? { ...point } : null; focusStart = clock.elapsedTime + delaySeconds;
+    },
     setTilt: (radians: number) => {
       orbitAngle = { ...orbitAngle, polar: Math.max(TILT.min, Math.min(TILT.max, radians)) };
       polarTarget = orbitAngle.polar;

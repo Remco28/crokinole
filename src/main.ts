@@ -10,6 +10,7 @@ import { assignDitchSlots, beginReview, reviewDuration, type ShotReview } from '
 import { PLAYER_NAMES as names, PLAYER_COLORS as colors } from './game/players';
 import { remainingTime, resumeDeadline } from './game/clock';
 import { CLASSIC, TOURNAMENT_ROUNDS, completeTournamentRound, discsPerPlayer, discsPerSide, formatAllowsMode, formatKey, isGameOver, parseFormatKey, readFormat, startingPlayer, type FormatRoundResult, type MatchFormat } from './game/format';
+import { SETTLE_DELAY_MS, parseShotCamera, settleFocus, type ShotCamera } from './render/shot-camera';
 import { isFreshVisit, setupTutorial } from './tutorial';
 import { beginLog, createPracticePanel, liveText, recordEvent, recordStep, summarize, type ShotLog } from './practice';
 import { MATCH_STORAGE_KEY, readMatch, type Phase, type SavedMatch } from './game/session';
@@ -25,7 +26,7 @@ const pauseDialog = $<HTMLDialogElement>('pause-dialog');
 let paused = false, pausedRemaining: number | null = null;
 const sound = new BoardSound();
 const DEFAULT_ZOOM = 1.2;
-let volume = 0.65, muted = false, tilt: number = TILT.overview, zoom = DEFAULT_ZOOM, theme: 'light' | 'dark' = 'light', activeDiscHighlight = true, invertDrag = false, finalCountdown = true;
+let volume = 0.65, muted = false, tilt: number = TILT.overview, zoom = DEFAULT_ZOOM, theme: 'light' | 'dark' = 'light', activeDiscHighlight = true, invertDrag = false, finalCountdown = true, shotCamera: ShotCamera = 'off';
 const clampZoom = (value: number) => Math.max(0.75, Math.min(SHOT_VIEW.maxZoom, value));
 // Flicks are measured in board inches, so the same finger or mouse movement
 // would shoot harder on a small screen or in a foreshortened view and softer
@@ -52,6 +53,7 @@ try {
   else if (prefs.view === 'seated') tilt = TILT.table;
   if (typeof prefs.invertDrag === 'boolean') invertDrag = prefs.invertDrag;
   if (typeof prefs.finalCountdown === 'boolean') finalCountdown = prefs.finalCountdown;
+  shotCamera = parseShotCamera(prefs.shotCamera);
   if (prefs.theme === 'dark') theme = 'dark';
 } catch { /* Preferences are optional. */ }
 document.body.dataset.theme = theme;
@@ -70,10 +72,11 @@ function tablePreferences() {
   scene?.setInvertVerticalDrag(invertDrag);
   $<HTMLInputElement>('invert-drag').checked = invertDrag;
   $<HTMLInputElement>('final-countdown').checked = finalCountdown;
+  $<HTMLSelectElement>('shot-camera').value = shotCamera;
   if (scene) tilt = scene.getTilt();
   // view is kept for older builds that only know standing and seated.
   const view = tilt >= TILT.table - 0.01 ? 'seated' : 'standing', tiltDegrees = Math.round(tilt * 1800 / Math.PI) / 10;
-  try { localStorage.setItem('crokinole-table', JSON.stringify({ volume, muted, view, tilt: tiltDegrees, zoom, theme, activeDiscHighlight, invertDrag, finalCountdown })); } catch { /* optional */ }
+  try { localStorage.setItem('crokinole-table', JSON.stringify({ volume, muted, view, tilt: tiltDegrees, zoom, theme, activeDiscHighlight, invertDrag, finalCountdown, shotCamera })); } catch { /* optional */ }
 }
 const activeDiscHighlightSetting = document.createElement('label');
 activeDiscHighlightSetting.className = 'theme-setting';
@@ -102,6 +105,9 @@ $<HTMLInputElement>('active-disc-highlight').addEventListener('change', e => {
 });
 $<HTMLInputElement>('invert-drag').addEventListener('change', e => {
   invertDrag = (e.target as HTMLInputElement).checked; tablePreferences();
+});
+$<HTMLSelectElement>('shot-camera').addEventListener('change', e => {
+  shotCamera = parseShotCamera((e.target as HTMLSelectElement).value); if (shotCamera === 'off') scene.setFocus(null); tablePreferences();
 });
 $<HTMLInputElement>('final-countdown').addEventListener('change', e => {
   finalCountdown = (e.target as HTMLInputElement).checked; tablePreferences();
@@ -248,6 +254,8 @@ $('round-summary').addEventListener('click', event => {
   roundBoardFocus = !roundBoardFocus; hud();
 });
 function pass(message = '', restoreClock = false) {
+  // Practice has no review pause, so its glide ends when the next flick starts.
+  if (!practice) scene.setFocus(null);
   scene.highlightDisc(null);
   for (const d of discs) if (d.state === 'sunk') d.holeCleared = true;
   phase = 'pass';
@@ -502,7 +510,7 @@ function releaseFlick() {
   shot = { touched: new Set([staged.id]), opponentContact: false, side: side(player), sideOf: side };
   sound.play('flick', Math.hypot(velocity.x, velocity.y), staged.x, staged.y);
   staged.vx = velocity.x; staged.vy = velocity.y; staged.spin = velocity.spin; used[player]++; phase = 'moving';
-  if (practice) practiceLog = beginLog(staged);
+  if (practice) { practiceLog = beginLog(staged); scene.setFocus(null); }
   next.hidden = true;
   scene.highlightDisc(null);
   banner.textContent = 'Let it slide'; hint.textContent = 'Waiting for the board to settle…'; hud(); save();
@@ -548,6 +556,8 @@ canvas.addEventListener('pointerup', e => {
   cancel();
 });
 function finishShot() {
+  // Optionally glide, slowly, to where the shot ended once everything has rested.
+  if (shotCamera === 'gentle' && staged) scene.setFocus(settleFocus(discs, staged.id), SETTLE_DELAY_MS / 1000);
   if (practice) { finishPracticeShot(); return; }
   review = beginReview(discs, inspectShot(discs, shot!, hadOpponent)); shot = null;
   phase = 'review'; next.hidden = true;

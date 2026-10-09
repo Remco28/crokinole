@@ -304,3 +304,5 @@ body[data-theme=light] .practice-entry small{color:#667267}
 body[data-theme=light] #practice-panel{background:#fffdf7;border-color:#b7b5aa}body[data-theme=light] #practice-panel dt,body[data-theme=light] #practice-panel .practice-head span,body[data-theme=light] .practice-empty{color:#667267}
 body[data-practice] #match-panel,body[data-practice] #round-summary{display:none}
 @media(max-width:899px){#practice-panel{order:2}}
+#more-options label>small{display:block;color:#a5afa7;font-size:11px;line-height:1.4;margin-top:6px}
+body[data-theme=light] #more-options label>small{color:#667267}
