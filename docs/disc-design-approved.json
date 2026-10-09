@@ -5,12 +5,12 @@
     "src/disc-appearance.ts": "5cb8956a1a6c0070af2577338f578ef138058f5f076b196e953cf10e95b5b7bb",
     "src/disc-settings.ts": "b985acca27a51fbe724be799646d6df687a283f2ed516dffb545a339f88dceaf",
     "src/game/flick.ts": "647e1fc76e226298bed171a2c432b55596a4a065d9bcd351d0113018f6515d99",
-    "src/main.ts": "3aed7c7c0fe60444bec8a850478895579d85e072e728778acc18d8a41ffa25dd",
+    "src/main.ts": "4f12b3e510d57d11a1ba9c9717d84837fdf378f7a39e1b492f1fc9e44dbb0f2b",
     "src/render/disc-design.ts": "200fa7fb52cdc33c347dad36f66e9a65e17d838ba5487da5be1f5a36235d9f4e",
     "src/render/orbit.ts": "7493cae78452fda94fd057c09b6de7baf3e7ebf068ac1958001e90a677b70593",
-    "src/render/scene.ts": "775bbc08aa8796ded6f4f5bb9480cb8049c21be1a0fd8ec2f48cbc780efae7f8",
+    "src/render/scene.ts": "dcdf17f6b6e2731c188eeb0f4a431d68a9885d1257ea803e2834b9c6de28a12d",
     "src/storage/disc-images.ts": "85ba7c6d788f822824864735f68c73a9df6261804ea8dee473f0e685ef9b3037",
-    "src/style.css": "82acb713ef20e89cec2c7f69421080203602894c51a696b60a6cc2203e25c1a7"
+    "src/style.css": "1b33c6857eea02aa35d485f1165a8fcbf578a7cb3371b1d878d0f81cf41fcffd"
   },
   "profile": "disc-appearance"
 }

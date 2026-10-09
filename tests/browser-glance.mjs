@@ -91,7 +91,7 @@ try {
       window.__calibration.setTilt(62 * Math.PI / 180); window.__calibration.setZoom(1.2);
       window.__calibrationCanvas = canvas;
     })()`);
-    await until('!window.__calibration.isViewMoving() && !document.getElementById("camera-table").disabled');
+    await until('!window.__calibration.isViewMoving() && !document.getElementById("camera-toggle").disabled');
     await sleep(900); // The actual turn's gesture-readiness delay also has to expire.
   }
   async function project(points) {

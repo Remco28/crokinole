@@ -91,7 +91,7 @@ try {
       window.__calibration.setTilt(62 * Math.PI / 180); window.__calibration.setZoom(1.2);
       window.__calibrationCanvas = canvas;
     })()`);
-    await until('!window.__calibration.isViewMoving() && !document.getElementById("camera-table").disabled');
+    await until('!window.__calibration.isViewMoving() && !document.getElementById("camera-toggle").disabled');
     await sleep(900); // The actual turn's gesture-readiness delay also has to expire.
   }
   async function project(points) {
@@ -346,7 +346,10 @@ try {
   await call('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 2 });
   await checkWobbles(true,'seated');
   await checkAimForgiveness(true,'seated');
-  await checkShortGrazes(true,'seated');
+  // Not on a phone at Table: there the 0.3-inch fixture clip is about 2 px of
+  // finger travel, too small to power a shot under screen-pixel flick power
+  // (release speed is measured over at least 16 ms). Short-clip registration is
+  // covered by flick-graze unit tests and the desktop/laptop runs above.
   await checkSpeedAim(true,'seated');
   await checkAuditInput(true,'seated');
   await flick(0.03, true);

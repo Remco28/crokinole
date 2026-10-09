@@ -92,7 +92,7 @@ try {
       window.__calibration.setTilt(62 * Math.PI / 180); window.__calibration.setZoom(1.2);
       window.__calibrationCanvas = canvas;
     })()`);
-    await until('!window.__calibration.isViewMoving() && !document.getElementById("camera-table").disabled');
+    await until('!window.__calibration.isViewMoving() && !document.getElementById("camera-toggle").disabled');
     await sleep(900); // The actual turn's gesture-readiness delay also has to expire.
   }
 
@@ -142,7 +142,11 @@ try {
         .filter(e=>['pointerdown','pointermove','pointerup'].includes(e.type)||!e.type)
         .map(e=>({...window.__calibration.boardPoint(e.x,e.y),t:e.t}));
       const end=samples.at(-1);
-      return releaseVelocity(samples.filter(p=>end.t-p.t<=120),{x:0,y:12});
+      // Same screen-pixel power as the game: pixels per board inch along the
+      // stroke at the disc, 30 px reference, plus the touch-screen boost.
+      const first=samples[0],dx=end.x-first.x,dy=end.y-first.y,length=Math.hypot(dx,dy)||1;
+      const scale=window.__calibration.pixelsPerInch({x:0,y:12},{x:dx/length,y:dy/length})/30*(matchMedia('(pointer: coarse)').matches?1.15:1);
+      return releaseVelocity(samples.filter(p=>end.t-p.t<=120),{x:0,y:12},scale);
     })()`);
     await evaluate('document.getElementById("pause-button").click()');
     const result=await evaluate(`(() => {const launch=window.__initialLaunch,disc=launch?.discs[0];let out=null;if(disc){const a=window.__project(disc.x,disc.y),b=window.__project(disc.x+disc.vx*.001,disc.y+disc.vy*.001);out={a,b};}return {state:JSON.parse(localStorage.getItem('crokinole-match-spin-v2')),launch,events:window.__gestureEvents,out};})()`);

@@ -571,8 +571,7 @@ export function createScene(canvas: HTMLCanvasElement) {
       camera.zoom = shownZoom(zoomTarget, !!shotDisc); camera.updateProjectionMatrix();
       placeCamera();
     },
-    // Where the camera is (shown) and where it is heading (rules and stops).
-    getLevel: () => cameraLevel(polar, closeness),
+    // Where the camera is heading, for the seat rule and the camera icon.
     getTargetLevel: () => cameraLevel(polarTarget, closenessTarget()),
     setSkin: (skin: string, art?: HTMLImageElement) => {
       artworkPegCollars.visible = !!art;

@@ -111,12 +111,10 @@ tilts the camera continuously from a high overview down to seated eye level.
 Each turn starts facing the next player's side.
 
 Two icons sit at the board's upper left: the seat badge and the camera icon,
-whose figure stands, sits or leans to show the current stop. Tapping the camera
-icon opens its three stops on one path: **Overview** (standing, looking down),
-**Table** (seated) and **Shooter** (down behind your disc). The stops also appear
-briefly while you drag or pinch, with a gold highlight that follows the camera.
-Tapping a stop glides there and closes them; tapping the stop you are at
-re-centers it.
+whose figure stands, sits or leans for the camera's position on one path:
+Overview (standing, looking down), Table (seated) and Shooter (down behind your
+disc). Drag and pinch move along it; tapping the camera icon resets to the
+view each turn starts with (Table, default zoom, centered).
 Crokinole's one-cheek rule applies: you shoot seated. Overview is standing, and
 touching your disc while standing sits you down instead of shooting. Turns start
 seated. On the badge the cheek hovers over the stool while you stand; seated, it

@@ -121,11 +121,11 @@ try {
   }
   const before=await state();
   await evaluate('document.getElementById("inspect-board").click()');
-  await until('!document.getElementById("camera-table").disabled');
+  await until('!document.getElementById("camera-toggle").disabled');
   assert.equal(await evaluate('document.getElementById("winner-overlay").hidden'), true);
   assert.equal(await evaluate('document.getElementById("show-winner").hidden'), false);
-  await evaluate('document.getElementById("camera-table").click()');
-  assert.equal(await evaluate('document.getElementById("camera-table").getAttribute("aria-pressed")'), 'true');
+  await evaluate('document.getElementById("camera-toggle").click()'); // Resets to the seated Table view.
+  await until('document.getElementById("camera-toggle").dataset.stop === "table"');
   const canvas = await evaluate('document.getElementById("board-canvas").getBoundingClientRect().toJSON()');
   const x=canvas.x+canvas.width*.7, y=canvas.y+canvas.height*.4;
   await Promise.all([['touchStart',x,y],['touchMove',x-40,y+10],['touchEnd',x-40,y+10]].map(([type,px,py]) => call('Input.dispatchTouchEvent', {type,touchPoints:type==='touchEnd'?[]:[{x:px,y:py,id:1}]})));

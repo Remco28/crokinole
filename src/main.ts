@@ -105,8 +105,6 @@ try { scene = createScene(canvas); } catch {
 }
 scene.setTilt(tilt); scene.setZoom(zoom); tablePreferences();
 setupDiscSettings(scene);
-const cameraStops = ['overview', 'table', 'shooter'] as const;
-for (const stop of cameraStops) $(`camera-${stop}`).addEventListener('click', () => goToStop(stop));
 let mode: Mode = 'duel', player = 0, round = 1, id = 0;
 let discs: Disc[] = [], scores = [0, 0], used = [0, 0], phase: Phase = 'pass';
 let restored = false, winnerDismissed = false;
@@ -221,17 +219,11 @@ function nextRound() {
   round++; discs = []; used.fill(0); player = (round - 1) % count();
   roundResult = null; roundBoardFocus = false; pass();
 }
-// Stops are shortcuts on one continuous camera path. Tapping the stop you are
-// already at re-centers it on your quadrant.
-function goToStop(stop: CameraStop) {
+// Back to the view each turn starts with: seated at Table, default zoom,
+// centered on the player's quadrant.
+function resetView() {
   if (!canInspectBoard() || pointer !== null || orbitPointer !== null || placementPointer !== null || pinching || settings.open) return;
-  if (stop === 'shooter' && phase !== 'pass') return;
-  const again = nearestStop(scene.getTargetLevel()) === stop;
-  // Collapse after choosing, but keep the rail up while the camera glides there.
-  railOpen = false; cameraMovedAt = performance.now();
-  setZoom(stop === 'shooter' ? SHOT_VIEW.maxZoom : Math.min(zoom, DEFAULT_ZOOM));
-  scene.setTilt(stop === 'overview' ? TILT.overview : TILT.table);
-  if (again) scene.centerView();
+  setZoom(DEFAULT_ZOOM); scene.setTilt(TILT.table); scene.centerView();
   tablePreferences();
 }
 // The one-cheek rule: shots are taken seated. Standing players sit down first.
@@ -258,7 +250,7 @@ function winnerPresentation() {
 }
 $('inspect-board').addEventListener('click', () => {
   winnerDismissed = true; roundBoardFocus = true; hud(); save();
-  requestAnimationFrame(() => $('camera-table').focus({ preventScroll: true }));
+  requestAnimationFrame(() => $('camera-toggle').focus({ preventScroll: true }));
 });
 $('show-winner').addEventListener('click', () => {
   winnerDismissed = false; hud(); save(); $('inspect-board').focus({ preventScroll: true });
@@ -309,7 +301,6 @@ function setZoom(value: number) {
 }
 canvas.addEventListener('pointerdown', e => {
   if (paused) return;
-  railOpen = false; // Touching the board puts an opened camera rail away.
   if (e.pointerType === 'touch') {
     touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
     canvas.setPointerCapture(e.pointerId);
@@ -479,35 +470,21 @@ function finishReview() {
     if (phase === 'won') $('inspect-board').focus({ preventScroll: true });
   } else { player = (player + 1) % count(); pass(valid ? '' : 'Foul resolved'); }
 }
-// The camera control rests as an icon whose figure shows the current stop. Its
-// rail opens on tap, or for a moment while the camera is dragged or pinched,
-// and its highlight follows the camera. The badge's cheek hovers while
-// standing; seated, it slides toward the disc's end of the shooting line and
-// perches on the stool's edge.
-const tableControls = $('table-controls'), cameraControl = $('camera-control'), seatBadge = $('seat-badge'), cameraToggle = $('camera-toggle');
+// The camera icon's figure stands, sits or leans for the current stop; tapping
+// it resets the view. The badge's cheek hovers while standing; seated, it slides toward the disc's end
+// of the shooting line and perches on the stool's edge.
+const seatBadge = $('seat-badge'), cameraToggle = $<HTMLButtonElement>('camera-toggle');
 const stopNames: Record<CameraStop, string> = { overview: 'Overview', table: 'Table', shooter: 'Shooter' };
-let railOpen = false, cameraMovedAt = -Infinity;
-let shownLevel = '', shownStop = '', shownSeat = '', shownCheek = '', shownLock = '', shownOpen = '';
-cameraToggle.addEventListener('click', () => { railOpen = !railOpen; });
+cameraToggle.addEventListener('click', resetView);
+let shownStop = '', shownSeat = '', shownCheek = '';
 function cameraControls(locked: boolean, seated: boolean) {
-  const level = scene.getLevel().toFixed(3), stop = nearestStop(scene.getTargetLevel());
-  if (orbitPointer !== null || pinching) cameraMovedAt = performance.now();
-  const open = railOpen || performance.now() - cameraMovedAt < 1500;
-  if (String(open) !== shownOpen) {
-    tableControls.classList.toggle('expanded', open); cameraToggle.setAttribute('aria-expanded', String(open));
-    shownOpen = String(open);
-  }
-  if (level !== shownLevel) { cameraControl.style.setProperty('--level', level); shownLevel = level; }
+  const stop = nearestStop(scene.getTargetLevel());
   if (stop !== shownStop) {
-    for (const name of cameraStops) $(`camera-${name}`).setAttribute('aria-pressed', String(name === stop));
-    cameraToggle.dataset.stop = stop; cameraToggle.setAttribute('aria-label', `Camera: ${stopNames[stop]}. Show camera stops`);
+    cameraToggle.dataset.stop = stop;
+    cameraToggle.setAttribute('aria-label', `Camera: ${stopNames[stop]}. Reset view`);
     shownStop = stop;
   }
-  const lock = `${locked}${phase === 'pass'}`;
-  if (lock !== shownLock) {
-    for (const name of cameraStops) $<HTMLButtonElement>(`camera-${name}`).disabled = locked || (name === 'shooter' && phase !== 'pass');
-    shownLock = lock;
-  }
+  cameraToggle.disabled = locked;
   const seat = seated ? 'seated' : 'standing';
   if (seat !== shownSeat) {
     // Sitting down drops the cheek onto the chair.
