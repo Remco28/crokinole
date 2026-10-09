@@ -489,6 +489,8 @@ function cameraControls(locked: boolean, seated: boolean) {
   if (seat !== shownSeat) {
     // Sitting down drops the cheek onto the chair.
     if (seated && shownSeat) { seatBadge.classList.remove('plop'); void seatBadge.offsetWidth; seatBadge.classList.add('plop'); }
+    // Standing must clear the plop, or its later, equally specific rule keeps overriding the hover.
+    if (!seated) seatBadge.classList.remove('plop');
     seatBadge.dataset.seat = seat; seatBadge.setAttribute('aria-label', seated ? 'Seated: you may shoot' : 'Standing: sit down to shoot');
     shownSeat = seat;
   }
