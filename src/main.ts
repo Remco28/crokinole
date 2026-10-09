@@ -10,7 +10,9 @@ import { assignDitchSlots, beginReview, reviewDuration, type ShotReview } from '
 import { PLAYER_NAMES as names, PLAYER_COLORS as colors } from './game/players';
 import { remainingTime, resumeDeadline } from './game/clock';
 import { CLASSIC, TOURNAMENT_ROUNDS, completeTournamentRound, discsPerPlayer, discsPerSide, formatAllowsMode, formatKey, isGameOver, parseFormatKey, readFormat, startingPlayer, type FormatRoundResult, type MatchFormat } from './game/format';
+import { isFreshVisit, setupTutorial } from './tutorial';
 import { MATCH_STORAGE_KEY, readMatch, type Phase, type SavedMatch } from './game/session';
+const firstVisit = isFreshVisit(localStorage);
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('board-canvas');
 // A long press on the board is a context-menu gesture on desktop and mobile.
@@ -150,6 +152,17 @@ syncScoringOptions();
 clockSelect.addEventListener('change', () => {
   shotSeconds = Number(clockSelect.value);
   try { localStorage.setItem('crokinole-clock', String(shotSeconds)); } catch { /* optional */ }
+});
+let tutorialRemaining: number | null = null, tutorialOpen = false;
+const tutorial = setupTutorial({
+  onOpen: () => {
+    tutorialOpen = true; cancel(); cancelOrbit(); placementPointer = null; touches.clear(); pinching = false; pinchDistance = 0;
+    if (phase === 'pass') { tutorialRemaining = remainingTime(deadline, Date.now()); deadline = null; }
+  },
+  onClose: () => {
+    tutorialOpen = false; last = performance.now(); accumulator = 0;
+    if (tutorialRemaining !== null) { deadline = resumeDeadline(tutorialRemaining, Date.now()); tutorialRemaining = null; save(); }
+  },
 });
 let shot: Shot | null = null, hadOpponent = false, staged: Disc | null = null, readyAt = 0;
 const count = () => mode === 'duel' ? 2 : 4;
@@ -576,7 +589,7 @@ function tick(now: number) {
     }
     accumulator -= 1 / 120;
   }
-  if (!document.hidden && !settings.open) {
+  if (!document.hidden && !settings.open && !tutorialOpen) {
     if (phase === 'review' && review) {
       review.elapsed += elapsed * 1000;
       if (review.elapsed >= reviewDuration(review)) finishReview();
@@ -632,3 +645,4 @@ scene.snapView();
 winnerPresentation();
 if (paused) { scene.setPaused(true); pauseDialog.showModal(); }
 requestAnimationFrame(tick);
+if (firstVisit && !paused) tutorial.open();

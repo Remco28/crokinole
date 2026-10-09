@@ -24,7 +24,7 @@ try {
   async function evaluate(expression,timeoutMs=15000){const r=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true},timeoutMs);if(r.exceptionDetails)throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);return r.result.value;}
   async function until(expression){const deadline=Date.now()+15000;let error;while(Date.now()<deadline){try{if(await evaluate(expression,Math.max(1,deadline-Date.now())))return;}catch(e){error=e;}await sleep(100);}throw new Error(`Not ready: ${expression}; ${error || ''}`);}
   await call('Page.enable');await call('Runtime.enable'); await call('Page.setInterceptFileChooserDialog',{enabled:true});
-  const {identifier}=await call('Page.addScriptToEvaluateOnNewDocument',{source:"localStorage.setItem('crokinole-clock','0');"});
+  const {identifier}=await call('Page.addScriptToEvaluateOnNewDocument',{source:"localStorage.setItem('crokinole-clock','0'); localStorage.setItem('crokinole-tutorial','1');"});
   async function reload(){await evaluate('window.__oldDocument=true');await call('Page.reload',{ignoreCache:true});await until('!window.__oldDocument && !!document.getElementById("disc-design-note") && !document.querySelector("[data-disc-style=wood]").disabled');}
   await until('!!document.getElementById("disc-design-note") && !document.querySelector("[data-disc-style=wood]").disabled');await reload();
   const appearance=()=>evaluate('JSON.parse(localStorage.getItem("crokinole-disc-appearance-v1"))');

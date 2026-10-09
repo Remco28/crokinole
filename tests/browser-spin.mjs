@@ -64,7 +64,7 @@ try {
     await until('!window.__oldDocument && !!document.getElementById("shot-clock")');
   }
   async function reset(view) {
-    const { identifier } = await call('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.removeItem('crokinole-match-spin-v2'); localStorage.removeItem('crokinole-match'); localStorage.setItem('crokinole-clock','0'); localStorage.setItem('crokinole-table',JSON.stringify({view:${JSON.stringify(view)},zoom:1.2,muted:true,activeDiscHighlight:false}))` });
+    const { identifier } = await call('Page.addScriptToEvaluateOnNewDocument', { source: `localStorage.removeItem('crokinole-match-spin-v2'); localStorage.removeItem('crokinole-match'); localStorage.setItem('crokinole-clock','0'); localStorage.setItem('crokinole-tutorial','1'); localStorage.setItem('crokinole-table',JSON.stringify({view:${JSON.stringify(view)},zoom:1.2,muted:true,activeDiscHighlight:false}))` });
     try { await reload(); } finally { await call('Page.removeScriptToEvaluateOnNewDocument', { identifier }); }
     // A hidden independent scene supplies the exact production ray mapping;
     // no test/debug hooks are exposed by the actual game.
