@@ -79,7 +79,7 @@ export function createScene(canvas: HTMLCanvasElement) {
   let yaw = 0;
   let yawTarget = 0;
   let playerYaw = 0;
-  let orbitAngle = centeredOrbit(TILT.overview);
+  let orbitAngle = centeredOrbit(TILT.overview), invertVerticalDrag = false;
   // Shooter view: zooming in while a disc waits to be shot moves the eye down
   // and in behind that disc, keeping the board ahead in view. The anchor
   // follows the disc and stays put while the view eases back to the overview.
@@ -565,6 +565,7 @@ export function createScene(canvas: HTMLCanvasElement) {
       polarTarget = orbitAngle.polar;
     },
     getTilt: () => polarTarget,
+    setInvertVerticalDrag: (invert: boolean) => { invertVerticalDrag = invert; },
     snapView: () => {
       yaw = yawTarget; polar = polarTarget; closeness = closenessTarget();
       if (shotDisc) { shotAnchor.x = shotDisc.x; shotAnchor.y = shotDisc.y; }
@@ -585,7 +586,7 @@ export function createScene(canvas: HTMLCanvasElement) {
       yawTarget = playerYaw; polarTarget = orbitAngle.polar;
     },
     dragView: (horizontal: number, vertical: number) => {
-      orbitAngle = dragOrbit(orbitAngle, horizontal, vertical);
+      orbitAngle = dragOrbit(orbitAngle, horizontal, vertical, invertVerticalDrag);
       yawTarget = playerYaw + orbitAngle.offset; polarTarget = orbitAngle.polar;
     },
     centerView: () => {

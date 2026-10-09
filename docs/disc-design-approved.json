@@ -1,16 +1,16 @@
 {
   "accepted_physics_release": "425b35eb3a73663e55c1210deda8e0d821c0f827",
-  "boundary": "All16otherbaseline source files byte-exact; main only adds disc settings import/init; physical geometry reference/camera/picking/tick unchanged. Visual sidewall bowed within the same radius/height/flat footprints; wood stain/grain continuous. UI/source hashes reviewed independently; no physics golden changed. 2026-10-08 mobile shot zoom (user-approved): flick.ts adds only an optional speedScale (default 1, bit-identical); main/scene add the pinch shooter view and screen-pixel flick speed for every input (30 px per board inch reference). Pinned here alongside the cosmetic sources. 2026-10-08 camera stops (user-approved): orbit.ts tilts continuously between Overview and Table; main/scene/style add the three-stop camera control and one-cheek seat rule.",
+  "boundary": "All16otherbaseline source files byte-exact; main only adds disc settings import/init; physical geometry reference/camera/picking/tick unchanged. Visual sidewall bowed within the same radius/height/flat footprints; wood stain/grain continuous. UI/source hashes reviewed independently; no physics golden changed. 2026-10-08 mobile shot zoom (user-approved): flick.ts adds only an optional speedScale (default 1, bit-identical); main/scene add the pinch shooter view and screen-pixel flick speed for every input (30 px per board inch reference). Pinned here alongside the cosmetic sources. 2026-10-08 camera stops (user-approved): orbit.ts tilts continuously between Overview and Table; main/scene/style add the three-stop camera control and one-cheek seat rule. 2026-10-09 settings (user-approved): orbit.ts/scene.ts add an optional invert-vertical-drag flag (normal controls by default); main/index/style add the More options section (invert drag, final countdown badge) and drop the Preview sounds button.",
   "cosmeticSourceHashes": {
     "src/disc-appearance.ts": "5cb8956a1a6c0070af2577338f578ef138058f5f076b196e953cf10e95b5b7bb",
     "src/disc-settings.ts": "b985acca27a51fbe724be799646d6df687a283f2ed516dffb545a339f88dceaf",
     "src/game/flick.ts": "647e1fc76e226298bed171a2c432b55596a4a065d9bcd351d0113018f6515d99",
-    "src/main.ts": "6ffbec104660c521b5f47e9d424d3cbe7e84c6e0e707099e1122716b12e91da0",
+    "src/main.ts": "7c8b0731fd58eb10a234665eb072ee5f36574289e05e08c330b39843e90961c9",
     "src/render/disc-design.ts": "200fa7fb52cdc33c347dad36f66e9a65e17d838ba5487da5be1f5a36235d9f4e",
-    "src/render/orbit.ts": "7493cae78452fda94fd057c09b6de7baf3e7ebf068ac1958001e90a677b70593",
-    "src/render/scene.ts": "dcdf17f6b6e2731c188eeb0f4a431d68a9885d1257ea803e2834b9c6de28a12d",
+    "src/render/orbit.ts": "de210c4611bd971440f98d81ca254b0cfa5fdeccb1fa65bfe71a650d13df3205",
+    "src/render/scene.ts": "614bc8c86478fd750ab9286562d14f4c92a3c6feb5ff1927d0d7eabf49f15e95",
     "src/storage/disc-images.ts": "85ba7c6d788f822824864735f68c73a9df6261804ea8dee473f0e685ef9b3037",
-    "src/style.css": "1b33c6857eea02aa35d485f1165a8fcbf578a7cb3371b1d878d0f81cf41fcffd"
+    "src/style.css": "d51468099ce4256133cd245d5d502ad16fadb09bef5c8ece82064473fc1ab5fc"
   },
   "profile": "disc-appearance"
 }

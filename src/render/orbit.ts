@@ -11,10 +11,12 @@ export const SEATED_LEVEL = 0.5;
 export function centeredOrbit(polar: number = TILT.table): OrbitAngle {
   return { offset: 0, polar };
 }
-export function dragOrbit(angle: OrbitAngle, horizontal: number, vertical: number): OrbitAngle {
+// Normal controls: dragging up lowers the camera toward the table, like pulling
+// the board's far edge toward you. Inverted controls raise it instead.
+export function dragOrbit(angle: OrbitAngle, horizontal: number, vertical: number, invertVertical = false): OrbitAngle {
   return {
     offset: Math.max(-Math.PI / 4, Math.min(Math.PI / 4, angle.offset - horizontal)),
-    polar: Math.max(TILT.min, Math.min(TILT.max, angle.polar + vertical)),
+    polar: Math.max(TILT.min, Math.min(TILT.max, angle.polar + (invertVertical ? vertical : -vertical))),
   };
 }
 export function cameraLevel(polar: number, closeness: number): number {

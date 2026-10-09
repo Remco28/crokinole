@@ -14,10 +14,21 @@ describe('quadrant-limited camera', () => {
   });
   it('tilts continuously from the overview to seated eye level by drag alone', () => {
     let angle = centeredOrbit(TILT.overview);
-    for (let i = 0; i < 100; i++) angle = dragOrbit(angle, 0, 0.02);
-    expect(angle.polar).toBe(TILT.max);
     for (let i = 0; i < 100; i++) angle = dragOrbit(angle, 0, -0.02);
+    expect(angle.polar).toBe(TILT.max);
+    for (let i = 0; i < 100; i++) angle = dragOrbit(angle, 0, 0.02);
     expect(angle.polar).toBe(TILT.min);
+  });
+  it('lowers the camera when dragging up and raises it when dragging down by default', () => {
+    const start = centeredOrbit(TILT.table - 0.2);
+    expect(dragOrbit(start, 0, -0.05).polar).toBeCloseTo(start.polar + 0.05);
+    expect(dragOrbit(start, 0, 0.05).polar).toBeCloseTo(start.polar - 0.05);
+  });
+  it('reverses the vertical drag when inverted, leaving the horizontal drag alone', () => {
+    const start = centeredOrbit(TILT.table - 0.2);
+    expect(dragOrbit(start, 0, -0.05, true).polar).toBeCloseTo(start.polar - 0.05);
+    expect(dragOrbit(start, 0, 0.05, true).polar).toBeCloseTo(start.polar + 0.05);
+    expect(dragOrbit(start, 0.1, 0.05, true).offset).toBe(dragOrbit(start, 0.1, 0.05, false).offset);
   });
 });
 describe('camera stops and the one-cheek rule', () => {

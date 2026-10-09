@@ -21,7 +21,7 @@ const pauseDialog = $<HTMLDialogElement>('pause-dialog');
 let paused = false, pausedRemaining: number | null = null;
 const sound = new BoardSound();
 const DEFAULT_ZOOM = 1.2;
-let volume = 0.65, muted = false, tilt: number = TILT.overview, zoom = DEFAULT_ZOOM, theme: 'light' | 'dark' = 'light', activeDiscHighlight = true;
+let volume = 0.65, muted = false, tilt: number = TILT.overview, zoom = DEFAULT_ZOOM, theme: 'light' | 'dark' = 'light', activeDiscHighlight = true, invertDrag = false, finalCountdown = true;
 const clampZoom = (value: number) => Math.max(0.75, Math.min(SHOT_VIEW.maxZoom, value));
 // Flicks are measured in board inches, so the same finger or mouse movement
 // would shoot harder on a small screen or in a foreshortened view and softer
@@ -46,6 +46,8 @@ try {
   if (typeof prefs.activeDiscHighlight === 'boolean') activeDiscHighlight = prefs.activeDiscHighlight;
   if (typeof prefs.tilt === 'number' && Number.isFinite(prefs.tilt)) tilt = Math.max(TILT.min, Math.min(TILT.max, prefs.tilt * Math.PI / 180));
   else if (prefs.view === 'seated') tilt = TILT.table;
+  if (typeof prefs.invertDrag === 'boolean') invertDrag = prefs.invertDrag;
+  if (typeof prefs.finalCountdown === 'boolean') finalCountdown = prefs.finalCountdown;
   if (prefs.theme === 'dark') theme = 'dark';
 } catch { /* Preferences are optional. */ }
 document.body.dataset.theme = theme;
@@ -61,10 +63,13 @@ function tablePreferences() {
   $<HTMLInputElement>('theme-toggle').checked = theme === 'dark';
   $<HTMLInputElement>('active-disc-highlight').checked = activeDiscHighlight;
   scene?.setActiveDiscHighlight(activeDiscHighlight);
+  scene?.setInvertVerticalDrag(invertDrag);
+  $<HTMLInputElement>('invert-drag').checked = invertDrag;
+  $<HTMLInputElement>('final-countdown').checked = finalCountdown;
   if (scene) tilt = scene.getTilt();
   // view is kept for older builds that only know standing and seated.
   const view = tilt >= TILT.table - 0.01 ? 'seated' : 'standing', tiltDegrees = Math.round(tilt * 1800 / Math.PI) / 10;
-  try { localStorage.setItem('crokinole-table', JSON.stringify({ volume, muted, view, tilt: tiltDegrees, zoom, theme, activeDiscHighlight })); } catch { /* optional */ }
+  try { localStorage.setItem('crokinole-table', JSON.stringify({ volume, muted, view, tilt: tiltDegrees, zoom, theme, activeDiscHighlight, invertDrag, finalCountdown })); } catch { /* optional */ }
 }
 const activeDiscHighlightSetting = document.createElement('label');
 activeDiscHighlightSetting.className = 'theme-setting';
@@ -72,7 +77,7 @@ activeDiscHighlightSetting.innerHTML = '<input id="active-disc-highlight" type="
 $('theme-toggle').parentElement!.after(activeDiscHighlightSetting);
 async function unlockSound() {
   if (paused) return;
-  if (!await sound.unlock()) $('sound-note').textContent = 'Audio could not start. Tap Preview sounds to try again.';
+  await sound.unlock();
 }
 // Gesture listeners also recover audio after returning from a background tab.
 document.addEventListener('pointerdown', () => { void unlockSound(); }, { passive: true });
@@ -91,12 +96,11 @@ $<HTMLInputElement>('theme-toggle').addEventListener('change', e => {
 $<HTMLInputElement>('active-disc-highlight').addEventListener('change', e => {
   activeDiscHighlight = (e.target as HTMLInputElement).checked; tablePreferences();
 });
-$('sound-preview').addEventListener('click', async () => {
-  if (muted || volume === 0) { $('sound-note').textContent = 'Enable sound and raise the volume to hear the preview.'; return; }
-  const button = $<HTMLButtonElement>('sound-preview'); button.disabled = true;
-  const ok = await sound.preview();
-  $('sound-note').textContent = ok ? 'Soft / medium / firm wood clicks · peg · twenty · ditch' : 'Audio unavailable. Try another browser or enable audio for this site.';
-  window.setTimeout(() => { button.disabled = false; }, 2500);
+$<HTMLInputElement>('invert-drag').addEventListener('change', e => {
+  invertDrag = (e.target as HTMLInputElement).checked; tablePreferences();
+});
+$<HTMLInputElement>('final-countdown').addEventListener('change', e => {
+  finalCountdown = (e.target as HTMLInputElement).checked; tablePreferences();
 });
 let scene: ReturnType<typeof createScene>;
 try { scene = createScene(canvas); } catch {
@@ -118,6 +122,9 @@ try {
 const clockLabel = document.createElement('span');
 clockLabel.id = 'shot-clock'; clockLabel.setAttribute('role', 'timer');
 $('round-label').after(clockLabel);
+const countdownBadge = document.createElement('div');
+countdownBadge.id = 'final-countdown-badge'; countdownBadge.hidden = true; countdownBadge.setAttribute('aria-hidden', 'true');
+canvas.parentElement!.append(countdownBadge);
 const clockSetting = document.createElement('label');
 clockSetting.textContent = 'Shot clock (applies next turn)';
 const clockSelect = document.createElement('select'); clockSelect.id = 'shot-clock-setting';
@@ -519,6 +526,9 @@ function tick(now: number) {
   const remaining = deadline === null ? null : Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
   clockLabel.textContent = remaining === null ? ' · Clock off' : ` · ${remaining}s`;
   clockLabel.classList.toggle('urgent', remaining !== null && remaining <= 10);
+  const showCountdown = finalCountdown && awaitingShot && remaining !== null && remaining <= 10;
+  if (countdownBadge.hidden === showCountdown) countdownBadge.hidden = !showCountdown;
+  if (showCountdown && countdownBadge.textContent !== String(remaining)) countdownBadge.textContent = String(remaining);
   const elapsed = Math.min((now - last) / 1000, 0.25);
   const dt = Math.min(elapsed, 0.05); last = now;
   accumulator += dt;

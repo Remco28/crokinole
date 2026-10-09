@@ -256,3 +256,8 @@ body[data-theme=light] #seat-badge .crack{stroke:#6b5420aa}
 /* The phone status line can wrap to two lines; clear it. */
 @media(max-width:899px){#table-controls{top:52px}}
 @media (prefers-reduced-motion:reduce){#seat-badge .cheek{transition:none}#seat-badge.plop .cheek-body{animation:none}#seat-badge[data-seat=standing] .cheek-body{animation:none;transform:translateY(-8px)}}
+
+#more-options>summary{font-size:13px}#more-options label:first-of-type{margin-top:16px}
+#final-countdown-badge{position:absolute;top:12px;right:14px;z-index:3;min-width:46px;padding:4px 12px;border-radius:999px;background:#2a1411d9;border:1px solid #ff6b5a;color:#ff6b5a;font:700 24px/1.2 Manrope,sans-serif;font-variant-numeric:tabular-nums;text-align:center;pointer-events:none}
+#final-countdown-badge[hidden]{display:none}
+body[data-theme=light] #final-countdown-badge{background:#fff1ee;border-color:#c62f1f;color:#c62f1f}
