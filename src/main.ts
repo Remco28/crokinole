@@ -9,6 +9,7 @@ import { completeRound, inspectShot, sideOf, type Mode, type RoundResult } from 
 import { assignDitchSlots, beginReview, reviewDuration, type ShotReview } from './game/review';
 import { PLAYER_NAMES as names, PLAYER_COLORS as colors } from './game/players';
 import { remainingTime, resumeDeadline } from './game/clock';
+import { CLASSIC, TOURNAMENT_ROUNDS, completeTournamentRound, discsPerPlayer, discsPerSide, formatAllowsMode, formatKey, isGameOver, parseFormatKey, readFormat, startingPlayer, type FormatRoundResult, type MatchFormat } from './game/format';
 import { MATCH_STORAGE_KEY, readMatch, type Phase, type SavedMatch } from './game/session';
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('board-canvas');
@@ -110,6 +111,7 @@ try { scene = createScene(canvas); } catch {
 scene.setTilt(tilt); scene.setZoom(zoom); tablePreferences();
 setupDiscSettings(scene);
 let mode: Mode = 'duel', player = 0, round = 1, id = 0;
+let format: MatchFormat = CLASSIC, game = 1, gamesWon: number[] = [0, 0];
 let discs: Disc[] = [], scores = [0, 0], used = [0, 0], phase: Phase = 'pass';
 let restored = false, winnerDismissed = false;
 const canInspectBoard = () => phase === 'pass' || phase === 'round' || (phase === 'won' && winnerDismissed);
@@ -130,19 +132,33 @@ clockSetting.textContent = 'Shot clock (applies next turn)';
 const clockSelect = document.createElement('select'); clockSelect.id = 'shot-clock-setting';
 clockSelect.innerHTML = '<option value="60">60 seconds</option><option value="30">30 seconds</option><option value="0">Off</option>';
 clockSelect.value = String(shotSeconds); clockSetting.append(clockSelect);
-$('mode').parentElement!.after(clockSetting);
+$('scoring-note').after(clockSetting);
+const scoringSelect = $<HTMLSelectElement>('scoring');
+const scoringNotes: Record<string, string> = {
+  classic: '12 discs each. Each round adds the difference in disc totals. First to 100.',
+  tournament: 'World Crokinole Championship rules. 8 discs each, four rounds a game. The higher round total scores 2, a tie scores 1 each, and a tied game plays another round.',
+};
+function syncScoringOptions() {
+  const ffa = $<HTMLSelectElement>('mode').value === 'ffa';
+  for (const option of scoringSelect.options) option.disabled = ffa && option.value !== 'classic';
+  if (ffa) scoringSelect.value = 'classic';
+  $('scoring-note').textContent = ffa ? 'Free-for-all uses classic scoring.' : scoringNotes[scoringSelect.value === 'classic' ? 'classic' : 'tournament'];
+}
+$('mode').addEventListener('change', syncScoringOptions);
+scoringSelect.addEventListener('change', syncScoringOptions);
+syncScoringOptions();
 clockSelect.addEventListener('change', () => {
   shotSeconds = Number(clockSelect.value);
   try { localStorage.setItem('crokinole-clock', String(shotSeconds)); } catch { /* optional */ }
 });
 let shot: Shot | null = null, hadOpponent = false, staged: Disc | null = null, readyAt = 0;
 const count = () => mode === 'duel' ? 2 : 4;
-const allowance = () => mode === 'duel' ? 12 : 6;
+const allowance = () => discsPerPlayer(mode, format);
 const yaw = () => player * Math.PI * 2 / count();
 const side = (owner: number) => sideOf(mode, owner);
 const label = (i: number) => mode === 'teams' ? [`${names[0]} + ${names[2]}`, `${names[1]} + ${names[3]}`][i] : names[i];
 function save() {
-  const snapshot: SavedMatch = { version: 2, mode, player, round, id, discs, scores, used, phase, review, roundResult, winnerDismissed, deadline, paused, remaining: pausedRemaining, stagedId: staged?.id ?? null, hadOpponent, shot: shot ? { touched: [...shot.touched], opponentContact: shot.opponentContact, side: shot.side } : null };
+  const snapshot: SavedMatch & { scoring: string; game: number; gamesWon: number[] } = { scoring: formatKey(format), game, gamesWon, version: 2, mode, player, round, id, discs, scores, used, phase, review, roundResult, winnerDismissed, deadline, paused, remaining: pausedRemaining, stagedId: staged?.id ?? null, hadOpponent, shot: shot ? { touched: [...shot.touched], opponentContact: shot.opponentContact, side: shot.side } : null };
   try { localStorage.setItem(MATCH_STORAGE_KEY, JSON.stringify(snapshot)); } catch { /* Storage is optional. */ }
 }
 function pauseGame() {
@@ -163,6 +179,17 @@ pauseDialog.addEventListener('cancel', event => { event.preventDefault(); resume
 window.addEventListener('pagehide', save);
 let scoreboardExpanded = false, roundBoardFocus = false;
 const eyeIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.2 12s3.6-6 9.8-6 9.8 6 9.8 6-3.6 6-9.8 6-9.8-6-9.8-6Z"></path><circle cx="12" cy="12" r="2.6"></circle></svg>';
+function roundLabel() {
+  if (format.scoring === 'classic') return `ROUND ${round} · FIRST TO 100`;
+  const prefix = format.games === 3 ? `GAME ${game} OF 3 · ` : '';
+  return round > TOURNAMENT_ROUNDS ? `${prefix}EXTRA ROUND ${round - TOURNAMENT_ROUNDS}` : `${prefix}ROUND ${round} OF ${TOURNAMENT_ROUNDS}`;
+}
+function roundNote() {
+  const result = roundResult as FormatRoundResult | null;
+  if (format.scoring === 'classic') return `Disc counts × ring value = total. ${mode === 'ffa' ? 'Each player adds their own total.' : 'Only the difference is added to the winning side.'}`;
+  const outcome = result && result.gameOver && result.gameWinner !== null ? ` ${label(result.gameWinner)} ${mode === 'teams' ? 'win' : 'wins'} game ${game}.` : result && round >= TOURNAMENT_ROUNDS ? ' The game is tied, so one more round is played.' : '';
+  return `Disc counts × ring value = total. The higher total scores 2 points and a tie scores 1 each.${outcome}`;
+}
 function hud() {
   const scoreboard = $('scoreboard');
   scoreboard.dataset.expanded = String(scoreboardExpanded);
@@ -171,16 +198,16 @@ function hud() {
   scoreboard.innerHTML = scores.map((score, i) => {
     const twenties = discs.filter(d => side(d.owner) === i && d.state === 'sunk').length;
     const played = mode === 'teams' ? used.filter((_, p) => side(p) === i).reduce((a, b) => a + b, 0) : used[i];
-    return `<button type="button" class="score ${side(player) === i ? 'active' : ''}" data-score-card="${i}" aria-expanded="${scoreboardExpanded}" aria-label="${label(i)}, ${score} match points${side(player) === i ? ', current turn' : ''}. ${scoreboardExpanded ? 'Hide' : 'Show'} details" style="--player:${colors[i]}"><span class="score-identity"><span class="dot"></span><span class="name">${label(i)}</span></span><span class="match-total"><strong>${score}</strong><small>pts</small></span><span class="score-stats"><small><span>Twenties</span><b>${twenties}</b></small><small><span>Played</span><b>${played} / ${mode === 'ffa' ? 6 : 12}</b></small></span></button>`;
+    return `<button type="button" class="score ${side(player) === i ? 'active' : ''}" data-score-card="${i}" aria-expanded="${scoreboardExpanded}" aria-label="${label(i)}, ${score} match points${side(player) === i ? ', current turn' : ''}. ${scoreboardExpanded ? 'Hide' : 'Show'} details" style="--player:${colors[i]}"><span class="score-identity"><span class="dot"></span><span class="name">${label(i)}</span></span><span class="match-total"><strong>${score}</strong><small>pts</small></span><span class="score-stats"><small><span>Twenties</span><b>${twenties}</b></small><small><span>Played</span><b>${played} / ${discsPerSide(mode, format)}</b></small>${format.games === 3 ? `<small><span>Games won</span><b>${gamesWon[i]}</b></small>` : ''}</span></button>`;
   }).join('');
-  $('round-label').textContent = `ROUND ${round} · FIRST TO 100`;
+  $('round-label').textContent = roundLabel();
   assignDitchSlots(discs);
   scene.syncDiscs(discs, review);
   const summary = $('round-summary');
   summary.hidden = !roundResult;
   if (roundResult) {
     summary.dataset.boardFocus = String(roundBoardFocus);
-    summary.innerHTML = `<div class="summary-heading"><h2>Round ${round} · score breakdown</h2><button class="round-board-toggle" type="button" aria-expanded="${!roundBoardFocus}" aria-label="${roundBoardFocus ? 'Show round scores' : 'Show game board'}">${eyeIcon}</button></div><table><thead><tr><th scope="col">Side</th><th scope="col">20s</th><th scope="col">15s</th><th scope="col">10s</th><th scope="col">5s</th><th scope="col">Total</th><th scope="col">Added</th></tr></thead><tbody>${roundResult.sides.map((row, i) => `<tr><th scope="row">${label(i)}</th><td>${row.twenties}</td><td>${row.fifteens}</td><td>${row.tens}</td><td>${row.fives}</td><td>${row.total}</td><td><strong>+${row.awarded}</strong></td></tr>`).join('')}</tbody></table><p>Disc counts × ring value = total. ${mode === 'ffa' ? 'Each player adds their own total.' : 'Only the difference is added to the winning side.'}</p>`;
+    summary.innerHTML = `<div class="summary-heading"><h2>Round ${round} · score breakdown</h2><button class="round-board-toggle" type="button" aria-expanded="${!roundBoardFocus}" aria-label="${roundBoardFocus ? 'Show round scores' : 'Show game board'}">${eyeIcon}</button></div><table><thead><tr><th scope="col">Side</th><th scope="col">20s</th><th scope="col">15s</th><th scope="col">10s</th><th scope="col">5s</th><th scope="col">Total</th><th scope="col">Added</th></tr></thead><tbody>${roundResult.sides.map((row, i) => `<tr><th scope="row">${label(i)}</th><td>${row.twenties}</td><td>${row.fifteens}</td><td>${row.tens}</td><td>${row.fives}</td><td>${row.total}</td><td><strong>+${row.awarded}</strong></td></tr>`).join('')}</tbody></table><p>${roundNote()}</p>`;
   } else summary.dataset.boardFocus = 'false';
   winnerPresentation();
 }
@@ -218,12 +245,17 @@ function pass(message = '', restoreClock = false) {
 }
 function start() {
   mode = $<HTMLSelectElement>('mode').value as Mode;
+  format = parseFormatKey(scoringSelect.value) ?? CLASSIC;
+  if (!formatAllowsMode(format, mode)) format = CLASSIC;
+  game = 1; gamesWon = Array(mode === 'ffa' ? 4 : 2).fill(0);
   player = 0; round = 1; id = 0; discs = []; scores = Array(mode === 'ffa' ? 4 : 2).fill(0); used = Array(count()).fill(0);
   review = null; roundResult = null; shot = null; roundBoardFocus = false; winnerDismissed = false;
   settings.close(); pass();
 }
 function nextRound() {
-  round++; discs = []; used.fill(0); player = (round - 1) % count();
+  // After a finished game of a longer match, the next game starts from zero.
+  if (isGameOver(roundResult)) { game++; round = 1; scores = scores.map(() => 0); } else round++;
+  discs = []; used.fill(0); player = startingPlayer(round, game, count());
   roundResult = null; roundBoardFocus = false; pass();
 }
 // Back to the view each turn starts with: seated at Table, default zoom,
@@ -253,7 +285,7 @@ function winnerPresentation() {
   const title = `${label(winner)} ${mode === 'teams' ? 'Win' : 'Wins'}!`;
   $('winner-title').textContent = title;
   $('winner-overlay').style.setProperty('--winner-color', colors[winner]);
-  $('winner-result').textContent = `${scores.join('–')} · ${round} round${round === 1 ? '' : 's'}`;
+  $('winner-result').textContent = format.games === 3 ? `${gamesWon.join('–')} in games · ${scores.join('–')} last game` : `${scores.join('–')} · ${round} round${round === 1 ? '' : 's'}`;
 }
 $('inspect-board').addEventListener('click', () => {
   winnerDismissed = true; roundBoardFocus = true; hud(); save();
@@ -469,11 +501,16 @@ function finishReview() {
   const valid = review!.verdict.valid;
   review = null;
   if (used.every(n => n === allowance())) {
-    roundResult = completeRound(discs, mode, scores); scores = roundResult.after;
+    if (format.scoring === 'tournament') {
+      const result = completeTournamentRound(discs, mode, scores, round, format, gamesWon);
+      roundResult = result; gamesWon = result.gamesWon;
+    } else roundResult = completeRound(discs, mode, scores);
+    scores = roundResult.after;
     phase = roundResult.winner !== null ? 'won' : 'round'; winnerDismissed = false;
-    banner.textContent = roundResult.winner !== null ? `${label(roundResult.winner)} wins!` : 'Round complete';
+    const gameDone = isGameOver(roundResult);
+    banner.textContent = roundResult.winner !== null ? `${label(roundResult.winner)} wins!` : gameDone ? 'Game complete' : 'Round complete';
     hint.textContent = roundResult.sides.map((row, i) => `${label(i)} +${row.awarded}`).join(' · ');
-    next.textContent = phase === 'won' ? 'Start a new game' : 'Next round'; next.setAttribute('aria-label', next.textContent); next.dataset.mode = 'result'; next.hidden = false; hud(); save();
+    next.textContent = phase === 'won' ? 'Start a new game' : gameDone ? 'Next game' : 'Next round'; next.setAttribute('aria-label', next.textContent); next.dataset.mode = 'result'; next.hidden = false; hud(); save();
     if (phase === 'won') $('inspect-board').focus({ preventScroll: true });
   } else { player = (player + 1) % count(); pass(valid ? '' : 'Foul resolved'); }
 }
@@ -561,15 +598,16 @@ try {
   const savedSkin = localStorage.getItem('crokinole-skin'); if (savedSkin && ['maple', 'walnut', 'slate'].includes(savedSkin)) { skin.value = savedSkin; scene.setSkin(savedSkin); }
   const raw = localStorage.getItem(MATCH_STORAGE_KEY) ?? localStorage.getItem('crokinole-match');
   if (raw) {
-    const data = readMatch(raw);
-    if (data) {
+    const data = readMatch(raw), saved = data ? readFormat(data, data as unknown as Record<string, unknown>) : null;
+    if (data && saved) {
+      format = saved.format; game = saved.game; gamesWon = saved.gamesWon;
       mode = data.mode; player = data.player; round = data.round; id = data.id; discs = data.discs; scores = data.scores; used = data.used;
       deadline = data.deadline; phase = data.phase; restored = true;
       paused = data.paused; pausedRemaining = data.remaining;
       staged = discs.find(d => d.id === data.stagedId) ?? null;
       hadOpponent = data.hadOpponent;
       shot = data.shot ? { ...data.shot, touched: new Set(data.shot.touched), sideOf: side } : null;
-      $<HTMLSelectElement>('mode').value = mode;
+      $<HTMLSelectElement>('mode').value = mode; scoringSelect.value = formatKey(format); syncScoringOptions();
       roundResult = data.roundResult; review = data.review; winnerDismissed = data.winnerDismissed === true;
     }
   }
@@ -581,9 +619,9 @@ if (restored) {
   if (phase === 'review') { next.hidden = true; reviewMessage(); }
   else if (phase === 'moving') { next.hidden = true; banner.textContent = 'Let it slide'; hint.textContent = 'Waiting for the board to settle…'; }
   else if (phase === 'round' || phase === 'won') {
-    banner.textContent = phase === 'won' ? `${label(scores.indexOf(Math.max(...scores)))} wins!` : 'Round complete';
+    banner.textContent = phase === 'won' ? `${label(roundResult?.winner ?? scores.indexOf(Math.max(...scores)))} wins!` : isGameOver(roundResult) ? 'Game complete' : 'Round complete';
     hint.textContent = 'Your table has been restored.';
-    next.textContent = phase === 'won' ? 'Start a new game' : 'Next round'; next.setAttribute('aria-label', next.textContent); next.dataset.mode = 'result';
+    next.textContent = phase === 'won' ? 'Start a new game' : isGameOver(roundResult) ? 'Next game' : 'Next round'; next.setAttribute('aria-label', next.textContent); next.dataset.mode = 'result';
   } else {
     pass('', true);
   }
