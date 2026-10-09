@@ -139,13 +139,14 @@ $('scoring-note').after(clockSetting);
 const scoringSelect = $<HTMLSelectElement>('scoring');
 const scoringNotes: Record<string, string> = {
   classic: '12 discs each. Each round adds the difference in disc totals. First to 100.',
+  race: 'Tournament scoring with no round limit: the higher round total scores 2, a tie scores 1 each, and the first side to reach 9 wins. The round that gets there is finished first.',
   tournament: 'World Crokinole Championship rules. 8 discs each, four rounds a game. The higher round total scores 2, a tie scores 1 each, and a tied game plays another round.',
 };
 function syncScoringOptions() {
   const ffa = $<HTMLSelectElement>('mode').value === 'ffa';
   for (const option of scoringSelect.options) option.disabled = ffa && option.value !== 'classic';
   if (ffa) scoringSelect.value = 'classic';
-  $('scoring-note').textContent = ffa ? 'Free-for-all uses classic scoring.' : scoringNotes[scoringSelect.value === 'classic' ? 'classic' : 'tournament'];
+  $('scoring-note').textContent = ffa ? 'Free-for-all uses classic scoring.' : scoringNotes[scoringSelect.value === 'classic' ? 'classic' : scoringSelect.value === 'tournament-race9' ? 'race' : 'tournament'];
 }
 $('mode').addEventListener('change', syncScoringOptions);
 scoringSelect.addEventListener('change', syncScoringOptions);
@@ -201,13 +202,15 @@ const eyeIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.2 12s3.
 function roundLabel() {
   if (practice) return 'PRACTICE';
   if (format.scoring === 'classic') return `ROUND ${round} · FIRST TO 100`;
+  if (format.raceTo) return `ROUND ${round} · RACE TO ${format.raceTo}`;
   const prefix = format.games === 3 ? `GAME ${game} OF 3 · ` : '';
   return round > TOURNAMENT_ROUNDS ? `${prefix}EXTRA ROUND ${round - TOURNAMENT_ROUNDS}` : `${prefix}ROUND ${round} OF ${TOURNAMENT_ROUNDS}`;
 }
 function roundNote() {
   const result = roundResult as FormatRoundResult | null;
   if (format.scoring === 'classic') return `Disc counts × ring value = total. ${mode === 'ffa' ? 'Each player adds their own total.' : 'Only the difference is added to the winning side.'}`;
-  const outcome = result && result.gameOver && result.gameWinner !== null ? ` ${label(result.gameWinner)} ${mode === 'teams' ? 'win' : 'wins'} game ${game}.` : result && round >= TOURNAMENT_ROUNDS ? ' The game is tied, so one more round is played.' : '';
+  const reached = format.raceTo ? Math.max(...scores) >= format.raceTo : round >= TOURNAMENT_ROUNDS;
+  const outcome = result && result.gameOver && result.gameWinner !== null ? (format.raceTo ? '' : ` ${label(result.gameWinner)} ${mode === 'teams' ? 'win' : 'wins'} game ${game}.`) : result && reached ? ' The top scores are tied, so one more round is played.' : '';
   return `Disc counts × ring value = total. The higher total scores 2 points and a tie scores 1 each.${outcome}`;
 }
 function hud() {

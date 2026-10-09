@@ -10,16 +10,20 @@ import { roundBreakdown, type Mode, type RoundResult } from './rules';
 // gives 1 each. Four rounds make a game, and a tied game plays extra rounds.
 // A match is one game, or the best of three.
 export type Scoring = 'classic' | 'tournament';
-export interface MatchFormat { scoring: Scoring; games: 1 | 3 }
+// raceTo replaces the four-round game: rounds are played until a side reaches
+// that many points (the round that gets there is finished and scored first).
+export interface MatchFormat { scoring: Scoring; games: 1 | 3; raceTo?: number }
 export const CLASSIC: MatchFormat = { scoring: 'classic', games: 1 };
 export const TOURNAMENT_ROUNDS = 4;
 
-export type FormatKey = 'classic' | 'tournament-1' | 'tournament-3';
-export const formatKey = (f: MatchFormat): FormatKey => f.scoring === 'classic' ? 'classic' : f.games === 3 ? 'tournament-3' : 'tournament-1';
+export type FormatKey = 'classic' | 'tournament-1' | 'tournament-3' | 'tournament-race9';
+export const RACE_TARGET = 9;
+export const formatKey = (f: MatchFormat): FormatKey => f.scoring === 'classic' ? 'classic' : f.raceTo ? 'tournament-race9' : f.games === 3 ? 'tournament-3' : 'tournament-1';
 export function parseFormatKey(value: unknown): MatchFormat | null {
   if (value === 'classic') return CLASSIC;
   if (value === 'tournament-1') return { scoring: 'tournament', games: 1 };
   if (value === 'tournament-3') return { scoring: 'tournament', games: 3 };
+  if (value === 'tournament-race9') return { scoring: 'tournament', games: 1, raceTo: RACE_TARGET };
   return null;
 }
 // Free-for-all has no head-to-head winner, so it cannot use round points.
@@ -43,7 +47,8 @@ export function completeTournamentRound(discs: Disc[], mode: Mode, scores: numbe
   sides.forEach((row, i) => { row.awarded = roundPoints(row.total, sides[1 - i].total); });
   const after = scores.map((score, i) => score + sides[i].awarded);
   const high = Math.max(...after), leaders = after.map((score, i) => score === high ? i : -1).filter(i => i >= 0);
-  const gameWinner = round >= TOURNAMENT_ROUNDS && leaders.length === 1 ? leaders[0] : null;
+  const finished = format.raceTo ? high >= format.raceTo : round >= TOURNAMENT_ROUNDS;
+  const gameWinner = finished && leaders.length === 1 ? leaders[0] : null;
   const won = gamesWon.map((n, i) => n + (i === gameWinner ? 1 : 0));
   const winner = gameWinner !== null && won[gameWinner] >= gamesToWin(format) ? gameWinner : null;
   return { sides, before: [...scores], after, winner, gameOver: gameWinner !== null, gameWinner, gamesWon: won };

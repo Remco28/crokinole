@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { makeDisc } from '../src/sim/physics';
-import { CLASSIC, TOURNAMENT_ROUNDS, completeTournamentRound, discsPerPlayer, discsPerSide, formatAllowsMode, formatKey, gamesToWin, isGameOver, parseFormatKey, readFormat, roundPoints, startingPlayer, type MatchFormat } from '../src/game/format';
+import { RACE_TARGET, CLASSIC, TOURNAMENT_ROUNDS, completeTournamentRound, discsPerPlayer, discsPerSide, formatAllowsMode, formatKey, gamesToWin, isGameOver, parseFormatKey, readFormat, roundPoints, startingPlayer, type MatchFormat } from '../src/game/format';
 import { readMatch } from '../src/game/session';
 
 const single: MatchFormat = { scoring: 'tournament', games: 1 };
@@ -58,6 +58,31 @@ describe('tournament game and match end', () => {
   it('does not report a round before the fourth as a finished game', () => {
     expect(isGameOver(completeTournamentRound([fifteen(1, 0)], 'duel', [0, 0], 1, single, [0, 0]))).toBe(false);
     expect(isGameOver(null)).toBe(false);
+  });
+});
+
+describe('race to 9', () => {
+  const race = parseFormatKey('tournament-race9')!;
+  it('parses and round-trips', () => {
+    expect(race).toEqual({ scoring: 'tournament', games: 1, raceTo: RACE_TARGET }); expect(formatKey(race)).toBe('tournament-race9');
+  });
+  it('does not end at four rounds while nobody has reached 9', () => {
+    const r = completeTournamentRound([fifteen(1, 0)], 'duel', [4, 2], 4, race, [0, 0]);
+    expect(r.after).toEqual([6, 2]); expect(r.gameOver).toBe(false); expect(r.winner).toBeNull();
+  });
+  it('finishes the round that reaches 9 and names the leader', () => {
+    const r = completeTournamentRound([fifteen(1, 0)], 'duel', [7, 6], 5, race, [0, 0]);
+    expect(r.after).toEqual([9, 6]); expect(r.winner).toBe(0); expect(r.gameOver).toBe(true);
+  });
+  it('plays on when both reach 9 level, and a tied round can pass 9 together', () => {
+    const tied = completeTournamentRound([fifteen(1, 0), fifteen(2, 1)], 'duel', [8, 8], 6, race, [0, 0]);
+    expect(tied.after).toEqual([9, 9]); expect(tied.winner).toBeNull();
+    const next = completeTournamentRound([fifteen(1, 1)], 'duel', [9, 9], 7, race, [0, 0]);
+    expect(next.winner).toBe(1);
+  });
+  it('is not allowed in free-for-all and loads from a save', () => {
+    expect(formatAllowsMode(race, 'ffa')).toBe(false);
+    expect(readFormat({ mode: 'duel', scores: [3, 2], used: [0, 0] }, { scoring: 'tournament-race9' })?.format).toEqual(race);
   });
 });
 
