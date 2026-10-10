@@ -358,6 +358,7 @@ export function createScene(canvas: HTMLCanvasElement) {
   interface TubeRig { side: number; root: THREE.Group; owners: number[]; sim: TubeState; meshes: Array<THREE.Mesh<THREE.LatheGeometry, THREE.MeshStandardMaterial>>; motion: RimMotion; target: number }
   const tubeRigs = new Map<number, TubeRig>();
   let tubeListener: ((event: TubeEvent, x: number, y: number) => void) | null = null;
+  let tubeLandAt: number | null = null;
   function tubeDiscMesh(owner: number) {
     const look = discLook(owner);
     const mesh = new THREE.Mesh(discGeo, look.bodyMaterial.clone()); mesh.castShadow = true; mesh.userData.owner = owner;
@@ -416,7 +417,7 @@ export function createScene(canvas: HTMLCanvasElement) {
       const { motion, accel } = stepRim(rig.motion, rig.target, dt);
       rig.motion = motion; placeTubeRoot(rig);
       const wasAwake = rig.sim.awake;
-      stepTube(rig.sim, dt, rimFrameAccel(accel, motion.w, TUBE.centre), tubeListener ? event => tubeListener!(event, rig.root.position.x, rig.root.position.z) : undefined);
+      stepTube(rig.sim, dt, rimFrameAccel(accel, motion.w, TUBE.centre), event => { if (event.kind === 'land') tubeLandAt = clock.elapsedTime; tubeListener?.(event, rig.root.position.x, rig.root.position.z); });
       if (wasAwake || rig.sim.awake) applyTube(rig);
     }
   }
@@ -687,6 +688,8 @@ export function createScene(canvas: HTMLCanvasElement) {
     },
     syncDiscs,
     setTubes,
+    // Scene-clock seconds, the last time a disc landed in a tube, and whether one is still falling.
+    tubeDrops: () => ({ now: clock.elapsedTime, lastLand: tubeLandAt, falling: [...tubeRigs.values()].some(r => r.sim.discs.some(d => d.falling)) }),
     setTubeListener: (listener: ((event: TubeEvent, x: number, y: number) => void) | null) => { tubeListener = listener; },
     tubeHit,
     tubeRimHeight: TUBE.rimTop,

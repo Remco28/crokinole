@@ -61,7 +61,7 @@ describe('moving tubes', () => {
   });
 });
 
-import { RIM_STIFFNESS, rimFrameAccel, stepRim } from '../src/tubes';
+import { DROP_HOLD, DROP_MAX, dropFinished, RIM_STIFFNESS, rimFrameAccel, stepRim } from '../src/tubes';
 describe('rim follower', () => {
   const settle = (from: number, to: number, seconds = 2) => { let m = { a: from, w: 0 }, peak = 0, overshoot = 0; for (let i = 0; i < seconds * 60; i++) { const r = stepRim(m, to, 1 / 60); m = r.motion; peak = Math.max(peak, Math.abs(r.accel)); overshoot = Math.max(overshoot, Math.abs(Math.atan2(Math.sin(m.a - to), Math.cos(m.a - to)))) } return { m, peak }; };
   it('arrives on the target and stops', () => {
@@ -75,5 +75,20 @@ describe('rim follower', () => {
   });
   it('converts to the tube frame with the centripetal pull toward the board', () => {
     expect(rimFrameAccel(2, 0, 14.9)).toEqual({ x: 29.8, z: -0 }); expect(rimFrameAccel(0, 3, 10).z).toBeCloseTo(-90); expect(RIM_STIFFNESS).toBeGreaterThan(0);
+  });
+});
+
+describe('waiting for a 20 to drop', () => {
+  it('is not finished while the disc is still falling, or before anything has landed', () => {
+    expect(dropFinished(1, 0, null, true)).toBe(false); expect(dropFinished(1, 0, null, false)).toBe(false); expect(dropFinished(1, 0, 0.8, true)).toBe(false);
+  });
+  it('holds briefly after the landing so the drop can be seen, then moves on', () => {
+    expect(dropFinished(1.0 + DROP_HOLD - 0.01, 0, 1.0, false)).toBe(false); expect(dropFinished(1.0 + DROP_HOLD + 0.001, 0, 1.0, false)).toBe(true);
+  });
+  it('ignores a landing from before this drop began', () => {
+    expect(dropFinished(5, 4, 2, false)).toBe(false);
+  });
+  it('never waits longer than the cap, even if nothing lands', () => {
+    expect(dropFinished(DROP_MAX, 0, null, true)).toBe(true);
   });
 });

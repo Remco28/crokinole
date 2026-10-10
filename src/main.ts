@@ -11,7 +11,7 @@ import { PLAYER_NAMES as names, PLAYER_COLORS as colors } from './game/players';
 import { remainingTime, resumeDeadline } from './game/clock';
 import { CLASSIC, TOURNAMENT_ROUNDS, completeTournamentRound, discsPerPlayer, discsPerSide, formatAllowsMode, formatKey, isGameOver, parseFormatKey, readFormat, startingPlayer, type FormatRoundResult, type MatchFormat } from './game/format';
 import { FOLLOW, GENTLE, fastestSpeed, pullbackFor, SETTLE_DELAY_MS, movingFocus, parseShotCamera, settleFocus, type ShotCamera } from './render/shot-camera';
-import { SMALL_SCREEN_QUERY, anglesFor, angleFromPoint, parseTubePref, placeTube, readTubeAngles, tubeSpecs, tubesVisible, type TubeAngleStore, type TubePref } from './tubes';
+import { dropFinished, SMALL_SCREEN_QUERY, anglesFor, angleFromPoint, parseTubePref, placeTube, readTubeAngles, tubeSpecs, tubesVisible, type TubeAngleStore, type TubePref } from './tubes';
 import { isFreshVisit, setupTutorial } from './tutorial';
 import { beginLog, createPracticePanel, liveText, recordEvent, recordStep, summarize, type ShotLog } from './practice';
 import { MATCH_STORAGE_KEY, readMatch, type Phase, type SavedMatch } from './game/session';
@@ -633,7 +633,22 @@ function reviewMessage() {
   const revoked = verdict.revokedTwenties ? ` ${verdict.revokedTwenties} twenty${verdict.revokedTwenties === 1 ? '' : ' scores'} cancelled.` : '';
   hint.textContent = `${reason} ${removal}${revoked}`.trim();
 }
+// A valid 20 is cleared from the hole into its tube at handover. While it falls
+// the view stays where it is; the turn moves on once the drop has been seen.
+let dropStarted: number | null = null;
+function awaitTubeDrop(): boolean {
+  const pending = discs.some(d => d.state === 'sunk' && !d.holeCleared);
+  if (dropStarted === null) {
+    if (!pending || !tubesVisible(tubePref, smallScreen.matches)) return false;
+    for (const d of discs) if (d.state === 'sunk') d.holeCleared = true;
+    dropStarted = scene.tubeDrops().now; return true;
+  }
+  const { now, lastLand, falling } = scene.tubeDrops();
+  if (!dropFinished(now, dropStarted, lastLand, falling)) return true;
+  dropStarted = null; return false;
+}
 function finishReview() {
+  if (awaitTubeDrop()) return;
   const valid = review!.verdict.valid;
   review = null;
   if (used.every(n => n === allowance())) {

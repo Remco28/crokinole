@@ -84,3 +84,13 @@ export function stepRim(m: RimMotion, target: number, dt: number): { motion: Rim
 }
 // Acceleration of the tube in its own frame (x along the rim, z outward).
 export const rimFrameAccel = (accel: number, w: number, radius: number) => ({ x: accel * radius, z: -w * w * radius });
+
+// The turn waits for a 20 to fall into its tube before the view moves on. Done
+// once nothing is falling and the last landing has had HOLD seconds to be seen,
+// or when MAX seconds have passed since the drop began (so it can never hang).
+export const DROP_HOLD = 0.9, DROP_MAX = 3.5;
+export function dropFinished(now: number, started: number, lastLand: number | null, falling: boolean): boolean {
+  if (now - started >= DROP_MAX) return true;
+  if (falling) return false;
+  return lastLand !== null && lastLand >= started && now - lastLand >= DROP_HOLD;
+}
