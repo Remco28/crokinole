@@ -7,6 +7,8 @@ import { BOARD, DISC, PEGS, pegPositions } from '../sim/constants';
 import { DITCH_SLOTS, REVIEW_TIMING, type ShotReview } from '../game/review';
 
 import { TILT, cameraLevel, centeredOrbit, dragOrbit } from './orbit';
+import { rimFrameAccel, stepRim, type RimMotion } from '../tubes';
+import { TUBE_DIM, createTube, dropDisc, stepTube, type TubeEvent, type TubeState } from '../tube-sim';
 import { GENTLE, RETURN, atRest, limitFocus, stepFocus, type FocusState, type FocusTuning, type Point } from './shot-camera';
 import { SHOT_VIEW, cameraPose, shotCloseness, shownZoom, type BoardPoint } from './shot-framing';
 export type { BoardView, CameraStop } from './orbit';
@@ -322,34 +324,78 @@ export function createScene(canvas: HTMLCanvasElement) {
   const markerTexture = new THREE.CanvasTexture(markerCanvas);
   markerTexture.colorSpace = THREE.SRGBColorSpace;
   const markers = new Map<number, THREE.Sprite>();
-  // 20s tubes: clear plastic hanging on the rim, with real disc meshes resting
-  // on the thin rim ledge. Rebuilt whenever the contents, positions or disc
-  // looks change; the stack is small, so a rebuild is cheap.
-  const TUBE = { radius: 0.8, wall: 0.04, height: 5.4, rimTop: 0.4, centre: (BOARD.ditchOuterRadius + BOARD.ditchOuterRadius + 0.25) / 2 };
-  const tubeGroup = new THREE.Group(); scene.add(tubeGroup);
+  // 20s tubes: clear plastic hanging on the rim. Each tube owns a small loose-disc
+  // simulation (tube-sim.ts), so its discs are real objects: they rest on the
+  // rim edge, rattle when the tube is slid, and fall in with a sound.
+  const TUBE = { radius: TUBE_DIM.radius, wall: 0.04, height: TUBE_DIM.height, rimTop: TUBE_DIM.floor, centre: BOARD.ditchOuterRadius + 0.125 };
   const tubeGlass = new THREE.MeshPhysicalMaterial({ color: '#eaf4f4', transparent: true, opacity: 0.2, roughness: 0.05, metalness: 0, side: THREE.DoubleSide, depthWrite: false });
   const tubeEdge = new THREE.MeshStandardMaterial({ color: '#ffffff', transparent: true, opacity: 0.55, roughness: 0.1, depthWrite: false });
   const tubeBodyGeo = new THREE.CylinderGeometry(TUBE.radius, TUBE.radius, TUBE.height, 40, 1, true);
   const tubeLipGeo = new THREE.TorusGeometry(TUBE.radius, TUBE.wall, 8, 40);
-  let tubeSpecs: Array<{ side: number; angle: number; owners: number[] }> = [];
-  function rebuildTubes() {
-    for (const child of [...tubeGroup.children]) { tubeGroup.remove(child); child.traverse(o => { if ((o as THREE.Mesh).isMesh && o.userData.tubeDisc) (o as THREE.Mesh<THREE.BufferGeometry, THREE.Material>).material.dispose(); }); }
-    for (const spec of tubeSpecs) {
-      const tube = new THREE.Group();
-      tube.position.set(Math.sin(spec.angle) * TUBE.centre, 0, Math.cos(spec.angle) * TUBE.centre);
-      const glass = new THREE.Mesh(tubeBodyGeo, tubeGlass); glass.position.y = TUBE.rimTop - 0.15 + TUBE.height / 2; glass.renderOrder = 6;
-      const top = new THREE.Mesh(tubeLipGeo, tubeEdge); top.rotation.x = Math.PI / 2; top.position.y = TUBE.rimTop - 0.15 + TUBE.height; top.renderOrder = 6;
-      const bottom = new THREE.Mesh(tubeLipGeo, tubeEdge); bottom.rotation.x = Math.PI / 2; bottom.position.y = TUBE.rimTop - 0.15; bottom.renderOrder = 6;
-      tube.add(glass, top, bottom);
-      spec.owners.forEach((owner, k) => {
-        const look = discLook(owner);
-        const mesh = new THREE.Mesh(discGeo, look.bodyMaterial.clone()); mesh.castShadow = true; mesh.userData.tubeDisc = true;
-        const face = new THREE.Mesh(discAppearance.style === 'wood' ? woodFaceGeo : discFaceGeo, look.faceMaterial);
-        face.rotation.x = -Math.PI / 2; face.position.y = DISC.height / 2; mesh.add(face);
-        mesh.position.y = TUBE.rimTop + DISC.height / 2 + k * DISC.height;
-        tube.add(mesh);
-      });
-      tubeGroup.add(tube);
+  type TubeSpecLike = { side: number; angle: number; owners: number[] };
+  interface TubeRig { side: number; root: THREE.Group; owners: number[]; sim: TubeState; meshes: Array<THREE.Mesh<THREE.LatheGeometry, THREE.MeshStandardMaterial>>; motion: RimMotion; target: number }
+  const tubeRigs = new Map<number, TubeRig>();
+  let tubeListener: ((event: TubeEvent, x: number, y: number) => void) | null = null;
+  function tubeDiscMesh(owner: number) {
+    const look = discLook(owner);
+    const mesh = new THREE.Mesh(discGeo, look.bodyMaterial.clone()); mesh.castShadow = true; mesh.userData.owner = owner;
+    const face = new THREE.Mesh(discAppearance.style === 'wood' ? woodFaceGeo : discFaceGeo, look.faceMaterial);
+    face.rotation.x = -Math.PI / 2; face.position.y = DISC.height / 2; face.receiveShadow = true; mesh.add(face);
+    return mesh;
+  }
+  function applyTube(rig: TubeRig) {
+    rig.sim.discs.forEach((d, i) => { const m = rig.meshes[i]; if (m) { m.position.set(d.x, TUBE.rimTop + d.y, d.z); m.rotation.set(d.tx, 0, d.tz); } });
+  }
+  function fillTubeMeshes(rig: TubeRig) {
+    for (const m of rig.meshes) { rig.root.remove(m); m.clear(); m.material.dispose(); }
+    rig.meshes = rig.sim.discs.map(d => { const m = tubeDiscMesh(d.owner); rig.root.add(m); return m; });
+    applyTube(rig);
+  }
+  function placeTubeRoot(rig: TubeRig) {
+    rig.root.position.set(Math.sin(rig.motion.a) * TUBE.centre, 0, Math.cos(rig.motion.a) * TUBE.centre);
+    // The tube's own frame: local x runs along the rim, local z points outward.
+    rig.root.rotation.y = rig.motion.a;
+  }
+  function makeTubeRig(spec: TubeSpecLike): TubeRig {
+    const root = new THREE.Group(), y0 = TUBE.rimTop - 0.15;
+    const glass = new THREE.Mesh(tubeBodyGeo, tubeGlass); glass.position.y = y0 + TUBE.height / 2; glass.renderOrder = 6;
+    const top = new THREE.Mesh(tubeLipGeo, tubeEdge); top.rotation.x = Math.PI / 2; top.position.y = y0 + TUBE.height; top.renderOrder = 6;
+    const bottom = new THREE.Mesh(tubeLipGeo, tubeEdge); bottom.rotation.x = Math.PI / 2; bottom.position.y = y0; bottom.renderOrder = 6;
+    root.add(glass, top, bottom); scene.add(root);
+    const rig: TubeRig = { side: spec.side, root, owners: [...spec.owners], sim: createTube(spec.owners, spec.side + 1), meshes: [], motion: { a: spec.angle, w: 0 }, target: spec.angle };
+    placeTubeRoot(rig); fillTubeMeshes(rig); return rig;
+  }
+  function removeTubeRig(rig: TubeRig) {
+    scene.remove(rig.root); for (const m of rig.meshes) { m.clear(); m.material.dispose(); }
+  }
+  // Tube discs share the disc looks, so a new look rebuilds the meshes (not the simulation).
+  function rebuildTubes() { for (const rig of tubeRigs.values()) fillTubeMeshes(rig); }
+  function setTubes(specs: TubeSpecLike[]) {
+    const keep = new Set(specs.map(s => s.side));
+    for (const [side, rig] of tubeRigs) if (!keep.has(side)) { removeTubeRig(rig); tubeRigs.delete(side); }
+    for (const spec of specs) {
+      const rig = tubeRigs.get(spec.side);
+      if (!rig) { tubeRigs.set(spec.side, makeTubeRig(spec)); continue; }
+      rig.target = spec.angle;
+      // A jump (new game, mode change) places the tube without rattling it.
+      if (Math.abs(Math.atan2(Math.sin(spec.angle - rig.motion.a), Math.cos(spec.angle - rig.motion.a))) > 1.2) { rig.motion = { a: spec.angle, w: 0 }; placeTubeRoot(rig); }
+      if (spec.owners.length === rig.owners.length && spec.owners.every((o, i) => o === rig.owners[i])) continue;
+      const extra = spec.owners.length - rig.owners.length;
+      if (extra > 0 && extra <= 2 && rig.owners.every((o, i) => o === spec.owners[i])) {
+        // New 20s fall in from the top and land on the stack.
+        for (const owner of spec.owners.slice(rig.owners.length)) if (dropDisc(rig.sim, owner)) { const m = tubeDiscMesh(owner); rig.root.add(m); rig.meshes.push(m); }
+        applyTube(rig);
+      } else { rig.sim = createTube(spec.owners, spec.side + 1); fillTubeMeshes(rig); }
+      rig.owners = [...spec.owners];
+    }
+  }
+  function stepTubes(dt: number) {
+    for (const rig of tubeRigs.values()) {
+      const { motion, accel } = stepRim(rig.motion, rig.target, dt);
+      rig.motion = motion; placeTubeRoot(rig);
+      const wasAwake = rig.sim.awake;
+      stepTube(rig.sim, dt, rimFrameAccel(accel, motion.w, TUBE.centre), tubeListener ? event => tubeListener!(event, rig.root.position.x, rig.root.position.z) : undefined);
+      if (wasAwake || rig.sim.awake) applyTube(rig);
     }
   }
   // Which tube, if any, is under a screen point. The tube is a tall thin target,
@@ -358,22 +404,16 @@ export function createScene(canvas: HTMLCanvasElement) {
   function tubeHit(clientX: number, clientY: number): number | null {
     const rect = canvas.getBoundingClientRect(); let best: number | null = null, bestDistance = Infinity;
     const toPx = (v: THREE.Vector3) => { v.project(camera); return { x: rect.left + (v.x + 1) * rect.width / 2, y: rect.top + (1 - v.y) * rect.height / 2 }; };
-    for (const spec of tubeSpecs) {
-      const bx = Math.sin(spec.angle) * TUBE.centre, bz = Math.cos(spec.angle) * TUBE.centre;
+    for (const rig of tubeRigs.values()) {
+      const bx = Math.sin(rig.motion.a) * TUBE.centre, bz = Math.cos(rig.motion.a) * TUBE.centre;
       const base = toPx(tubeA.set(bx, TUBE.rimTop, bz)), top = toPx(tubeB.set(bx, TUBE.rimTop + TUBE.height, bz));
       const side = toPx(tubeA.set(bx + TUBE.radius, TUBE.rimTop, bz)), reach = Math.max(26, Math.hypot(side.x - base.x, side.y - base.y) * 1.6 + 14);
       const sx = top.x - base.x, sy = top.y - base.y, length2 = sx * sx + sy * sy || 1;
       const t = Math.max(0, Math.min(1, ((clientX - base.x) * sx + (clientY - base.y) * sy) / length2));
       const distance = Math.hypot(clientX - (base.x + sx * t), clientY - (base.y + sy * t));
-      if (distance <= reach && distance < bestDistance) { best = spec.side; bestDistance = distance; }
+      if (distance <= reach && distance < bestDistance) { best = rig.side; bestDistance = distance; }
     }
     return best;
-  }
-  function setTubes(specs: Array<{ side: number; angle: number; owners: number[] }>) {
-    const same = specs.length === tubeSpecs.length && specs.every((s, i) => s.side === tubeSpecs[i].side && Math.abs(s.angle - tubeSpecs[i].angle) < 1e-6
-      && s.owners.length === tubeSpecs[i].owners.length && s.owners.every((o, k) => o === tubeSpecs[i].owners[k]));
-    if (same) return;
-    tubeSpecs = specs.map(s => ({ ...s, owners: [...s.owners] })); rebuildTubes();
   }
 
   function syncDiscs(discs: Disc[], review: ShotReview | null = null) {
@@ -606,6 +646,7 @@ export function createScene(canvas: HTMLCanvasElement) {
       shotAnchor.x += (shotDisc.x - shotAnchor.x) * blend; shotAnchor.y += (shotDisc.y - shotAnchor.y) * blend;
     }
     placeCamera();
+    stepTubes(dt);
     renderer.render(scene, camera);
     raf = requestAnimationFrame(tick);
   }
@@ -620,6 +661,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     },
     syncDiscs,
     setTubes,
+    setTubeListener: (listener: ((event: TubeEvent, x: number, y: number) => void) | null) => { tubeListener = listener; },
     tubeHit,
     tubeRimHeight: TUBE.rimTop,
     setDiscAppearance,
@@ -682,6 +724,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     },
     dispose: () => {
       cancelAnimationFrame(raf);
+      for (const rig of tubeRigs.values()) removeTubeRig(rig); tubeRigs.clear();
       window.removeEventListener('resize', resize);
       resizeObserver.disconnect();
       for (const [id, mesh] of meshes) removeDiscMesh(id, mesh);

@@ -125,6 +125,13 @@ try { scene = createScene(canvas); } catch {
   banner.textContent = 'This table needs WebGL'; hint.textContent = 'Try a browser with hardware acceleration enabled.'; next.hidden = true;
   throw new Error('WebGL could not initialize');
 }
+// The tubes' loose discs make their own sounds: a drop clacks, a shove knocks,
+// and a rocking disc ticks. These reuse the existing board sounds, played softer.
+scene.setTubeListener((event, x, y) => {
+  if (event.kind === 'land') sound.play('disc', Math.min(90, event.speed * 0.8), x, y);
+  else if (event.kind === 'knock') sound.play('disc', Math.min(40, 6 + event.speed * 8), x, y);
+  else sound.play('land', Math.min(35, 4 + event.speed * 10), x, y);
+});
 scene.setTilt(tilt); scene.setZoom(zoom); tablePreferences();
 setupDiscSettings(scene);
 let mode: Mode = 'duel', player = 0, round = 1, id = 0;
@@ -630,6 +637,8 @@ function finishReview() {
   const valid = review!.verdict.valid;
   review = null;
   if (used.every(n => n === allowance())) {
+    // A 20 from the last shot goes to its tube, as at any other turn.
+    for (const d of discs) if (d.state === 'sunk') d.holeCleared = true;
     if (format.scoring === 'tournament') {
       const result = completeTournamentRound(discs, mode, scores, round, format, gamesWon);
       roundResult = result; gamesWon = result.gamesWon;

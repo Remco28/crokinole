@@ -60,3 +60,20 @@ describe('moving tubes', () => {
     expect(readTubeAngles(null)).toEqual({}); expect(readTubeAngles([1, 2])).toEqual({});
   });
 });
+
+import { RIM_STIFFNESS, rimFrameAccel, stepRim } from '../src/tubes';
+describe('rim follower', () => {
+  const settle = (from: number, to: number, seconds = 2) => { let m = { a: from, w: 0 }, peak = 0, overshoot = 0; for (let i = 0; i < seconds * 60; i++) { const r = stepRim(m, to, 1 / 60); m = r.motion; peak = Math.max(peak, Math.abs(r.accel)); overshoot = Math.max(overshoot, Math.abs(Math.atan2(Math.sin(m.a - to), Math.cos(m.a - to)))) } return { m, peak }; };
+  it('arrives on the target and stops', () => {
+    const { m } = settle(1, 1.4); expect(m.a).toBeCloseTo(1.4, 3); expect(Math.abs(m.w)).toBeLessThan(1e-3);
+  });
+  it('takes the short way around the seam', () => {
+    const r = stepRim({ a: 6.2, w: 0 }, 0.1, 1 / 60); expect(r.motion.w).toBeGreaterThan(0);
+  });
+  it('accelerates harder for a bigger jump, and not at all when already there', () => {
+    expect(settle(1, 1.5).peak).toBeGreaterThan(settle(1, 1.05).peak); expect(stepRim({ a: 2, w: 0 }, 2, 1 / 60).accel).toBe(0);
+  });
+  it('converts to the tube frame with the centripetal pull toward the board', () => {
+    expect(rimFrameAccel(2, 0, 14.9)).toEqual({ x: 29.8, z: -0 }); expect(rimFrameAccel(0, 3, 10).z).toBeCloseTo(-90); expect(RIM_STIFFNESS).toBeGreaterThan(0);
+  });
+});

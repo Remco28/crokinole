@@ -65,3 +65,22 @@ export function readTubeAngles(raw: unknown): TubeAngleStore {
   return store;
 }
 export const anglesFor = (store: TubeAngleStore, mode: Mode): Array<number | undefined> => (store[mode] ?? []).map(a => Number.isFinite(a) ? a : undefined);
+
+// The drawn tube follows the dragged angle through a stiff, nearly critically
+// damped spring. Its angular acceleration is what the loose discs inside feel,
+// so a quick drag rattles them and a slow one barely does. Semi-implicit steps.
+export const RIM_STIFFNESS = 700;
+export interface RimMotion { a: number; w: number }
+const shortestTurn = (to: number, from: number) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
+export function stepRim(m: RimMotion, target: number, dt: number): { motion: RimMotion; accel: number } {
+  if (dt <= 0) return { motion: m, accel: 0 };
+  const steps = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / steps, damping = 2 * Math.sqrt(RIM_STIFFNESS) * 0.95;
+  let a = m.a, w = m.w, sum = 0;
+  for (let i = 0; i < steps; i++) {
+    const acc = RIM_STIFFNESS * shortestTurn(target, a) - damping * w;
+    w += acc * h; a += w * h; sum += acc;
+  }
+  return { motion: { a: normalizeAngle(a), w }, accel: sum / steps };
+}
+// Acceleration of the tube in its own frame (x along the rim, z outward).
+export const rimFrameAccel = (accel: number, w: number, radius: number) => ({ x: accel * radius, z: -w * w * radius });
