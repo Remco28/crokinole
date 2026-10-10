@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FOLLOW, GENTLE, RETURN, movingFocus, atRest, limitFocus, parseShotCamera, settleFocus, stepFocus } from '../src/render/shot-camera';
+import { FOLLOW, GENTLE, PULLBACK, RETURN, fastestSpeed, movingFocus, pullbackFor, atRest, limitFocus, parseShotCamera, settleFocus, stepFocus } from '../src/render/shot-camera';
 import { makeDisc } from '../src/sim/physics';
 
 const run = (target: { x: number; y: number }, seconds: number, tuning = GENTLE, start = atRest()) => {
@@ -65,11 +65,15 @@ describe('follow camera', () => {
     const out = mover(2, 5, 5, 30, 0); out.state = 'out'; expect(movingFocus([out])).toBeNull();
   });
   it('ignores action near the middle of the view and only drifts when it leaves', () => {
-    expect(run({ x: 2.5, y: 0 }, 5, FOLLOW).p.x).toBe(0);
-    expect(run({ x: 9, y: 0 }, 20, FOLLOW).p.x).toBeCloseTo(6, 1);
+    expect(run({ x: 1.5, y: 0 }, 5, FOLLOW).p.x).toBe(0);
+    expect(run({ x: 9, y: 0 }, 20, FOLLOW).p.x).toBeCloseTo(9 - FOLLOW.deadZone, 1);
   });
-  it('is slower and heavier than the settle glide', () => {
-    expect(FOLLOW.maxSpeed).toBeLessThan(GENTLE.maxSpeed); expect(FOLLOW.maxAccel).toBeLessThan(GENTLE.maxAccel); expect(FOLLOW.tau).toBeGreaterThan(GENTLE.tau);
+  it('keeps up with the action faster than the settle glide, still within hard caps', () => {
+    expect(FOLLOW.maxSpeed).toBeGreaterThan(GENTLE.maxSpeed); expect(FOLLOW.tau).toBeLessThan(GENTLE.tau);
+    expect(FOLLOW.maxSpeed).toBeLessThanOrEqual(12); expect(FOLLOW.maxAccel).toBeLessThanOrEqual(20);
+  });
+  it('closes most of a 6 inch gap within about a second', () => {
+    expect(run({ x: 6 + FOLLOW.deadZone, y: 0 }, 1.2, FOLLOW).p.x).toBeGreaterThan(3);
   });
   it('keeps motion smooth while the target jumps around, as discs collide', () => {
     let p = atRest(), last = 0, worst = 0;
@@ -78,5 +82,17 @@ describe('follow camera', () => {
       worst = Math.max(worst, Math.abs(v - last)); expect(v).toBeLessThanOrEqual(FOLLOW.maxSpeed + 1e-9); last = v; p = n;
     }
     expect(worst).toBeLessThanOrEqual(FOLLOW.maxAccel / 60 + 1e-9);
+  });
+});
+
+describe('follow zoom pullback', () => {
+  it('stays put for slow discs, eases out as they speed up, and is capped', () => {
+    expect(pullbackFor(0)).toBe(0); expect(pullbackFor(PULLBACK.slow)).toBe(0); expect(pullbackFor(PULLBACK.fast)).toBe(1); expect(pullbackFor(500)).toBe(1);
+    expect(pullbackFor(30)).toBeGreaterThan(pullbackFor(15));
+  });
+  it('is gentle: it never zooms out more than a fifth', () => { expect(PULLBACK.maxZoomOut).toBeLessThanOrEqual(0.2); });
+  it('reads the fastest disc still on the board', () => {
+    const a = makeDisc(1, 0, 0, 0), b = makeDisc(2, 0, 1, 1), gone = makeDisc(3, 0, 2, 2); a.vx = 30; b.vy = 55; gone.vx = 400; gone.state = 'out';
+    expect(fastestSpeed([a, b, gone])).toBe(55); expect(fastestSpeed([])).toBe(0);
   });
 });

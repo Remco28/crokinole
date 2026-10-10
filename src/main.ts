@@ -10,7 +10,7 @@ import { assignDitchSlots, beginReview, reviewDuration, type ShotReview } from '
 import { PLAYER_NAMES as names, PLAYER_COLORS as colors } from './game/players';
 import { remainingTime, resumeDeadline } from './game/clock';
 import { CLASSIC, TOURNAMENT_ROUNDS, completeTournamentRound, discsPerPlayer, discsPerSide, formatAllowsMode, formatKey, isGameOver, parseFormatKey, readFormat, startingPlayer, type FormatRoundResult, type MatchFormat } from './game/format';
-import { FOLLOW, GENTLE, SETTLE_DELAY_MS, movingFocus, parseShotCamera, settleFocus, type ShotCamera } from './render/shot-camera';
+import { FOLLOW, GENTLE, fastestSpeed, pullbackFor, SETTLE_DELAY_MS, movingFocus, parseShotCamera, settleFocus, type ShotCamera } from './render/shot-camera';
 import { SMALL_SCREEN_QUERY, anglesFor, angleFromPoint, parseTubePref, placeTube, readTubeAngles, tubeSpecs, tubesVisible, type TubeAngleStore, type TubePref } from './tubes';
 import { isFreshVisit, setupTutorial } from './tutorial';
 import { beginLog, createPracticePanel, liveText, recordEvent, recordStep, summarize, type ShotLog } from './practice';
@@ -723,6 +723,7 @@ function tick(now: number) {
     }
   }
   if (shotCamera === 'follow' && phase === 'moving' && followPoint) scene.setFocus(followPoint, 0, FOLLOW);
+  scene.setPullback(shotCamera === 'follow' && phase === 'moving' ? pullbackFor(fastestSpeed(discs)) : 0);
   if (practice) { practicePanel.busy(phase !== 'pass'); if (phase === 'moving' && practiceLog) practicePanel.live(liveText(practiceLog, discs)); }
   sound.setListenerYaw(scene.getYaw());
   const controlsLocked = !canInspectBoard() || pointer !== null || orbitPointer !== null || placementPointer !== null || pinching;

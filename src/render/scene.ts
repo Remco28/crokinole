@@ -8,8 +8,8 @@ import { DITCH_SLOTS, REVIEW_TIMING, type ShotReview } from '../game/review';
 
 import { TILT, cameraLevel, centeredOrbit, dragOrbit } from './orbit';
 import { rimFrameAccel, stepRim, type RimMotion } from '../tubes';
-import { TUBE_DIM, createTube, dropDisc, stepTube, type TubeEvent, type TubeState } from '../tube-sim';
-import { GENTLE, RETURN, atRest, limitFocus, stepFocus, type FocusState, type FocusTuning, type Point } from './shot-camera';
+import { TUBE_DIM, TUBE_SHAPE, createTube, dropDisc, stepTube, type TubeEvent, type TubeState } from '../tube-sim';
+import { GENTLE, PULLBACK, RETURN, atRest, limitFocus, stepFocus, type FocusState, type FocusTuning, type Point } from './shot-camera';
 import { SHOT_VIEW, cameraPose, shotCloseness, shownZoom, type BoardPoint } from './shot-framing';
 export type { BoardView, CameraStop } from './orbit';
 export { TILT, isSeated, nearestStop } from './orbit';
@@ -95,12 +95,14 @@ export function createScene(canvas: HTMLCanvasElement) {
   let focusTarget: Point | null = null, focusStart = 0, focusPan: FocusState = atRest();
   const FAR_PAN = 0.3;
   let focusTuning: FocusTuning = GENTLE;
+  let pull = 0, pullTarget = 0, panGain = FAR_PAN;
+  const zoomGoal = () => shownZoom(zoomTarget, !!shotDisc) * (1 - PULLBACK.maxZoomOut * pull);
   const closenessTarget = () => shotDisc ? shotCloseness(zoomTarget) : 0;
 
   function placeCamera() {
     const pose = cameraPose({ yaw, polar, polarOffset: polar - TILT.table, distance: camDist, disc: shotAnchor, closeness });
     const pan = 1 - Math.min(1, closeness);
-    const px = focusPan.x * FAR_PAN * pan, pz = focusPan.y * FAR_PAN * pan;
+    const px = focusPan.x * panGain * pan, pz = focusPan.y * panGain * pan;
     camera.position.set(pose.eye.x + px, pose.eye.y, pose.eye.z + pz);
     camera.lookAt(pose.target.x + px, pose.target.y, pose.target.z + pz);
     camera.updateMatrixWorld();
@@ -330,8 +332,13 @@ export function createScene(canvas: HTMLCanvasElement) {
   const TUBE = { radius: TUBE_DIM.radius, wall: 0.04, height: TUBE_DIM.height, rimTop: TUBE_DIM.floor, centre: BOARD.ditchOuterRadius + 0.125 };
   const tubeGlass = new THREE.MeshPhysicalMaterial({ color: '#eaf4f4', transparent: true, opacity: 0.2, roughness: 0.05, metalness: 0, side: THREE.DoubleSide, depthWrite: false });
   const tubeEdge = new THREE.MeshStandardMaterial({ color: '#ffffff', transparent: true, opacity: 0.55, roughness: 0.1, depthWrite: false });
+  // Upper wall (above the rim), the outer half hanging below the rim, and the
+  // slot the rail passes through (the notch). The ditch side has no lower wall.
+  const notchAngle = Math.asin(TUBE_SHAPE.notch / 2 / TUBE.radius);
   const tubeBodyGeo = new THREE.CylinderGeometry(TUBE.radius, TUBE.radius, TUBE.height, 40, 1, true);
+  const tubeOuterGeo = new THREE.CylinderGeometry(TUBE.radius, TUBE.radius, TUBE_SHAPE.outerDrop, 24, 1, true, -Math.PI / 2 + notchAngle, Math.PI - 2 * notchAngle);
   const tubeLipGeo = new THREE.TorusGeometry(TUBE.radius, TUBE.wall, 8, 40);
+  const tubeOuterLipGeo = new THREE.TorusGeometry(TUBE.radius, TUBE.wall, 8, 24, Math.PI - 2 * notchAngle); tubeOuterLipGeo.rotateZ(notchAngle);
   type TubeSpecLike = { side: number; angle: number; owners: number[] };
   interface TubeRig { side: number; root: THREE.Group; owners: number[]; sim: TubeState; meshes: Array<THREE.Mesh<THREE.LatheGeometry, THREE.MeshStandardMaterial>>; motion: RimMotion; target: number }
   const tubeRigs = new Map<number, TubeRig>();
@@ -357,11 +364,13 @@ export function createScene(canvas: HTMLCanvasElement) {
     rig.root.rotation.y = rig.motion.a;
   }
   function makeTubeRig(spec: TubeSpecLike): TubeRig {
-    const root = new THREE.Group(), y0 = TUBE.rimTop - 0.15;
+    const root = new THREE.Group(), y0 = TUBE.rimTop;
     const glass = new THREE.Mesh(tubeBodyGeo, tubeGlass); glass.position.y = y0 + TUBE.height / 2; glass.renderOrder = 6;
+    const outer = new THREE.Mesh(tubeOuterGeo, tubeGlass); outer.position.y = y0 - TUBE_SHAPE.outerDrop / 2; outer.renderOrder = 6;
     const top = new THREE.Mesh(tubeLipGeo, tubeEdge); top.rotation.x = Math.PI / 2; top.position.y = y0 + TUBE.height; top.renderOrder = 6;
-    const bottom = new THREE.Mesh(tubeLipGeo, tubeEdge); bottom.rotation.x = Math.PI / 2; bottom.position.y = y0; bottom.renderOrder = 6;
-    root.add(glass, top, bottom); scene.add(root);
+    const rimLip = new THREE.Mesh(tubeLipGeo, tubeEdge); rimLip.rotation.x = Math.PI / 2; rimLip.position.y = y0; rimLip.renderOrder = 6;
+    const outerLip = new THREE.Mesh(tubeOuterLipGeo, tubeEdge); outerLip.rotation.x = Math.PI / 2; outerLip.position.y = y0 - TUBE_SHAPE.outerDrop; outerLip.renderOrder = 6;
+    root.add(glass, outer, top, rimLip, outerLip); scene.add(root);
     const rig: TubeRig = { side: spec.side, root, owners: [...spec.owners], sim: createTube(spec.owners, spec.side + 1), meshes: [], motion: { a: spec.angle, w: 0 }, target: spec.angle };
     placeTubeRoot(rig); fillTubeMeshes(rig); return rig;
   }
@@ -624,7 +633,11 @@ export function createScene(canvas: HTMLCanvasElement) {
     const blend = reducedMotion.matches ? 1 : 1 - Math.exp(-dt * 9);
     yaw += (yawTarget - yaw) * blend;
     polar += (polarTarget - polar) * blend;
-    const zoom = shownZoom(zoomTarget, !!shotDisc);
+    pull += (reducedMotion.matches ? 0 - pull : (pullTarget - pull) * (1 - Math.exp(-dt / PULLBACK.tau)));
+    if (Math.abs(pullTarget - pull) < 0.0005) pull = pullTarget;
+    // The view's pan gain eases between modes, so switching never snaps.
+    panGain += ((focusTarget !== null ? (focusTuning.gain ?? FAR_PAN) : panGain) - panGain) * (1 - Math.exp(-dt / 0.6));
+    const zoom = zoomGoal();
     if (camera.zoom !== zoom) {
       camera.zoom = Math.abs(zoom - camera.zoom) > 0.0001 ? camera.zoom + (zoom - camera.zoom) * blend : zoom;
       camera.updateProjectionMatrix();
@@ -668,7 +681,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     boardPoint,
     getYaw: () => yaw,
     isViewMoving: () => Math.abs(yawTarget - yaw) > 0.003 || Math.abs(polarTarget - polar) > 0.003
-      || Math.abs(shownZoom(zoomTarget, !!shotDisc) - camera.zoom) > 0.003
+      || Math.abs(zoomGoal() - camera.zoom) > 0.003
       || Math.abs(closenessTarget() - closeness) > 0.003
       || (focusTarget === null && Math.hypot(focusPan.x, focusPan.y) > 0.05)
       || (!!shotDisc && closeness > 0 && Math.hypot(shotDisc.x - shotAnchor.x, shotDisc.y - shotAnchor.y) > 0.01),
@@ -683,6 +696,8 @@ export function createScene(canvas: HTMLCanvasElement) {
     // Table is about 22 inches above the surface, 42 inches from center at the
     // base framing distance. Overview preserves the original standing look.
     // Glide toward a settled shot after delaySeconds; null returns the view.
+    // 0..1: how far the lens eases out while discs are fast (Follow camera).
+    setPullback: (amount: number) => { pullTarget = Math.max(0, Math.min(1, amount)); },
     setFocus: (point: Point | null, delaySeconds = 0, tuning: FocusTuning = GENTLE) => {
       focusTuning = tuning;
       // A new glide starts from where the view already is, so nothing snaps.

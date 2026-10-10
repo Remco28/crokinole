@@ -16,6 +16,7 @@ export interface FocusTuning {
   maxAccel: number;  // inches per second squared: the camera ramps up and brakes, never jerks
   deadZone: number;  // inches the target may stray before the camera moves at all
   maxPan: number;    // inches the focus may sit away from the waiting disc
+  gain?: number;     // how much of the pan shows in the far view (default 0.3)
 }
 export interface FocusState extends Point { vx: number; vy: number }
 export const atRest = (p: Point = { x: 0, y: 0 }): FocusState => ({ x: p.x, y: p.y, vx: 0, vy: 0 });
@@ -24,7 +25,19 @@ export const GENTLE: FocusTuning = { tau: 0.8, maxSpeed: 6, maxAccel: 8, deadZon
 // While discs are moving (Follow): slower and heavier, with a dead zone so the
 // camera ignores small movements near the middle and only drifts once the
 // action leaves it. It tracks the speed-weighted centre of the moving discs.
-export const FOLLOW: FocusTuning = { tau: 1.1, maxSpeed: 4, maxAccel: 5, deadZone: 3, maxPan: 8 };
+export const FOLLOW: FocusTuning = { tau: 0.55, maxSpeed: 9, maxAccel: 14, deadZone: 2, maxPan: 10, gain: 0.55 };
+// While the discs are fast the lens eases out a little, so more of the board is
+// in view and the camera seems quicker without moving harder. Smooth and capped.
+export const PULLBACK = { maxZoomOut: 0.2, slow: 8, fast: 60, tau: 0.7 } as const;
+export function pullbackFor(speed: number): number {
+  const t = Math.max(0, Math.min(1, (speed - PULLBACK.slow) / (PULLBACK.fast - PULLBACK.slow)));
+  return t * t * (3 - 2 * t);
+}
+export function fastestSpeed(discs: Disc[]): number {
+  let fastest = 0;
+  for (const d of discs) if (d.state === 'board') fastest = Math.max(fastest, Math.hypot(d.vx, d.vy));
+  return fastest;
+}
 // The glide back out when the next turn starts: quicker, still ramped.
 export const RETURN: FocusTuning = { tau: 0.35, maxSpeed: 40, maxAccel: 160, deadZone: 0, maxPan: 99 };
 // How long a settled shot rests before the camera starts to glide.
@@ -44,7 +57,10 @@ export function stepFocus(state: FocusState, target: Point, dt: number, tuning: 
   const vx = state.vx + ax, vy = state.vy + ay;
   let x = state.x + vx * dt, y = state.y + vy * dt;
   // Landing exactly on the leash edge ends the motion.
-  if (gap > 0 && Math.hypot(x - state.x, y - state.y) >= gap) { x = state.x + ux * gap; y = state.y + uy * gap; return { x, y, vx: 0, vy: 0 }; }
+  // Reaching the leash edge: land on it and keep the (already acceleration-
+  // limited) velocity, so the camera never halts with a jolt. The braking curve
+  // above makes that speed small by then.
+  if (gap > 0 && Math.hypot(x - state.x, y - state.y) >= gap) return { x: state.x + ux * gap, y: state.y + uy * gap, vx, vy };
   return { x, y, vx: gap <= 0 && Math.hypot(vx, vy) < 0.01 ? 0 : vx, vy: gap <= 0 && Math.hypot(vx, vy) < 0.01 ? 0 : vy };
 }
 // Keep a focus point near the waiting disc and on the playing surface.

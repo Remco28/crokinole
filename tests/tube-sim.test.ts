@@ -16,9 +16,9 @@ describe('stack and capacity', () => {
     expect(t.discs.map(d => d.y)).toEqual([restHeight(0), restHeight(1), restHeight(2)]);
     expect(run(t, 1)).toEqual([]);
   });
-  it('holds about a dozen discs and refuses more', () => {
+  it('holds the eight discs of tournament play and refuses more', () => {
     const t = createTube(Array(TUBE_CAPACITY).fill(0));
-    expect(TUBE_CAPACITY).toBeGreaterThanOrEqual(12); expect(dropDisc(t, 0)).toBe(false); expect(tubeCount(t)).toBe(TUBE_CAPACITY);
+    expect(TUBE_CAPACITY).toBe(8); expect(dropDisc(t, 0)).toBe(false); expect(tubeCount(t)).toBe(TUBE_CAPACITY);
     expect(createTube(Array(40).fill(1)).discs.length).toBe(TUBE_CAPACITY);
   });
 });

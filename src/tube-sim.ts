@@ -9,7 +9,12 @@ import { DISC } from './sim/constants';
 // two discs it can rock a little; more discs above it press it steady. Discs
 // are loose in the tube: a shove slides them against the wall (a knock) and
 // rocking discs tick as they settle back. Landing drives sound-sized impacts.
-export const TUBE_DIM = { radius: 0.8, height: 5.4, floor: 0.4 } as const;
+// height is the part above the rim: room for the 8 discs of tournament play.
+export const TUBE_DIM = { radius: 0.8, height: 3.3, floor: 0.4 } as const;
+// The tube straddles the rail. A notch lets the rail pass through, the outer
+// half hangs down the outside of the rail, and the ditch-side half stops at the
+// rim top so a disc flung across the ditch glides underneath it.
+export const TUBE_SHAPE = { outerDrop: 1.3, notch: 0.34 } as const;
 export const TUBE_CAPACITY = Math.floor(TUBE_DIM.height / DISC.height);
 export const TUBE_TUNE = {
   gravity: 386,                  // in/s²: a real drop
