@@ -37,21 +37,28 @@ export function tubeSpecs(discs: Disc[], mode: Mode, sideOf: (owner: number) => 
 export const normalizeAngle = (angle: number) => { const a = angle % (Math.PI * 2); return a < 0 ? a + Math.PI * 2 : a; };
 
 // Dragging: a tube slides around the rim, so a pointer on the board gives an
-// angle. Tubes never overlap: if the wanted spot is taken, the tube rests
-// against the neighbour on the side it was dragged from.
+// angle. Tubes are solid: the dragged tube sweeps from where it is to where the
+// pointer is, and any tube in its way is pushed along the rail ahead of it (a
+// chain of tubes pushes together). It can never pass through another tube.
 export const TUBE_GAP = 0.16;
 export const angleFromPoint = (p: { x: number; y: number }) => normalizeAngle(Math.atan2(p.x, p.y));
 const turn = (a: number, b: number) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
-export function placeTube(angles: number[], side: number, wanted: number, minGap = TUBE_GAP): number {
-  let angle = normalizeAngle(wanted);
-  for (let pass = 0; pass < 3; pass++) {
-    for (let other = 0; other < angles.length; other++) {
-      if (other === side) continue;
-      const delta = turn(angle, angles[other]);
-      if (Math.abs(delta) < minGap) angle = normalizeAngle(angles[other] + (delta >= 0 ? minGap : -minGap));
-    }
+export function pushTubes(angles: number[], side: number, wanted: number, gap = TUBE_GAP): number[] {
+  const out = angles.map(normalizeAngle), from = out[side];
+  const delta = turn(normalizeAngle(wanted), from), dir = delta >= 0 ? 1 : -1, move = Math.abs(delta);
+  out[side] = normalizeAngle(from + delta);
+  if (move === 0) return out;
+  // Distance of each other tube from the start, measured in the drag direction.
+  const others = out.map((a, i) => ({ i, rel: turn(a, from) * dir })).filter(o => o.i !== side);
+  let limit = move + gap;                                   // nearest a tube ahead may sit
+  for (const o of others.filter(o => o.rel > 0).sort((a, b) => a.rel - b.rel)) {
+    const rel = Math.max(o.rel, limit); out[o.i] = normalizeAngle(from + dir * rel); limit = rel + gap;
   }
-  return angle;
+  limit = move - gap;                                       // farthest a tube behind may sit
+  for (const o of others.filter(o => o.rel <= 0).sort((a, b) => b.rel - a.rel)) {
+    const rel = Math.min(o.rel, limit); out[o.i] = normalizeAngle(from + dir * rel); limit = rel - gap;
+  }
+  return out;
 }
 // Saved positions are kept per game mode, since the defaults differ.
 export type TubeAngleStore = Partial<Record<Mode, number[]>>;

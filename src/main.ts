@@ -11,7 +11,7 @@ import { PLAYER_NAMES as names, PLAYER_COLORS as colors } from './game/players';
 import { remainingTime, resumeDeadline } from './game/clock';
 import { CLASSIC, TOURNAMENT_ROUNDS, completeTournamentRound, discsPerPlayer, discsPerSide, formatAllowsMode, formatKey, isGameOver, parseFormatKey, readFormat, startingPlayer, type FormatRoundResult, type MatchFormat } from './game/format';
 import { FOLLOW, GENTLE, fastestSpeed, pullbackFor, SETTLE_DELAY_MS, movingFocus, parseShotCamera, settleFocus, type ShotCamera } from './render/shot-camera';
-import { dropFinished, SMALL_SCREEN_QUERY, anglesFor, angleFromPoint, parseTubePref, placeTube, readTubeAngles, tubeSpecs, tubesVisible, type TubeAngleStore, type TubePref } from './tubes';
+import { dropFinished, SMALL_SCREEN_QUERY, anglesFor, angleFromPoint, parseTubePref, pushTubes, readTubeAngles, tubeSpecs, tubesVisible, type TubeAngleStore, type TubePref } from './tubes';
 import { isFreshVisit, setupTutorial } from './tutorial';
 import { beginLog, createPracticePanel, liveText, recordEvent, recordStep, summarize, type ShotLog } from './practice';
 import { MATCH_STORAGE_KEY, readMatch, type Phase, type SavedMatch } from './game/session';
@@ -454,10 +454,8 @@ function tubeMove(e: PointerEvent): boolean {
   if (e.pointerId !== tubePointer) return false;
   const p = scene.boardPoint(e.clientX, e.clientY, scene.tubeRimHeight);
   if (p) {
-    const angles = currentTubeAngles(), list = anglesFor(tubeStore, mode).slice(0, angles.length);
-    const placed = placeTube(angles, tubeSide, angleFromPoint(p));
-    const next = angles.map((a, i) => i === tubeSide ? placed : (list[i] ?? a));
-    tubeStore = { ...tubeStore, [mode]: next };
+    // Tubes pushed along by this one move too, so every angle is saved.
+    tubeStore = { ...tubeStore, [mode]: pushTubes(currentTubeAngles(), tubeSide, angleFromPoint(p)) };
   }
   return true;
 }
