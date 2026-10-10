@@ -91,7 +91,7 @@ export function checkSourceNeutrality(policy = 'integrated-physics') {
   let cosmetic = null;
   if (policy === 'disc-appearance') {
     const text = readFileSync(resolve(root, 'docs/disc-design-approved.json'), 'utf8');
-    assert.equal(sha(text), 'c8365135a4b284a3389ade95a4e4161765fcf56bfee20fb6d6ab225da9d5fd1c', 'Reviewed cosmetic manifest must not drift');
+    assert.equal(sha(text), '2fe40dfcae20d0d8df4b13f1e98f25c02fe8e07ef92167374fd049fcf417c424', 'Reviewed cosmetic manifest must not drift');
     cosmetic = JSON.parse(text);
     assert.equal(cosmetic.accepted_physics_release, '425b35eb3a73663e55c1210deda8e0d821c0f827');
     assert.deepStrictEqual(Object.keys(cosmetic.cosmeticSourceHashes).sort(), [

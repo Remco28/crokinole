@@ -16,6 +16,7 @@ function route(samples: FlickSample[]) {
   const result = { placements: 0, launches: 0, cancels: 0 };
   const context = {
     canvas: { addEventListener: (_: string, cb: typeof callback) => { callback = cb; } },
+    tubeGrab: () => false, tubeMove: () => false, tubeRelease: () => false,
     paused: false, flickSpeedScale: () => 1, inward: () => ({ x: 0, y: -1 }), placementPointer: null, orbitPointer: null, pinching: false,
     touches: new Map(), pointer: 1, staged: disc, phase: 'pass', deadline: null,
     scene: { isViewMoving: () => false, boardPoint: (x: number, y: number) => ({ x: x / scale, y: y / scale }) },

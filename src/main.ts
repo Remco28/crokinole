@@ -11,7 +11,7 @@ import { PLAYER_NAMES as names, PLAYER_COLORS as colors } from './game/players';
 import { remainingTime, resumeDeadline } from './game/clock';
 import { CLASSIC, TOURNAMENT_ROUNDS, completeTournamentRound, discsPerPlayer, discsPerSide, formatAllowsMode, formatKey, isGameOver, parseFormatKey, readFormat, startingPlayer, type FormatRoundResult, type MatchFormat } from './game/format';
 import { FOLLOW, GENTLE, SETTLE_DELAY_MS, movingFocus, parseShotCamera, settleFocus, type ShotCamera } from './render/shot-camera';
-import { SMALL_SCREEN_QUERY, parseTubePref, tubeSpecs, tubesVisible, type TubePref } from './tubes';
+import { SMALL_SCREEN_QUERY, anglesFor, angleFromPoint, parseTubePref, placeTube, readTubeAngles, tubeSpecs, tubesVisible, type TubeAngleStore, type TubePref } from './tubes';
 import { isFreshVisit, setupTutorial } from './tutorial';
 import { beginLog, createPracticePanel, liveText, recordEvent, recordStep, summarize, type ShotLog } from './practice';
 import { MATCH_STORAGE_KEY, readMatch, type Phase, type SavedMatch } from './game/session';
@@ -28,7 +28,7 @@ let paused = false, pausedRemaining: number | null = null;
 const sound = new BoardSound();
 const DEFAULT_ZOOM = 1.2;
 let volume = 0.65, muted = false, tilt: number = TILT.overview, zoom = DEFAULT_ZOOM, theme: 'light' | 'dark' = 'light', activeDiscHighlight = true, invertDrag = false, finalCountdown = true, shotCamera: ShotCamera = 'off', tubePref: TubePref = 'auto';
-let tubeAngles: Array<number | undefined> = [];
+let tubeStore: TubeAngleStore = {};
 const smallScreen = window.matchMedia(SMALL_SCREEN_QUERY);
 const clampZoom = (value: number) => Math.max(0.75, Math.min(SHOT_VIEW.maxZoom, value));
 // Flicks are measured in board inches, so the same finger or mouse movement
@@ -57,7 +57,7 @@ try {
   if (typeof prefs.invertDrag === 'boolean') invertDrag = prefs.invertDrag;
   if (typeof prefs.finalCountdown === 'boolean') finalCountdown = prefs.finalCountdown;
   shotCamera = parseShotCamera(prefs.shotCamera); tubePref = parseTubePref(prefs.tubes);
-  if (Array.isArray(prefs.tubeAngles)) tubeAngles = prefs.tubeAngles.map((a: unknown) => typeof a === 'number' && Number.isFinite(a) ? a : undefined).slice(0, 4);
+  tubeStore = readTubeAngles(prefs.tubeAngles);
   if (prefs.theme === 'dark') theme = 'dark';
 } catch { /* Preferences are optional. */ }
 document.body.dataset.theme = theme;
@@ -81,7 +81,7 @@ function tablePreferences() {
   if (scene) tilt = scene.getTilt();
   // view is kept for older builds that only know standing and seated.
   const view = tilt >= TILT.table - 0.01 ? 'seated' : 'standing', tiltDegrees = Math.round(tilt * 1800 / Math.PI) / 10;
-  try { localStorage.setItem('crokinole-table', JSON.stringify({ volume, muted, view, tilt: tiltDegrees, zoom, theme, activeDiscHighlight, invertDrag, finalCountdown, shotCamera, tubes: tubePref, tubeAngles })); } catch { /* optional */ }
+  try { localStorage.setItem('crokinole-table', JSON.stringify({ volume, muted, view, tilt: tiltDegrees, zoom, theme, activeDiscHighlight, invertDrag, finalCountdown, shotCamera, tubes: tubePref, tubeAngles: tubeStore })); } catch { /* optional */ }
 }
 const activeDiscHighlightSetting = document.createElement('label');
 activeDiscHighlightSetting.className = 'theme-setting';
@@ -431,8 +431,37 @@ function setZoom(value: number) {
   if (paused || !canInspectBoard() || pointer !== null || orbitPointer !== null || settings.open) return;
   zoom = clampZoom(value); scene.setZoom(zoom); tablePreferences();
 }
+// Tubes slide around the rim by dragging them. A drag that starts on a tube
+// moves only the tube, never the camera or a flick.
+let tubePointer: number | null = null, tubeSide = 0;
+const currentTubeAngles = () => tubeSpecs(discs, mode, side, anglesFor(tubeStore, mode)).map(s => s.angle);
+function tubeGrab(e: PointerEvent): boolean {
+  if (paused || settings.open || tutorialOpen || tubePointer !== null || pointer !== null || orbitPointer !== null || placementPointer !== null || pinching) return false;
+  if (e.pointerType !== 'touch' && e.button !== 0) return false;
+  if (!tubesVisible(tubePref, smallScreen.matches)) return false;
+  const hit = scene.tubeHit(e.clientX, e.clientY); if (hit === null) return false;
+  tubePointer = e.pointerId; tubeSide = hit; canvas.setPointerCapture(e.pointerId); canvas.classList.add('is-moving-tube');
+  return true;
+}
+function tubeMove(e: PointerEvent): boolean {
+  if (e.pointerId !== tubePointer) return false;
+  const p = scene.boardPoint(e.clientX, e.clientY, scene.tubeRimHeight);
+  if (p) {
+    const angles = currentTubeAngles(), list = anglesFor(tubeStore, mode).slice(0, angles.length);
+    const placed = placeTube(angles, tubeSide, angleFromPoint(p));
+    const next = angles.map((a, i) => i === tubeSide ? placed : (list[i] ?? a));
+    tubeStore = { ...tubeStore, [mode]: next };
+  }
+  return true;
+}
+function tubeRelease(e: PointerEvent): boolean {
+  if (e.pointerId !== tubePointer) return false;
+  tubePointer = null; canvas.classList.remove('is-moving-tube'); tablePreferences();
+  return true;
+}
 canvas.addEventListener('pointerdown', e => {
   if (paused) return;
+  if (tubeGrab(e)) return;
   if (e.pointerType === 'touch') {
     touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
     canvas.setPointerCapture(e.pointerId);
@@ -462,6 +491,7 @@ canvas.addEventListener('pointerdown', e => {
 });
 canvas.addEventListener('pointermove', e => {
   if (paused) return;
+  if (tubeMove(e)) return;
   if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pinching) {
     const distance = touchDistance();
@@ -525,6 +555,7 @@ function releaseFlick() {
 }
 function cancel() { pointer = null; trail = []; contactTrail = []; discCrossed = false; flickContact = null; }
 function endPointer(e: PointerEvent) {
+  tubeRelease(e);
   touches.delete(e.pointerId);
   if (touches.size === 0) { pinching = false; pinchDistance = 0; }
   if (pointer === e.pointerId) cancel();
@@ -536,6 +567,7 @@ canvas.addEventListener('lostpointercapture', endPointer);
 window.addEventListener('blur', () => { cancel(); cancelOrbit(); placementPointer = null; touches.clear(); pinching = false; pinchDistance = 0; });
 canvas.addEventListener('pointerup', e => {
   if (paused) return;
+  if (tubeRelease(e)) return;
   if (e.pointerId === placementPointer) {
     placementPointer = null; touches.delete(e.pointerId);
     if (phase === 'pass' && !pinching && !scene.isViewMoving()) placeAt(e.clientX, e.clientY);
@@ -693,7 +725,7 @@ function tick(now: number) {
   // moves it to the new disc, and round results return to the overview.
   if (phase === 'pass') scene.setShotDisc(staged);
   else if (phase !== 'moving' && phase !== 'review') scene.setShotDisc(null);
-  scene.setTubes(tubesVisible(tubePref, smallScreen.matches) ? tubeSpecs(discs, mode, side, tubeAngles) : []);
+  scene.setTubes(tubesVisible(tubePref, smallScreen.matches) ? tubeSpecs(discs, mode, side, anglesFor(tubeStore, mode)) : []);
   scene.syncDiscs(discs, review); requestAnimationFrame(tick);
 }
 try {

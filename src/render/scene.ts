@@ -352,6 +352,23 @@ export function createScene(canvas: HTMLCanvasElement) {
       tubeGroup.add(tube);
     }
   }
+  // Which tube, if any, is under a screen point. The tube is a tall thin target,
+  // so test distance to its centre line in pixels with a generous finger margin.
+  const tubeA = new THREE.Vector3(), tubeB = new THREE.Vector3();
+  function tubeHit(clientX: number, clientY: number): number | null {
+    const rect = canvas.getBoundingClientRect(); let best: number | null = null, bestDistance = Infinity;
+    const toPx = (v: THREE.Vector3) => { v.project(camera); return { x: rect.left + (v.x + 1) * rect.width / 2, y: rect.top + (1 - v.y) * rect.height / 2 }; };
+    for (const spec of tubeSpecs) {
+      const bx = Math.sin(spec.angle) * TUBE.centre, bz = Math.cos(spec.angle) * TUBE.centre;
+      const base = toPx(tubeA.set(bx, TUBE.rimTop, bz)), top = toPx(tubeB.set(bx, TUBE.rimTop + TUBE.height, bz));
+      const side = toPx(tubeA.set(bx + TUBE.radius, TUBE.rimTop, bz)), reach = Math.max(26, Math.hypot(side.x - base.x, side.y - base.y) * 1.6 + 14);
+      const sx = top.x - base.x, sy = top.y - base.y, length2 = sx * sx + sy * sy || 1;
+      const t = Math.max(0, Math.min(1, ((clientX - base.x) * sx + (clientY - base.y) * sy) / length2));
+      const distance = Math.hypot(clientX - (base.x + sx * t), clientY - (base.y + sy * t));
+      if (distance <= reach && distance < bestDistance) { best = spec.side; bestDistance = distance; }
+    }
+    return best;
+  }
   function setTubes(specs: Array<{ side: number; angle: number; owners: number[] }>) {
     const same = specs.length === tubeSpecs.length && specs.every((s, i) => s.side === tubeSpecs[i].side && Math.abs(s.angle - tubeSpecs[i].angle) < 1e-6
       && s.owners.length === tubeSpecs[i].owners.length && s.owners.every((o, k) => o === tubeSpecs[i].owners[k]));
@@ -603,6 +620,8 @@ export function createScene(canvas: HTMLCanvasElement) {
     },
     syncDiscs,
     setTubes,
+    tubeHit,
+    tubeRimHeight: TUBE.rimTop,
     setDiscAppearance,
     boardPoint,
     getYaw: () => yaw,
