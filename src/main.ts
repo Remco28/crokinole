@@ -11,6 +11,7 @@ import { PLAYER_NAMES as names, PLAYER_COLORS as colors } from './game/players';
 import { remainingTime, resumeDeadline } from './game/clock';
 import { CLASSIC, TOURNAMENT_ROUNDS, completeTournamentRound, discsPerPlayer, discsPerSide, formatAllowsMode, formatKey, isGameOver, parseFormatKey, readFormat, startingPlayer, type FormatRoundResult, type MatchFormat } from './game/format';
 import { FOLLOW, GENTLE, SETTLE_DELAY_MS, movingFocus, parseShotCamera, settleFocus, type ShotCamera } from './render/shot-camera';
+import { SMALL_SCREEN_QUERY, parseTubePref, tubeSpecs, tubesVisible, type TubePref } from './tubes';
 import { isFreshVisit, setupTutorial } from './tutorial';
 import { beginLog, createPracticePanel, liveText, recordEvent, recordStep, summarize, type ShotLog } from './practice';
 import { MATCH_STORAGE_KEY, readMatch, type Phase, type SavedMatch } from './game/session';
@@ -26,7 +27,9 @@ const pauseDialog = $<HTMLDialogElement>('pause-dialog');
 let paused = false, pausedRemaining: number | null = null;
 const sound = new BoardSound();
 const DEFAULT_ZOOM = 1.2;
-let volume = 0.65, muted = false, tilt: number = TILT.overview, zoom = DEFAULT_ZOOM, theme: 'light' | 'dark' = 'light', activeDiscHighlight = true, invertDrag = false, finalCountdown = true, shotCamera: ShotCamera = 'off';
+let volume = 0.65, muted = false, tilt: number = TILT.overview, zoom = DEFAULT_ZOOM, theme: 'light' | 'dark' = 'light', activeDiscHighlight = true, invertDrag = false, finalCountdown = true, shotCamera: ShotCamera = 'off', tubePref: TubePref = 'auto';
+let tubeAngles: Array<number | undefined> = [];
+const smallScreen = window.matchMedia(SMALL_SCREEN_QUERY);
 const clampZoom = (value: number) => Math.max(0.75, Math.min(SHOT_VIEW.maxZoom, value));
 // Flicks are measured in board inches, so the same finger or mouse movement
 // would shoot harder on a small screen or in a foreshortened view and softer
@@ -53,7 +56,8 @@ try {
   else if (prefs.view === 'seated') tilt = TILT.table;
   if (typeof prefs.invertDrag === 'boolean') invertDrag = prefs.invertDrag;
   if (typeof prefs.finalCountdown === 'boolean') finalCountdown = prefs.finalCountdown;
-  shotCamera = parseShotCamera(prefs.shotCamera);
+  shotCamera = parseShotCamera(prefs.shotCamera); tubePref = parseTubePref(prefs.tubes);
+  if (Array.isArray(prefs.tubeAngles)) tubeAngles = prefs.tubeAngles.map((a: unknown) => typeof a === 'number' && Number.isFinite(a) ? a : undefined).slice(0, 4);
   if (prefs.theme === 'dark') theme = 'dark';
 } catch { /* Preferences are optional. */ }
 document.body.dataset.theme = theme;
@@ -73,10 +77,11 @@ function tablePreferences() {
   $<HTMLInputElement>('invert-drag').checked = invertDrag;
   $<HTMLInputElement>('final-countdown').checked = finalCountdown;
   $<HTMLSelectElement>('shot-camera').value = shotCamera;
+  $<HTMLSelectElement>('tubes-setting').value = tubePref;
   if (scene) tilt = scene.getTilt();
   // view is kept for older builds that only know standing and seated.
   const view = tilt >= TILT.table - 0.01 ? 'seated' : 'standing', tiltDegrees = Math.round(tilt * 1800 / Math.PI) / 10;
-  try { localStorage.setItem('crokinole-table', JSON.stringify({ volume, muted, view, tilt: tiltDegrees, zoom, theme, activeDiscHighlight, invertDrag, finalCountdown, shotCamera })); } catch { /* optional */ }
+  try { localStorage.setItem('crokinole-table', JSON.stringify({ volume, muted, view, tilt: tiltDegrees, zoom, theme, activeDiscHighlight, invertDrag, finalCountdown, shotCamera, tubes: tubePref, tubeAngles })); } catch { /* optional */ }
 }
 const activeDiscHighlightSetting = document.createElement('label');
 activeDiscHighlightSetting.className = 'theme-setting';
@@ -105,6 +110,9 @@ $<HTMLInputElement>('active-disc-highlight').addEventListener('change', e => {
 });
 $<HTMLInputElement>('invert-drag').addEventListener('change', e => {
   invertDrag = (e.target as HTMLInputElement).checked; tablePreferences();
+});
+$<HTMLSelectElement>('tubes-setting').addEventListener('change', e => {
+  tubePref = parseTubePref((e.target as HTMLSelectElement).value); tablePreferences();
 });
 $<HTMLSelectElement>('shot-camera').addEventListener('change', e => {
   shotCamera = parseShotCamera((e.target as HTMLSelectElement).value); if (shotCamera === 'off') scene.setFocus(null); tablePreferences();
@@ -685,6 +693,7 @@ function tick(now: number) {
   // moves it to the new disc, and round results return to the overview.
   if (phase === 'pass') scene.setShotDisc(staged);
   else if (phase !== 'moving' && phase !== 'review') scene.setShotDisc(null);
+  scene.setTubes(tubesVisible(tubePref, smallScreen.matches) ? tubeSpecs(discs, mode, side, tubeAngles) : []);
   scene.syncDiscs(discs, review); requestAnimationFrame(tick);
 }
 try {

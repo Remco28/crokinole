@@ -300,6 +300,8 @@ export function createScene(canvas: HTMLCanvasElement) {
       }
       if (oldLook) disposeDiscLook(oldLook);
     }
+    // Tube discs share these looks, so they are rebuilt with the new ones.
+    rebuildTubes();
   }
   let pausedAt: number | null = null, pausedDuration = 0;
   const animationNow = () => (pausedAt ?? performance.now()) - pausedDuration;
@@ -320,6 +322,43 @@ export function createScene(canvas: HTMLCanvasElement) {
   const markerTexture = new THREE.CanvasTexture(markerCanvas);
   markerTexture.colorSpace = THREE.SRGBColorSpace;
   const markers = new Map<number, THREE.Sprite>();
+  // 20s tubes: clear plastic hanging on the rim, with real disc meshes resting
+  // on the thin rim ledge. Rebuilt whenever the contents, positions or disc
+  // looks change; the stack is small, so a rebuild is cheap.
+  const TUBE = { radius: 0.8, wall: 0.04, height: 5.4, rimTop: 0.4, centre: (BOARD.ditchOuterRadius + BOARD.ditchOuterRadius + 0.25) / 2 };
+  const tubeGroup = new THREE.Group(); scene.add(tubeGroup);
+  const tubeGlass = new THREE.MeshPhysicalMaterial({ color: '#eaf4f4', transparent: true, opacity: 0.2, roughness: 0.05, metalness: 0, side: THREE.DoubleSide, depthWrite: false });
+  const tubeEdge = new THREE.MeshStandardMaterial({ color: '#ffffff', transparent: true, opacity: 0.55, roughness: 0.1, depthWrite: false });
+  const tubeBodyGeo = new THREE.CylinderGeometry(TUBE.radius, TUBE.radius, TUBE.height, 40, 1, true);
+  const tubeLipGeo = new THREE.TorusGeometry(TUBE.radius, TUBE.wall, 8, 40);
+  let tubeSpecs: Array<{ side: number; angle: number; owners: number[] }> = [];
+  function rebuildTubes() {
+    for (const child of [...tubeGroup.children]) { tubeGroup.remove(child); child.traverse(o => { if ((o as THREE.Mesh).isMesh && o.userData.tubeDisc) (o as THREE.Mesh<THREE.BufferGeometry, THREE.Material>).material.dispose(); }); }
+    for (const spec of tubeSpecs) {
+      const tube = new THREE.Group();
+      tube.position.set(Math.sin(spec.angle) * TUBE.centre, 0, Math.cos(spec.angle) * TUBE.centre);
+      const glass = new THREE.Mesh(tubeBodyGeo, tubeGlass); glass.position.y = TUBE.rimTop - 0.15 + TUBE.height / 2; glass.renderOrder = 6;
+      const top = new THREE.Mesh(tubeLipGeo, tubeEdge); top.rotation.x = Math.PI / 2; top.position.y = TUBE.rimTop - 0.15 + TUBE.height; top.renderOrder = 6;
+      const bottom = new THREE.Mesh(tubeLipGeo, tubeEdge); bottom.rotation.x = Math.PI / 2; bottom.position.y = TUBE.rimTop - 0.15; bottom.renderOrder = 6;
+      tube.add(glass, top, bottom);
+      spec.owners.forEach((owner, k) => {
+        const look = discLook(owner);
+        const mesh = new THREE.Mesh(discGeo, look.bodyMaterial.clone()); mesh.castShadow = true; mesh.userData.tubeDisc = true;
+        const face = new THREE.Mesh(discAppearance.style === 'wood' ? woodFaceGeo : discFaceGeo, look.faceMaterial);
+        face.rotation.x = -Math.PI / 2; face.position.y = DISC.height / 2; mesh.add(face);
+        mesh.position.y = TUBE.rimTop + DISC.height / 2 + k * DISC.height;
+        tube.add(mesh);
+      });
+      tubeGroup.add(tube);
+    }
+  }
+  function setTubes(specs: Array<{ side: number; angle: number; owners: number[] }>) {
+    const same = specs.length === tubeSpecs.length && specs.every((s, i) => s.side === tubeSpecs[i].side && Math.abs(s.angle - tubeSpecs[i].angle) < 1e-6
+      && s.owners.length === tubeSpecs[i].owners.length && s.owners.every((o, k) => o === tubeSpecs[i].owners[k]));
+    if (same) return;
+    tubeSpecs = specs.map(s => ({ ...s, owners: [...s.owners] })); rebuildTubes();
+  }
+
   function syncDiscs(discs: Disc[], review: ShotReview | null = null) {
     const active = activeHighlightEnabled ? discs.find(d => d.id === activeDisc && d.state === 'board') : undefined;
     const age = (animationNow() - highlightAt) / 1000;
@@ -563,6 +602,7 @@ export function createScene(canvas: HTMLCanvasElement) {
       else if (!paused && pausedAt !== null) { pausedDuration += performance.now() - pausedAt; pausedAt = null; }
     },
     syncDiscs,
+    setTubes,
     setDiscAppearance,
     boardPoint,
     getYaw: () => yaw,
