@@ -11,10 +11,26 @@ import { DISC } from './sim/constants';
 // rocking discs tick as they settle back. Landing drives sound-sized impacts.
 // height is the part above the rim: room for the 8 discs of tournament play.
 export const TUBE_DIM = { radius: 0.8, height: 3.3, floor: 0.4 } as const;
-// The tube straddles the rail. A notch lets the rail pass through, the outer
-// half hangs down the outside of the rail, and the ditch-side half stops at the
-// rim top so a disc flung across the ditch glides underneath it.
-export const TUBE_SHAPE = { outerDrop: 1.3, notch: 0.34 } as const;
+// One continuous wall straddles the rail. Its bottom edge is lowest on the outer
+// face (hanging down the outside of the rail) and stops just below the rail top
+// on the board side, so a disc flung across the ditch glides underneath. Where
+// the rail passes through each side of the tube the edge rises in a rounded arch
+// to rest on the rail top. theta is measured round the tube from the outward
+// direction (0 = away from the board, PI = toward the board).
+export const TUBE_SHAPE = {
+  outerDrop: 1.3,   // below the rail top, outer face
+  innerDrop: 0.3,   // below the rail top, board face (disc tops sit 0.425 below it)
+  slotHalf: 0.16,   // radians of flat rest on each side, about the rail's thickness
+  slotRise: 0.55,   // radians over which the edge curves down from the rail
+} as const;
+const smooth = (t: number) => { const u = Math.max(0, Math.min(1, t)); return u * u * (3 - 2 * u); };
+// How far below the rail top the wall extends at angle theta.
+export function tubeEdgeDrop(theta: number): number {
+  const t = Math.atan2(Math.sin(theta), Math.cos(theta));
+  const side = Math.abs(Math.abs(t) - Math.PI / 2);          // distance to the nearer rail crossing
+  const face = Math.abs(t) < Math.PI / 2 ? TUBE_SHAPE.outerDrop : TUBE_SHAPE.innerDrop;
+  return face * smooth((side - TUBE_SHAPE.slotHalf) / TUBE_SHAPE.slotRise);
+}
 export const TUBE_CAPACITY = Math.floor(TUBE_DIM.height / DISC.height);
 export const TUBE_TUNE = {
   gravity: 386,                  // in/s²: a real drop

@@ -8,7 +8,7 @@ import { DITCH_SLOTS, REVIEW_TIMING, type ShotReview } from '../game/review';
 
 import { TILT, cameraLevel, centeredOrbit, dragOrbit } from './orbit';
 import { rimFrameAccel, stepRim, type RimMotion } from '../tubes';
-import { TUBE_DIM, TUBE_SHAPE, createTube, dropDisc, stepTube, type TubeEvent, type TubeState } from '../tube-sim';
+import { TUBE_DIM, createTube, tubeEdgeDrop, dropDisc, stepTube, type TubeEvent, type TubeState } from '../tube-sim';
 import { GENTLE, PULLBACK, RETURN, atRest, limitFocus, stepFocus, type FocusState, type FocusTuning, type Point } from './shot-camera';
 import { SHOT_VIEW, cameraPose, shotCloseness, shownZoom, type BoardPoint } from './shot-framing';
 export type { BoardView, CameraStop } from './orbit';
@@ -332,13 +332,28 @@ export function createScene(canvas: HTMLCanvasElement) {
   const TUBE = { radius: TUBE_DIM.radius, wall: 0.04, height: TUBE_DIM.height, rimTop: TUBE_DIM.floor, centre: BOARD.ditchOuterRadius + 0.125 };
   const tubeGlass = new THREE.MeshPhysicalMaterial({ color: '#eaf4f4', transparent: true, opacity: 0.2, roughness: 0.05, metalness: 0, side: THREE.DoubleSide, depthWrite: false });
   const tubeEdge = new THREE.MeshStandardMaterial({ color: '#ffffff', transparent: true, opacity: 0.55, roughness: 0.1, depthWrite: false });
-  // Upper wall (above the rim), the outer half hanging below the rim, and the
-  // slot the rail passes through (the notch). The ditch side has no lower wall.
-  const notchAngle = Math.asin(TUBE_SHAPE.notch / 2 / TUBE.radius);
-  const tubeBodyGeo = new THREE.CylinderGeometry(TUBE.radius, TUBE.radius, TUBE.height, 40, 1, true);
-  const tubeOuterGeo = new THREE.CylinderGeometry(TUBE.radius, TUBE.radius, TUBE_SHAPE.outerDrop, 24, 1, true, -Math.PI / 2 + notchAngle, Math.PI - 2 * notchAngle);
-  const tubeLipGeo = new THREE.TorusGeometry(TUBE.radius, TUBE.wall, 8, 40);
-  const tubeOuterLipGeo = new THREE.TorusGeometry(TUBE.radius, TUBE.wall, 8, 24, Math.PI - 2 * notchAngle); tubeOuterLipGeo.rotateZ(notchAngle);
+  // One seamless wall. Its bottom edge follows tubeEdgeDrop(), so the long outer
+  // face, the shorter board face and the rounded arches over the rail are all one
+  // piece of plastic. A thin rounded lip runs along the top and the curved bottom.
+  const WALL_SEGMENTS = 96;
+  const edgeAt = (theta: number) => TUBE.rimTop - tubeEdgeDrop(theta);
+  const tubeWallGeo = (() => {
+    const positions: number[] = [], normals: number[] = [], index: number[] = [];
+    for (let i = 0; i <= WALL_SEGMENTS; i++) {
+      const theta = i / WALL_SEGMENTS * Math.PI * 2, nx = Math.sin(theta), nz = Math.cos(theta);
+      positions.push(nx * TUBE.radius, TUBE.rimTop + TUBE.height, nz * TUBE.radius, nx * TUBE.radius, edgeAt(theta), nz * TUBE.radius);
+      normals.push(nx, 0, nz, nx, 0, nz);
+      if (i < WALL_SEGMENTS) { const k = i * 2; index.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    g.setIndex(index); return g;
+  })();
+  const loop = (height: (theta: number) => number) => new THREE.CatmullRomCurve3(
+    Array.from({ length: WALL_SEGMENTS }, (_, i) => { const theta = i / WALL_SEGMENTS * Math.PI * 2; return new THREE.Vector3(Math.sin(theta) * TUBE.radius, height(theta), Math.cos(theta) * TUBE.radius); }), true);
+  const tubeTopLipGeo = new THREE.TubeGeometry(loop(() => TUBE.rimTop + TUBE.height), WALL_SEGMENTS * 2, TUBE.wall, 6, true);
+  const tubeBottomLipGeo = new THREE.TubeGeometry(loop(edgeAt), WALL_SEGMENTS * 2, TUBE.wall, 6, true);
   type TubeSpecLike = { side: number; angle: number; owners: number[] };
   interface TubeRig { side: number; root: THREE.Group; owners: number[]; sim: TubeState; meshes: Array<THREE.Mesh<THREE.LatheGeometry, THREE.MeshStandardMaterial>>; motion: RimMotion; target: number }
   const tubeRigs = new Map<number, TubeRig>();
@@ -364,13 +379,11 @@ export function createScene(canvas: HTMLCanvasElement) {
     rig.root.rotation.y = rig.motion.a;
   }
   function makeTubeRig(spec: TubeSpecLike): TubeRig {
-    const root = new THREE.Group(), y0 = TUBE.rimTop;
-    const glass = new THREE.Mesh(tubeBodyGeo, tubeGlass); glass.position.y = y0 + TUBE.height / 2; glass.renderOrder = 6;
-    const outer = new THREE.Mesh(tubeOuterGeo, tubeGlass); outer.position.y = y0 - TUBE_SHAPE.outerDrop / 2; outer.renderOrder = 6;
-    const top = new THREE.Mesh(tubeLipGeo, tubeEdge); top.rotation.x = Math.PI / 2; top.position.y = y0 + TUBE.height; top.renderOrder = 6;
-    const rimLip = new THREE.Mesh(tubeLipGeo, tubeEdge); rimLip.rotation.x = Math.PI / 2; rimLip.position.y = y0; rimLip.renderOrder = 6;
-    const outerLip = new THREE.Mesh(tubeOuterLipGeo, tubeEdge); outerLip.rotation.x = Math.PI / 2; outerLip.position.y = y0 - TUBE_SHAPE.outerDrop; outerLip.renderOrder = 6;
-    root.add(glass, outer, top, rimLip, outerLip); scene.add(root);
+    const root = new THREE.Group();
+    const wall = new THREE.Mesh(tubeWallGeo, tubeGlass); wall.renderOrder = 6;
+    const topLip = new THREE.Mesh(tubeTopLipGeo, tubeEdge); topLip.renderOrder = 6;
+    const bottomLip = new THREE.Mesh(tubeBottomLipGeo, tubeEdge); bottomLip.renderOrder = 6;
+    root.add(wall, topLip, bottomLip); scene.add(root);
     const rig: TubeRig = { side: spec.side, root, owners: [...spec.owners], sim: createTube(spec.owners, spec.side + 1), meshes: [], motion: { a: spec.angle, w: 0 }, target: spec.angle };
     placeTubeRoot(rig); fillTubeMeshes(rig); return rig;
   }

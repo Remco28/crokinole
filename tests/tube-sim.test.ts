@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TUBE_CAPACITY, TUBE_DIM, TUBE_TUNE, createTube, dropDisc, nudgeTube, restHeight, stepTube, tubeCount, tubeOwners, type TubeEvent, type TubeState } from '../src/tube-sim';
+import { TUBE_SHAPE, tubeEdgeDrop, TUBE_CAPACITY, TUBE_DIM, TUBE_TUNE, createTube, dropDisc, nudgeTube, restHeight, stepTube, tubeCount, tubeOwners, type TubeEvent, type TubeState } from '../src/tube-sim';
 import { DISC } from '../src/sim/constants';
 
 const run = (s: TubeState, seconds: number, accel = { x: 0, z: 0 }) => {
@@ -101,5 +101,25 @@ describe('geometry', () => {
   it('gives the discs sideways play and a stack that fits the tube', () => {
     expect(TUBE_TUNE.play).toBeGreaterThan(0.05); expect(TUBE_DIM.radius).toBeGreaterThan(DISC.radius);
     expect(restHeight(TUBE_CAPACITY - 1) + DISC.height / 2).toBeLessThanOrEqual(TUBE_DIM.height + 1e-9);
+  });
+});
+
+describe('tube wall profile', () => {
+  const outward = 0, toBoard = Math.PI, rail = Math.PI / 2;
+  it('hangs lowest on the outside, shorter on the board side', () => {
+    expect(tubeEdgeDrop(outward)).toBeCloseTo(TUBE_SHAPE.outerDrop); expect(tubeEdgeDrop(toBoard)).toBeCloseTo(TUBE_SHAPE.innerDrop);
+    expect(tubeEdgeDrop(toBoard)).toBeLessThan(tubeEdgeDrop(outward));
+  });
+  it('rises to rest on the rail top where the rail passes through, on both sides', () => {
+    expect(tubeEdgeDrop(rail)).toBe(0); expect(tubeEdgeDrop(-rail)).toBe(0);
+  });
+  it('is continuous and symmetric, with no step anywhere round the tube', () => {
+    let worst = 0;
+    for (let i = 0; i < 720; i++) { const a = i / 720 * Math.PI * 2; worst = Math.max(worst, Math.abs(tubeEdgeDrop(a + 0.0087) - tubeEdgeDrop(a))); expect(tubeEdgeDrop(a)).toBeCloseTo(tubeEdgeDrop(-a)); }
+    expect(worst).toBeLessThan(0.05);
+  });
+  it('never dips below the outer drop, and keeps the board side clear of the ditch floor', () => {
+    for (let i = 0; i < 360; i++) expect(tubeEdgeDrop(i / 360 * Math.PI * 2)).toBeLessThanOrEqual(TUBE_SHAPE.outerDrop + 1e-9);
+    expect(0.4 - TUBE_SHAPE.innerDrop).toBeGreaterThan(0.375 - 0.4);
   });
 });
