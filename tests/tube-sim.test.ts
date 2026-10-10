@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TUBE_SHAPE, tubeEdgeDrop, TUBE_CAPACITY, TUBE_DIM, TUBE_TUNE, createTube, dropDisc, nudgeTube, restHeight, stepTube, tubeCount, tubeOwners, type TubeEvent, type TubeState } from '../src/tube-sim';
+import { RAIL_THICKNESS, TUBE_SHAPE, tubeEdgeDrop, TUBE_CAPACITY, TUBE_DIM, TUBE_TUNE, createTube, dropDisc, nudgeTube, restHeight, stepTube, tubeCount, tubeOwners, type TubeEvent, type TubeState } from '../src/tube-sim';
 import { DISC } from '../src/sim/constants';
 
 const run = (s: TubeState, seconds: number, accel = { x: 0, z: 0 }) => {
@@ -106,20 +106,35 @@ describe('geometry', () => {
 
 describe('tube wall profile', () => {
   const outward = 0, toBoard = Math.PI, rail = Math.PI / 2;
-  it('hangs lowest on the outside, shorter on the board side', () => {
+  it('hangs lowest on the outside but never past two thirds of the rail', () => {
     expect(tubeEdgeDrop(outward)).toBeCloseTo(TUBE_SHAPE.outerDrop); expect(tubeEdgeDrop(toBoard)).toBeCloseTo(TUBE_SHAPE.innerDrop);
-    expect(tubeEdgeDrop(toBoard)).toBeLessThan(tubeEdgeDrop(outward));
+    expect(TUBE_SHAPE.outerDrop).toBeLessThanOrEqual(1.8 * 2 / 3);
   });
-  it('rises to rest on the rail top where the rail passes through, on both sides', () => {
+  it('differs between the two faces by about one disc plus a little glide room', () => {
+    const step = TUBE_SHAPE.outerDrop - TUBE_SHAPE.innerDrop;
+    expect(step).toBeGreaterThanOrEqual(DISC.height); expect(step).toBeLessThanOrEqual(DISC.height * 2);
+  });
+  it('keeps the board-side edge above a disc sliding in the ditch', () => {
+    // The ditch floor is 0.8 below the rail top; a disc on it reaches 0.8 - 0.375 below it.
+    expect(TUBE_SHAPE.innerDrop).toBeLessThan(0.8 - DISC.height);
+  });
+  it('has a narrow slot only a little wider than the rail, with its top on the rail', () => {
     expect(tubeEdgeDrop(rail)).toBe(0); expect(tubeEdgeDrop(-rail)).toBe(0);
+    expect(TUBE_SHAPE.slotHalf * 2).toBeGreaterThanOrEqual(RAIL_THICKNESS); expect(TUBE_SHAPE.slotHalf * 2).toBeLessThanOrEqual(RAIL_THICKNESS * 1.4);
+    const inches = (a: number) => a * TUBE_DIM.radius;
+    expect(tubeEdgeDrop(rail + (TUBE_SHAPE.slotHalf - TUBE_SHAPE.slotCorner) / TUBE_DIM.radius)).toBe(0);
+    expect(tubeEdgeDrop(rail + (TUBE_SHAPE.slotHalf + TUBE_SHAPE.slotSide + 0.01) / TUBE_DIM.radius)).toBeGreaterThan(TUBE_SHAPE.innerDrop - 1e-9);
+    expect(inches(1)).toBeGreaterThan(0);
   });
-  it('is continuous and symmetric, with no step anywhere round the tube', () => {
+  it('is symmetric, and rises only inside the slot walls (no other steps)', () => {
     let worst = 0;
-    for (let i = 0; i < 720; i++) { const a = i / 720 * Math.PI * 2; worst = Math.max(worst, Math.abs(tubeEdgeDrop(a + 0.0087) - tubeEdgeDrop(a))); expect(tubeEdgeDrop(a)).toBeCloseTo(tubeEdgeDrop(-a)); }
-    expect(worst).toBeLessThan(0.05);
+    for (let i = 0; i < 3600; i++) {
+      const a = i / 3600 * Math.PI * 2; expect(tubeEdgeDrop(a)).toBeCloseTo(tubeEdgeDrop(-a));
+      worst = Math.max(worst, Math.abs(tubeEdgeDrop(a + 0.0017) - tubeEdgeDrop(a)));
+    }
+    expect(worst).toBeLessThan(0.15);
   });
-  it('never dips below the outer drop, and keeps the board side clear of the ditch floor', () => {
-    for (let i = 0; i < 360; i++) expect(tubeEdgeDrop(i / 360 * Math.PI * 2)).toBeLessThanOrEqual(TUBE_SHAPE.outerDrop + 1e-9);
-    expect(0.4 - TUBE_SHAPE.innerDrop).toBeGreaterThan(0.375 - 0.4);
+  it('never dips below the outer drop', () => {
+    for (let i = 0; i < 720; i++) expect(tubeEdgeDrop(i / 720 * Math.PI * 2)).toBeLessThanOrEqual(TUBE_SHAPE.outerDrop + 1e-9);
   });
 });

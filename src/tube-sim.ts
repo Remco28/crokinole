@@ -10,26 +10,33 @@ import { DISC } from './sim/constants';
 // are loose in the tube: a shove slides them against the wall (a knock) and
 // rocking discs tick as they settle back. Landing drives sound-sized impacts.
 // height is the part above the rim: room for the 8 discs of tournament play.
-export const TUBE_DIM = { radius: 0.8, height: 3.3, floor: 0.4 } as const;
-// One continuous wall straddles the rail. Its bottom edge is lowest on the outer
-// face (hanging down the outside of the rail) and stops just below the rail top
-// on the board side, so a disc flung across the ditch glides underneath. Where
-// the rail passes through each side of the tube the edge rises in a rounded arch
-// to rest on the rail top. theta is measured round the tube from the outward
-// direction (0 = away from the board, PI = toward the board).
+// The bore is only a little wider than a disc, so discs have just a hair of play.
+export const TUBE_DIM = { radius: 0.68, height: 3.3, floor: 0.4 } as const;
+// One continuous wall straddles the rail. Where the rail passes through each
+// side of the tube there is a narrow U-shaped slot, just wider than the rail
+// (0.25 inch), whose rounded top rests on the rail. Below the slot the wall
+// hangs lower on the outside of the rail and only a little lower on the board
+// side. The two edge heights differ by about one disc plus glide room, so a disc
+// flung across the ditch passes underneath. theta is measured round the tube
+// from the outward direction (0 = away from the board, PI = toward the board).
+export const RAIL_THICKNESS = 0.25;
 export const TUBE_SHAPE = {
-  outerDrop: 1.3,   // below the rail top, outer face
-  innerDrop: 0.3,   // below the rail top, board face (disc tops sit 0.425 below it)
-  slotHalf: 0.16,   // radians of flat rest on each side, about the rail's thickness
-  slotRise: 0.55,   // radians over which the edge curves down from the rail
+  outerDrop: 0.9,    // below the rail top, outside face: under 2/3 of the rail's 1.8 inch height
+  innerDrop: 0.3,    // below the rail top, board face; disc tops sit 0.425 below the rail top
+  slotHalf: 0.15,    // inches either side of the rail's centre line
+  slotCorner: 0.07,  // rounding of the slot's top corners
+  slotSide: 0.03,    // inches over which the slot's sides climb (almost vertical)
 } as const;
-const smooth = (t: number) => { const u = Math.max(0, Math.min(1, t)); return u * u * (3 - 2 * u); };
 // How far below the rail top the wall extends at angle theta.
 export function tubeEdgeDrop(theta: number): number {
   const t = Math.atan2(Math.sin(theta), Math.cos(theta));
-  const side = Math.abs(Math.abs(t) - Math.PI / 2);          // distance to the nearer rail crossing
   const face = Math.abs(t) < Math.PI / 2 ? TUBE_SHAPE.outerDrop : TUBE_SHAPE.innerDrop;
-  return face * smooth((side - TUBE_SHAPE.slotHalf) / TUBE_SHAPE.slotRise);
+  const d = Math.abs(Math.abs(t) - Math.PI / 2) * TUBE_DIM.radius;   // arc inches from the rail's centre line
+  const { slotHalf: w, slotCorner: r, slotSide: run } = TUBE_SHAPE;
+  if (d <= w - r) return 0;
+  if (d <= w) { const x = d - (w - r); return r - Math.sqrt(Math.max(0, r * r - x * x)); }
+  if (d <= w + run) return r + (face - r) * ((d - w) / run);
+  return face;
 }
 export const TUBE_CAPACITY = Math.floor(TUBE_DIM.height / DISC.height);
 export const TUBE_TUNE = {
@@ -46,8 +53,8 @@ export const TUBE_TUNE = {
   rockDamping: 0.05,             // damping ratio of the bottom disc; lone discs ring a while
   upperDamping: 0.4,
   accelToTilt: 1.3,              // tube acceleration to tilting torque
-  maxTiltBottom: 0.14,           // rad: where the disc meets the tube wall
-  maxTiltUpper: 0.05,
+  maxTiltBottom: 0.07,           // rad: a snug bore lets the disc rock only slightly
+  maxTiltUpper: 0.025,
   tickSpeed: 0.8,                // in/s of rim speed worth reporting
   knockSpeed: 1,
   substep: 1 / 480,

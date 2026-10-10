@@ -329,13 +329,13 @@ export function createScene(canvas: HTMLCanvasElement) {
   // 20s tubes: clear plastic hanging on the rim. Each tube owns a small loose-disc
   // simulation (tube-sim.ts), so its discs are real objects: they rest on the
   // rim edge, rattle when the tube is slid, and fall in with a sound.
-  const TUBE = { radius: TUBE_DIM.radius, wall: 0.04, height: TUBE_DIM.height, rimTop: TUBE_DIM.floor, centre: BOARD.ditchOuterRadius + 0.125 };
+  const TUBE = { radius: TUBE_DIM.radius, wall: 0.03, height: TUBE_DIM.height, rimTop: TUBE_DIM.floor, centre: BOARD.ditchOuterRadius + 0.125 };
   const tubeGlass = new THREE.MeshPhysicalMaterial({ color: '#eaf4f4', transparent: true, opacity: 0.2, roughness: 0.05, metalness: 0, side: THREE.DoubleSide, depthWrite: false });
   const tubeEdge = new THREE.MeshStandardMaterial({ color: '#ffffff', transparent: true, opacity: 0.55, roughness: 0.1, depthWrite: false });
   // One seamless wall. Its bottom edge follows tubeEdgeDrop(), so the long outer
   // face, the shorter board face and the rounded arches over the rail are all one
   // piece of plastic. A thin rounded lip runs along the top and the curved bottom.
-  const WALL_SEGMENTS = 96;
+  const WALL_SEGMENTS = 360;  // fine enough for the 0.3 inch slot
   const edgeAt = (theta: number) => TUBE.rimTop - tubeEdgeDrop(theta);
   const tubeWallGeo = (() => {
     const positions: number[] = [], normals: number[] = [], index: number[] = [];
@@ -352,7 +352,7 @@ export function createScene(canvas: HTMLCanvasElement) {
   })();
   const loop = (height: (theta: number) => number) => new THREE.CatmullRomCurve3(
     Array.from({ length: WALL_SEGMENTS }, (_, i) => { const theta = i / WALL_SEGMENTS * Math.PI * 2; return new THREE.Vector3(Math.sin(theta) * TUBE.radius, height(theta), Math.cos(theta) * TUBE.radius); }), true);
-  const tubeTopLipGeo = new THREE.TubeGeometry(loop(() => TUBE.rimTop + TUBE.height), WALL_SEGMENTS * 2, TUBE.wall, 6, true);
+  const tubeTopLipGeo = new THREE.TubeGeometry(loop(() => TUBE.rimTop + TUBE.height), WALL_SEGMENTS, TUBE.wall, 6, true);
   const tubeBottomLipGeo = new THREE.TubeGeometry(loop(edgeAt), WALL_SEGMENTS * 2, TUBE.wall, 6, true);
   type TubeSpecLike = { side: number; angle: number; owners: number[] };
   interface TubeRig { side: number; root: THREE.Group; owners: number[]; sim: TubeState; meshes: Array<THREE.Mesh<THREE.LatheGeometry, THREE.MeshStandardMaterial>>; motion: RimMotion; target: number }
