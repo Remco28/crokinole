@@ -1,0 +1,19 @@
+<!doctype html>
+<!-- Dev-only: every tutorial picture on one page, drawn with the real CSS. Served by vite at /scripts/tutorial-gallery.html; captured by scripts/tutorial-shot.mjs. -->
+<meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<style>
+  body{margin:0;padding:12px;background:#1b211f;font:12px sans-serif;color:#ddd;display:grid;grid-template-columns:repeat(3,376px);gap:12px}
+  figure{margin:0}figcaption{margin:0 0 4px}
+  /* #tutorial card is 420px wide with 22px padding: the art box is 376px, so these are true size. */
+</style>
+<body id="gallery"></body>
+<script type="module">
+  import '/src/style.css';
+  import { STEPS } from '/src/tutorial.ts';
+  const params = new URLSearchParams(location.search);
+  document.body.dataset.theme = params.get('theme') ?? 'light';
+  const only = params.get('step');
+  document.getElementById('gallery').insertAdjacentHTML('beforeend', STEPS.map((s, i) => only && Number(only) !== i + 1 ? '' :
+    `<figure><figcaption>${i + 1}. ${s.title}</figcaption><div class="tutorial-art" style="margin:0">${s.art}</div></figure>`).join(''));
+  document.title = 'ready';
+</script>

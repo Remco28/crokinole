@@ -4,30 +4,56 @@ export interface TutorialStep { title: string; body: string; art: string }
 
 const RED = '#d0553f', BLUE = '#5d93a8';
 const svg = (inner: string) => `<svg viewBox="0 0 200 120" role="img" aria-hidden="true">${inner}</svg>`;
-// A top-down board: playing surface with the 15, 10 and 5 rings and the hole.
-const board = (cx = 100, cy = 60, r = 54) => `<circle cx="${cx}" cy="${cy}" r="${r}" class="t-board"/><circle cx="${cx}" cy="${cy}" r="${r * 0.9}" class="t-line"/><circle cx="${cx}" cy="${cy}" r="${r * 0.6}" class="t-line"/><circle cx="${cx}" cy="${cy}" r="${r * 0.3}" class="t-line"/><circle cx="${cx}" cy="${cy}" r="${r * 0.07}" class="t-hole"/>`;
+const n = (v: number) => Math.round(v * 10) / 10;
+// Real proportions (BOARD in sim/constants.ts): rings at 4, 8 and 12 inches on a 13 inch board, eight pegs on the 4 inch ring.
+const RING = { r15: 4 / 13, r10: 8 / 13, r5: 12 / 13 };
+const board = (cx = 100, cy = 60, r = 54) => {
+  const pegs = Array.from({ length: 8 }, (_, i) => { const a = Math.PI / 8 + i * Math.PI / 4; return `<circle cx="${n(cx + Math.cos(a) * r * RING.r15)}" cy="${n(cy + Math.sin(a) * r * RING.r15)}" r="1.5" class="t-peg"/>`; }).join('');
+  return `<circle cx="${cx}" cy="${cy}" r="${r}" class="t-board"/>${[RING.r5, RING.r10, RING.r15].map(f => `<circle cx="${cx}" cy="${cy}" r="${n(r * f)}" class="t-line"/>`).join('')}<circle cx="${cx}" cy="${cy}" r="${n(r * 0.07)}" class="t-hole"/>${pegs}`;
+};
 const disc = (x: number, y: number, color: string, extra = '') => `<circle cx="${x}" cy="${y}" r="7" fill="${color}" class="t-disc" ${extra}/>`;
+// An arrowhead whose tip is at (x, y) pointing along (dx, dy); the shaft ends at its base so the two always line up.
+const head = (x: number, y: number, dx: number, dy: number, len = 9, half = 5.5, cls = 't-head') => {
+  const m = Math.hypot(dx, dy), ux = dx / m, uy = dy / m, bx = x - ux * len, by = y - uy * len;
+  return { base: [bx, by] as const, svg: `<path d="M${n(x)} ${n(y)}L${n(bx - uy * half)} ${n(by + ux * half)}L${n(bx + uy * half)} ${n(by - ux * half)}z" class="${cls}"/>` };
+};
+// A straight arrow between two points, trimmed by `from`/`to` so it can start and stop at the edge of a disc.
+const arrow = (x1: number, y1: number, x2: number, y2: number, from = 0, to = 0) => {
+  const m = Math.hypot(x2 - x1, y2 - y1), ux = (x2 - x1) / m, uy = (y2 - y1) / m;
+  const [sx, sy, tx, ty] = [x1 + ux * from, y1 + uy * from, x2 - ux * to, y2 - uy * to];
+  const h = head(tx, ty, ux, uy);
+  return `<line x1="${n(sx)}" y1="${n(sy)}" x2="${n(h.base[0])}" y2="${n(h.base[1])}" class="t-arrow"/>${h.svg}`;
+};
+// A curved arrow along a circle, from angle a0 to a1 (degrees, clockwise from 3 o'clock), with a head at each end when `both`.
+const arcArrow = (cx: number, cy: number, r: number, a0: number, a1: number, both = false) => {
+  const rad = (deg: number) => deg * Math.PI / 180, at = (deg: number) => [cx + r * Math.cos(rad(deg)), cy + r * Math.sin(rad(deg))] as const;
+  const tip = (deg: number, sign: number) => { const [x, y] = at(deg); return head(x, y, -Math.sin(rad(deg)) * sign, Math.cos(rad(deg)) * sign, 9, 5.5, 't-head t-orbit-head'); };
+  const angleOf = (p: readonly [number, number]) => Math.atan2(p[1] - cy, p[0] - cx) * 180 / Math.PI;
+  const dir = Math.sign(a1 - a0), end = tip(a1, dir), start = both ? tip(a0, -dir) : null;
+  const [sx, sy] = at(start ? angleOf(start.base) : a0), [ex, ey] = at(angleOf(end.base));
+  return `<path d="M${n(sx)} ${n(sy)}A${r} ${r} 0 0 ${dir > 0 ? 1 : 0} ${n(ex)} ${n(ey)}" class="t-orbit"/>${end.svg}${start?.svg ?? ''}`;
+};
 
 export const STEPS: TutorialStep[] = [
   {
     title: 'Place and flick',
     body: 'On your turn, tap your shooting line to slide your disc along it. Start your finger behind the disc and flick straight through it. A faster flick travels farther.',
-    art: svg(`${board()}<path d="M70 106a54 54 0 0 0 60 0" class="t-guide"/>${disc(100, 100, RED)}<line x1="100" y1="118" x2="100" y2="70" class="t-arrow"/><path d="M94 77l6-8 6 8" class="t-arrow"/>`),
+    art: svg(`${board()}${disc(100, 100, RED)}${arrow(100, 118, 100, 72)}`),
   },
   {
     title: 'Hit an opponent',
     body: 'If any opposing disc is on the board, your shot must hit one, directly or by bumping your own disc into it. Miss, and your disc is removed.',
-    art: svg(`${board()}${disc(100, 100, RED)}${disc(122, 38, BLUE)}<line x1="100" y1="92" x2="120" y2="48" class="t-arrow"/><path d="M111 52l9-4 2 10" class="t-arrow"/>`),
+    art: svg(`${board()}${disc(100, 100, RED)}${disc(122, 38, BLUE)}${arrow(100, 100, 122, 38, 10, 10)}`),
   },
   {
     title: 'Play to the middle',
     body: 'With no opponent discs to hit, one of your discs must finish touching or inside the inner ring, or drop into the center hole. Otherwise it is a foul.',
-    art: svg(`${board()}<circle cx="100" cy="60" r="16.2" class="t-focus"/>${disc(108, 66, RED)}${disc(100, 104, RED, 'opacity=".35"')}<line x1="100" y1="96" x2="106" y2="74" class="t-arrow"/>`),
+    art: svg(`${board()}<circle cx="100" cy="60" r="${n(54 * RING.r15 + 3)}" class="t-focus"/>${disc(100, 104, RED, 'opacity=".35"')}${disc(108, 66, RED)}${arrow(100, 104, 108, 66, 9, 9)}`),
   },
   {
     title: 'Scoring',
     body: 'After the last shot, discs score by ring: 5 outside, 10 in the middle, 15 inside the pegs, and 20 in the center hole. A disc touching a line scores the lower ring.',
-    art: svg(`${board(56, 60, 50)}<g class="t-callouts"><line x1="91" y1="60" x2="112" y2="60" class="t-lead"/><text x="118" y="63" class="t-label">20 · hole</text><line x1="71" y1="45" x2="112" y2="45" class="t-lead"/><text x="118" y="48" class="t-label">15 · inside the pegs</text><line x1="86" y1="75" x2="112" y2="75" class="t-lead"/><text x="118" y="78" class="t-label">10 · middle ring</text><line x1="101" y1="90" x2="112" y2="90" class="t-lead"/><text x="118" y="93" class="t-label">5 · outer ring</text></g>`),
+    art: svg(`${board(56, 60, 50)}${[[20, 56, 60, 94, '20 · hole'], [15, 67.5, 60, 72, '15 · inside the pegs'], [10, 76.9, 50.2, 50, '10 · middle ring'], [5, 75.2, 26.7, 26, '5 · outer ring']].map(([, x, y, ly, label]) => `<line x1="${x}" y1="${y}" x2="112" y2="${ly}" class="t-lead"/><circle cx="${x}" cy="${y}" r="2.2" class="t-dot"/><text x="116" y="${Number(ly) + 3}" class="t-label">${label}</text>`).join('')}`),
   },
   {
     title: 'Winning',
@@ -37,7 +63,7 @@ export const STEPS: TutorialStep[] = [
   {
     title: 'Look around',
     body: 'Drag the board to look around and pinch to zoom. You shoot while seated, so touch your disc if you are standing. The camera button resets your view.',
-    art: svg(`${board(100, 68, 44)}<path d="M34 34a74 30 0 0 1 132 0" class="t-arrow"/><path d="M166 34l-2-11 10 6z" class="t-head"/><path d="M34 34l2-11-10 6z" class="t-head"/>`),
+    art: svg(`${board(100, 68, 40)}${arcArrow(100, 68, 52, 215, 325, true)}`),
   },
 ];
 

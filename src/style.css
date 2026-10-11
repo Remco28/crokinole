@@ -270,7 +270,9 @@ body[data-theme=light] #final-countdown-badge{background:#fff1ee;border-color:#c
 .tutorial-art .t-board{fill:#b98a43;stroke:#6b4a1f;stroke-width:2}.tutorial-art .t-line{fill:none;stroke:#6b4a1f;stroke-width:1.2}
 .tutorial-art .t-hole{fill:#171d1c}.tutorial-art .t-disc{stroke:#00000044;stroke-width:1}
 .tutorial-art .t-arrow{fill:none;stroke:#fff6dc;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none}
-.tutorial-art .t-head{fill:#fff6dc;stroke:none}
+.tutorial-art .t-head{fill:#fff6dc;stroke:#fff6dc;stroke-width:1.4;stroke-linejoin:round}
+.tutorial-art .t-peg{fill:#2a1d0c}.tutorial-art .t-dot{fill:#fff6dc;stroke:#2a1d0c;stroke-width:1}
+.tutorial-art .t-orbit{fill:none;stroke:#d8bc80;stroke-width:2.6;stroke-linecap:round}.tutorial-art .t-orbit-head{fill:#d8bc80;stroke:#d8bc80}
 .tutorial-art .t-guide{fill:none;stroke:#fff6dc99;stroke-width:1.6;stroke-dasharray:3 4}
 .tutorial-art .t-focus{fill:#fff6dc22;stroke:#fff6dc;stroke-width:1.4;stroke-dasharray:3 3}
 .tutorial-art .t-num{fill:#2a1d0c;font:700 11px Manrope,sans-serif;text-anchor:middle}.tutorial-art .t-white{fill:#fff;font-size:15px}.tutorial-art .t-big{font-size:26px;fill:#d8bc80}
@@ -281,12 +283,13 @@ body[data-theme=light] #final-countdown-badge{background:#fff1ee;border-color:#c
 .tutorial-dots button[aria-current=true]::after{background:#d8bc80;inset:7px}
 .tutorial-nav{display:flex;justify-content:space-between;gap:10px}.tutorial-nav .primary{flex:1}
 body[data-theme=light] .tutorial-art{background:#efe7d4}body[data-theme=light] .tutorial-skip{color:#75551c}
-body[data-theme=light] .tutorial-art .t-arrow,body[data-theme=light] .tutorial-art .t-focus{stroke:#fffdf7}body[data-theme=light] .tutorial-art .t-head{fill:#fffdf7}body[data-theme=light] .tutorial-dots button::after{background:#c9c9be}body[data-theme=light] .tutorial-dots button[aria-current=true]::after{background:#a68038}
+body[data-theme=light] .tutorial-art .t-arrow,body[data-theme=light] .tutorial-art .t-focus{stroke:#fffdf7}body[data-theme=light] .tutorial-art .t-head{fill:#fffdf7;stroke:#fffdf7}body[data-theme=light] .tutorial-dots button::after{background:#c9c9be}body[data-theme=light] .tutorial-dots button[aria-current=true]::after{background:#a68038}
 
 .tutorial-art .t-label{fill:#e6dcc3;font:600 8.5px 'DM Sans',sans-serif}.tutorial-art .t-mid{text-anchor:middle}
 body[data-theme=light] .tutorial-art .t-label{fill:#3a2d17}
-.tutorial-art .t-lead{stroke:#b9a679;stroke-width:1;stroke-dasharray:2 2}
-body[data-theme=light] .tutorial-art .t-lead{stroke:#7a6232}
+.tutorial-art .t-lead{stroke:#e6dcc3;stroke-width:1}
+body[data-theme=light] .tutorial-art .t-lead{stroke:#3a2d17}
+body[data-theme=light] .tutorial-art .t-orbit{stroke:#8b6a22}body[data-theme=light] .tutorial-art .t-orbit-head{fill:#8b6a22;stroke:#8b6a22}
 #tutorial p{min-height:6.4em}
 
 .practice-entry{margin:16px 0 4px}.practice-entry button{width:100%}.practice-entry small{display:block;color:#a5afa7;font-size:11px;line-height:1.4;margin-top:6px}
