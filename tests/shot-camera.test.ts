@@ -49,8 +49,8 @@ describe('focus limits and targets', () => {
     d.state = 'out'; expect(settleFocus([d], 7)).toBeNull();
     expect(settleFocus([], 7)).toBeNull();
   });
-  it('defaults an unknown saved camera setting to off', () => {
-    expect(parseShotCamera('gentle')).toBe('gentle'); expect(parseShotCamera('follow')).toBe('follow'); expect(parseShotCamera('wild')).toBe('off'); expect(parseShotCamera(undefined)).toBe('off');
+  it('defaults to follow, keeping only an explicit off (the retired gentle option becomes follow)', () => {
+    expect(parseShotCamera('off')).toBe('off'); expect(parseShotCamera('follow')).toBe('follow'); expect(parseShotCamera('gentle')).toBe('follow'); expect(parseShotCamera('wild')).toBe('follow'); expect(parseShotCamera(undefined)).toBe('follow');
   });
 });
 

@@ -5,9 +5,10 @@ import { BOARD } from '../sim/constants';
 // tilt or zoom changes, so the horizon never rolls. All motion is slow and
 // capped, because a camera chasing a fast disc is what made earlier tracking
 // feel sickening.
-export type ShotCamera = 'off' | 'gentle' | 'follow';
-export const SHOT_CAMERAS: ShotCamera[] = ['off', 'gentle', 'follow'];
-export const parseShotCamera = (value: unknown): ShotCamera => SHOT_CAMERAS.includes(value as ShotCamera) ? value as ShotCamera : 'off';
+export type ShotCamera = 'off' | 'follow';
+export const SHOT_CAMERAS: ShotCamera[] = ['off', 'follow'];
+// Follow is the default; a saved setting from the retired 'gentle' option also falls back to it.
+export const parseShotCamera = (value: unknown): ShotCamera => value === 'off' ? 'off' : 'follow';
 
 export interface Point { x: number; y: number }
 export interface FocusTuning {

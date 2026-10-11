@@ -27,7 +27,7 @@ const pauseDialog = $<HTMLDialogElement>('pause-dialog');
 let paused = false, pausedRemaining: number | null = null;
 const sound = new BoardSound();
 const DEFAULT_ZOOM = 1.2;
-let volume = 0.65, muted = false, tilt: number = TILT.overview, zoom = DEFAULT_ZOOM, theme: 'light' | 'dark' = 'light', activeDiscHighlight = true, invertDrag = false, finalCountdown = true, shotCamera: ShotCamera = 'off', tubePref: TubePref = 'auto';
+let volume = 0.65, muted = false, tilt: number = TILT.overview, zoom = DEFAULT_ZOOM, theme: 'light' | 'dark' = 'light', activeDiscHighlight = true, invertDrag = false, finalCountdown = true, shotCamera: ShotCamera = 'follow', tubePref: TubePref = 'on';
 let tubeStore: TubeAngleStore = {};
 const smallScreen = window.matchMedia(SMALL_SCREEN_QUERY);
 const clampZoom = (value: number) => Math.max(0.75, Math.min(SHOT_VIEW.maxZoom, value));

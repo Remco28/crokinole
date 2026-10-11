@@ -29,7 +29,7 @@ describe('tube layout and setting', () => {
   it('shows tubes automatically only on larger screens', () => {
     expect(tubesVisible('auto', false)).toBe(true); expect(tubesVisible('auto', true)).toBe(false);
     expect(tubesVisible('on', true)).toBe(true); expect(tubesVisible('off', false)).toBe(false);
-    expect(parseTubePref('on')).toBe('on'); expect(parseTubePref('junk')).toBe('auto');
+    expect(parseTubePref('auto')).toBe('auto'); expect(parseTubePref('off')).toBe('off'); expect(parseTubePref('junk')).toBe('on'); expect(parseTubePref(undefined)).toBe('on');
   });
   it('wraps angles into one turn', () => {
     expect(normalizeAngle(-Math.PI / 2)).toBeCloseTo(Math.PI * 1.5); expect(normalizeAngle(Math.PI * 5)).toBeCloseTo(Math.PI);

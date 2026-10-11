@@ -4,7 +4,7 @@ import type { Mode } from './game/rules';
 // 20s tubes: clear tubes that hang on the board's rim and hold each side's
 // sunk 20s. Layout and contents are pure so they can be tested without a scene.
 export type TubePref = 'auto' | 'on' | 'off';
-export const parseTubePref = (value: unknown): TubePref => value === 'on' || value === 'off' ? value : 'auto';
+export const parseTubePref = (value: unknown): TubePref => value === 'auto' || value === 'off' ? value : 'on';
 // Auto hides the tubes on phones and other small screens.
 export const SMALL_SCREEN_QUERY = '(max-width: 700px), (max-height: 480px) and (pointer: coarse)';
 export const tubesVisible = (pref: TubePref, smallScreen: boolean) => pref === 'on' || (pref === 'auto' && !smallScreen);
