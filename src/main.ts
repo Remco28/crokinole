@@ -140,9 +140,9 @@ let discs: Disc[] = [], scores = [0, 0], used = [0, 0], phase: Phase = 'pass';
 let restored = false, winnerDismissed = false;
 const canInspectBoard = () => phase === 'pass' || phase === 'round' || (phase === 'won' && winnerDismissed);
 let review: ShotReview | null = null, roundResult: RoundResult | null = null;
-let shotSeconds = 60, deadline: number | null = null;
+let shotSeconds = 0, deadline: number | null = null;
 try {
-  const saved = Number(localStorage.getItem('crokinole-clock') ?? 60);
+  const saved = Number(localStorage.getItem('crokinole-clock') ?? 0);
   if ([0, 30, 60].includes(saved)) shotSeconds = saved;
 } catch { /* optional */ }
 const clockLabel = document.createElement('span');
@@ -154,7 +154,7 @@ canvas.parentElement!.append(countdownBadge);
 const clockSetting = document.createElement('label');
 clockSetting.textContent = 'Shot clock (applies next turn)';
 const clockSelect = document.createElement('select'); clockSelect.id = 'shot-clock-setting';
-clockSelect.innerHTML = '<option value="60">60 seconds</option><option value="30">30 seconds</option><option value="0">Off</option>';
+clockSelect.innerHTML = '<option value="0">No time limit</option><option value="30">30 seconds</option><option value="60">60 seconds</option>';
 clockSelect.value = String(shotSeconds); clockSetting.append(clockSelect);
 $('scoring-note').after(clockSetting);
 const scoringSelect = $<HTMLSelectElement>('scoring');
@@ -364,9 +364,8 @@ function resetView() {
   setZoom(DEFAULT_ZOOM); scene.setTilt(TILT.table); scene.centerView();
   tablePreferences();
 }
-// The one-cheek rule: shots are taken seated. Standing players sit down first.
 function sitDown() {
-  if (isSeated(scene.getTargetLevel())) return;
+  if (isSeated(scene.getTargetLevel(), scene.getSeatView().polar, scene.getSeatView().distance)) return;
   scene.setTilt(TILT.table); tablePreferences();
 }
 next.addEventListener('click', () => {
@@ -480,7 +479,7 @@ canvas.addEventListener('pointerdown', e => {
     const p = scene.boardPoint(e.clientX, e.clientY);
     if (phase === 'pass' && staged && p && !scene.isViewMoving() && canStartFlick(p, staged)) {
       // A standing player reaching for the disc sits down; the next touch shoots.
-      if (!isSeated(scene.getTargetLevel())) { sitDown(); return; }
+      if (!isSeated(scene.getTargetLevel(), scene.getSeatView().polar, scene.getSeatView().distance)) { sitDown(); return; }
       pointer = e.pointerId; press = { x: e.clientX, y: e.clientY }; flickStart = p;
       discCrossed = false; flickContact = null;
       trail = [{ ...p, t: e.timeStamp }];
@@ -704,7 +703,7 @@ function tick(now: number) {
   const modeLabel = practice ? (phase === 'pass' ? 'Practice · place and shoot' : 'Practice · shot in motion') : phase === 'pass' ? 'Place and shoot' : phase === 'moving' ? 'Shot in motion' : phase === 'review' ? 'Shot review' : phase === 'won' ? 'Game complete' : 'Round complete';
   if ($('board-mode').textContent !== modeLabel) $('board-mode').textContent = modeLabel;
   canvas.parentElement!.dataset.mode = phase === 'pass' ? 'play' : 'view';
-  const seated = isSeated(scene.getTargetLevel());
+  const seated = isSeated(scene.getTargetLevel(), scene.getSeatView().polar, scene.getSeatView().distance);
   const guidance = phase !== 'pass' ? '' : seated ? 'Tap line to place · drag to look · flick through disc to shoot'
     : 'Standing to look · touch your disc to sit down and shoot';
   if ($('board-guidance').textContent !== guidance) $('board-guidance').textContent = guidance;

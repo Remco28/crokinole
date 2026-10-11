@@ -734,6 +734,9 @@ export function createScene(canvas: HTMLCanvasElement) {
     },
     // Where the camera is heading, for the seat rule and the camera icon.
     getTargetLevel: () => cameraLevel(polarTarget, closenessTarget()),
+    // The angle and distance the seat rule needs, so it can compare the camera
+    // against a real eye height instead of a fraction of the tilt range.
+    getSeatView: () => ({ polar: polarTarget, distance: camDist }),
     setSkin: (skin: string, art?: HTMLImageElement) => {
       artworkPegCollars.visible = !!art;
       surfaceTopMat.map?.dispose(); surfaceTopMat.map = makeSurfaceTexture(skin, art); surfaceTopMat.needsUpdate = true;

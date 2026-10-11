@@ -41,10 +41,11 @@ describe('camera stops and the one-cheek rule', () => {
   it('names the nearest stop', () => {
     expect([0, 0.49, 0.5, 1.49, 1.5, 2].map(nearestStop)).toEqual(['overview', 'overview', 'table', 'table', 'shooter', 'shooter']);
   });
-  it('stands at Overview and sits from halfway down, or when moved in close', () => {
+  it('stands at Overview and sits from the Table stop down, or when moved in close', () => {
     expect(isSeated(cameraLevel(TILT.overview, 0))).toBe(false);
     expect(isSeated(cameraLevel(TILT.table, 0))).toBe(true);
+    expect(isSeated(SEATED_LEVEL - 0.01)).toBe(false);
     expect(isSeated(SEATED_LEVEL)).toBe(true);
-    expect(isSeated(cameraLevel(TILT.overview, 0.6))).toBe(true);
+    expect(isSeated(cameraLevel(TILT.overview, 1))).toBe(true);
   });
 });
