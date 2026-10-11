@@ -12,6 +12,10 @@
 // the low end of the usual 17-19 range, which puts the eye as high as that
 // body allows. This board is 1.8 inches thick, so the eye ends up 18.6 inches
 // above the playing surface. A camera higher than that cannot belong to him.
+// The limit is then eased by 20% of the angle, so a player may lean back a
+// little and still count as seated. At the Table framing distance that is
+// about 13 degrees of extra tilt.
+export const SEAT_FORGIVENESS = 0.8;
 export const SEAT = {
   eyeAboveSeat: 33.4,
   seatHeight: 17,
@@ -29,5 +33,5 @@ export function seatedEyeHeight(seat = SEAT): number {
 // camera is above the seated eye: the player is standing.
 export function seatedLimit(distance: number, seat = SEAT): number {
   const height = seatedEyeHeight(seat);
-  return Math.acos(Math.min(1, Math.max(-1, height / distance)));
+  return Math.acos(Math.min(1, Math.max(-1, height / distance))) * SEAT_FORGIVENESS;
 }

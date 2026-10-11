@@ -24,7 +24,9 @@ describe('camera stops and the one-cheek rule', () => {
     const limit = seatedLimit(tableDistance);
     expect(isSeated(0, limit - 0.01, tableDistance)).toBe(false);
     expect(isSeated(0, limit, tableDistance)).toBe(true);
-    expect(TILT.table).toBeLessThan(limit);
+    // Table is 62° from vertical. The eased limit sits near 51°, so the Table
+    // view is seated with room to lean back, and Overview is standing.
+    expect(TILT.table).toBeGreaterThan(limit);
     expect(TILT.overview).toBeLessThan(limit);
   });
   it('keeps the level fallback at the Table stop', () => {
@@ -34,7 +36,9 @@ describe('camera stops and the one-cheek rule', () => {
     // Moving in close behind the disc is still seated, however high the tilt.
     expect(isSeated(cameraLevel(TILT.overview, 1))).toBe(true);
   });
-  it('pins the angle so a later change to the body is visible here', () => {
-    expect(seatedLimit(tableDistance)).toBeCloseTo(radians(63.64), 2);
+  it('eases the limit by 20%, so a lean back still counts as seated', () => {
+    const strict = Math.acos(18.6 / 42);
+    expect(seatedLimit(42)).toBeCloseTo(strict * 0.8, 5);
+    expect(seatedLimit(42)).toBeCloseTo(radians(50.97), 2);
   });
 });

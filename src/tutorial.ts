@@ -27,7 +27,7 @@ export const STEPS: TutorialStep[] = [
   {
     title: 'Scoring',
     body: 'After the last shot, discs score by ring: 5 outside, 10 in the middle, 15 inside the pegs, and 20 in the center hole. A disc touching a line scores the lower ring.',
-    art: svg(`${board(58, 60, 52)}<g class="t-legend"><line x1="58" y1="60" x2="122" y2="26" class="t-lead"/><text x="128" y="30" class="t-label">20 · center hole</text><line x1="58" y1="46" x2="122" y2="52" class="t-lead"/><text x="128" y="56" class="t-label">15 · inside the pegs</text><line x1="58" y1="34" x2="122" y2="78" class="t-lead"/><text x="128" y="82" class="t-label">10 · middle ring</text><line x1="58" y1="16" x2="122" y2="104" class="t-lead"/><text x="128" y="108" class="t-label">5 · outer ring</text></g>`),
+    art: svg(`${board(56, 60, 50)}<g class="t-callouts"><line x1="91" y1="60" x2="112" y2="60" class="t-lead"/><text x="118" y="63" class="t-label">20 · hole</text><line x1="71" y1="45" x2="112" y2="45" class="t-lead"/><text x="118" y="48" class="t-label">15 · inside the pegs</text><line x1="86" y1="75" x2="112" y2="75" class="t-lead"/><text x="118" y="78" class="t-label">10 · middle ring</text><line x1="101" y1="90" x2="112" y2="90" class="t-lead"/><text x="118" y="93" class="t-label">5 · outer ring</text></g>`),
   },
   {
     title: 'Winning',
@@ -37,7 +37,7 @@ export const STEPS: TutorialStep[] = [
   {
     title: 'Look around',
     body: 'Drag the board to look around and pinch to zoom. You shoot while seated, so touch your disc if you are standing. The camera button resets your view.',
-    art: svg(`<ellipse cx="100" cy="74" rx="76" ry="32" class="t-board"/><ellipse cx="100" cy="74" rx="46" ry="19" class="t-line"/><ellipse cx="100" cy="74" rx="14" ry="6" class="t-line"/><path d="M42 36q58-30 116 0" class="t-arrow"/><path d="M150 26l9 11-13 3" class="t-arrow"/><path d="M58 26l-9 11 13 3" class="t-arrow"/>`),
+    art: svg(`${board(100, 68, 44)}<path d="M34 34a74 30 0 0 1 132 0" class="t-arrow"/><path d="M166 34l-2-11 10 6z" class="t-head"/><path d="M34 34l2-11-10 6z" class="t-head"/>`),
   },
 ];
 
