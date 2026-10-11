@@ -31,7 +31,7 @@ export const STEPS: TutorialStep[] = [
   },
   {
     title: 'Winning',
-    body: 'Classic play adds the difference between your totals each round, and first to 100 wins. For tournament play, choose Scoring in Settings: four rounds a game, 2 points to the higher total and 1 each for a tie.',
+    body: 'House rules add the difference between your totals each round, and first to 100 wins. If both sides pass 100 on the same round, the higher score wins. For tournament play, choose Scoring in Settings: four rounds a game, 2 points to the higher total and 1 each for a tie.',
     art: svg(`<rect x="36" y="58" width="34" height="40" rx="4" class="t-board"/><rect x="83" y="28" width="34" height="70" rx="4" fill="${RED}"/><rect x="130" y="80" width="34" height="18" rx="4" class="t-board"/><text x="53" y="84" class="t-num t-white">1</text><text x="100" y="70" class="t-num t-white">2</text><text x="147" y="93" class="t-num t-white">0</text><text x="53" y="112" class="t-label t-mid">Tie</text><text x="100" y="112" class="t-label t-mid">Higher total</text><text x="147" y="112" class="t-label t-mid">Lower</text><text x="100" y="18" class="t-num t-big">✳</text>`),
   },
   {

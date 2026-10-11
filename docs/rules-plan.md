@@ -472,21 +472,20 @@ changes physics, scoring, or the pinned audio.
 
 ### Not started
 
-1. **Say what the formats are, in the interface.** Classic is a house format
-   (12 discs, the difference, first to 100) and should be labelled that way, so
-   a player arriving from a tournament video is not surprised.[8][11] The
-   tournament option should note that the Worlds' own finals differ: singles is
-   best of three with each game first to 5, doubles is first to 7, and 11 is
-   the other common race target.[3][6]
-2. **The last-round tie at 100.** Decide, and write down, what happens when
-   both sides cross 100 on the same round. The home sheet that states it gives
-   the win to whoever crossed by more, and calls a dead heat a tie.[11] The
-   game currently plays on. Either reading is defensible; it should be a
-   choice rather than an accident.
-3. **Damage stays, only once a rail exists.** A disc that leaves, hits the rail
+1. **Say what the formats are, in the interface. Done.** The default scoring
+   option now reads "House rules · first to 100", the round label says "HOUSE
+   RULES", and the note under it says the higher score wins when both sides
+   pass 100 together. No new rules were added.
+2. **The last-round tie at 100. Already the rule.** `completeRound` crowns a
+   winner only when one side is strictly ahead at or above 100, so when both
+   sides pass 100 on the same round the higher score wins and an exact tie
+   plays on. That is what was asked for, and it matches the home sheet that
+   states it.[11] The settings note, the round label and the tutorial now say
+   so, instead of leaving it implicit.
+
+3. **Damage stays. Left alone**, as decided. A disc that leaves, hits the rail
    or a ditched disc, and comes back is dead, and everything it moved
-   stands.[1] There is no rail today, so building the rule first would be
-   guessing. It waits for that work.
+   stands.[1] There is no rail today, so the rule waits until one exists.
 4. **Leave free-for-all as it is.** Six discs each and raw totals match the
    only published house version; 100 rather than 120 is this game's choice and
    is fine.[12] No association publishes a rule for it.[3]
