@@ -311,3 +311,15 @@ body[data-practice] #match-panel,body[data-practice] #round-summary{display:none
 #more-options label>small{display:block;color:#a5afa7;font-size:11px;line-height:1.4;margin-top:6px}
 body[data-theme=light] #more-options label>small{color:#667267}
 #board-canvas.is-moving-tube{cursor:grabbing}
+
+/* Full screen: a small icon at the board's upper right, mirroring the camera icons. */
+#fullscreen-toggle{position:absolute;top:45px;right:8px;z-index:2;width:34px;height:34px;padding:0;border-radius:10px;display:grid;place-items:center;background:#20292580;border:1px solid #a5afa730;color:#ecebdf}
+#fullscreen-toggle[hidden]{display:none}
+#fullscreen-toggle svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#fullscreen-toggle .fs-exit,#fullscreen-toggle[data-on=true] .fs-enter{display:none}
+#fullscreen-toggle[data-on=true] .fs-exit{display:inline}
+body[data-theme=light] #fullscreen-toggle{background:#fffdf7cc;border-color:#62686230;color:#3a403b}
+#show-winner{right:52px}
+/* The final countdown sits just left of it, where they share a row. */
+#final-countdown-badge{right:52px}
+@media(max-width:899px){#fullscreen-toggle{top:52px;right:0}#show-winner{right:42px}#final-countdown-badge{right:14px}}

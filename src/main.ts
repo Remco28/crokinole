@@ -95,6 +95,9 @@ async function unlockSound() {
 document.addEventListener('pointerdown', () => { void unlockSound(); }, { passive: true });
 document.addEventListener('keydown', () => { void unlockSound(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden) sound.suspend(); });
+// Leaving the page with a shot clock running pauses the game, so the clock waits
+// (and a closed tab reopens at the Resume dialog instead of a forfeited shot).
+document.addEventListener('visibilitychange', () => { if (document.hidden && phase === 'pass' && deadline !== null && !practice) pauseGame(); });
 $('sound-toggle').addEventListener('click', () => {
   if (muted || volume === 0) { muted = false; if (volume === 0) volume = 0.65; } else muted = true;
   tablePreferences();
@@ -218,7 +221,8 @@ $('pause-button').addEventListener('click', pauseGame);
 $('resume-game').addEventListener('click', resumeGame);
 pauseDialog.addEventListener('cancel', event => { event.preventDefault(); resumeGame(); });
 window.addEventListener('pagehide', save);
-let scoreboardExpanded = false, roundBoardFocus = false;
+// Desktop has room for the score details, so they start open there; phones start collapsed.
+let scoreboardExpanded = window.matchMedia('(min-width:900px)').matches, roundBoardFocus = false;
 const eyeIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.2 12s3.6-6 9.8-6 9.8 6 9.8 6-3.6 6-9.8 6-9.8-6-9.8-6Z"></path><circle cx="12" cy="12" r="2.6"></circle></svg>';
 function roundLabel() {
   if (practice) return 'PRACTICE';
@@ -290,6 +294,9 @@ function pass(message = '', restoreClock = false) {
   next.hidden = true; scene.highlightDisc(staged.id); hud(); save();
 }
 function start() {
+  // A new game asked for from practice replaces the saved match and ends practice.
+  if (practice) { practice = false; delete document.body.dataset.practice; practicePanel.show(false); practiceLog = null; practiceRemaining = null; }
+  dropStarted = null;
   mode = $<HTMLSelectElement>('mode').value as Mode;
   format = parseFormatKey(scoringSelect.value) ?? CLASSIC;
   if (!formatAllowsMode(format, mode)) format = CLASSIC;
@@ -306,7 +313,7 @@ function nextRound() {
 }
 function practiceReset() {
   cancel(); cancelOrbit(); placementPointer = null; touches.clear(); pinching = false; pinchDistance = 0;
-  mode = 'duel'; format = CLASSIC; game = 1; gamesWon = [0, 0]; round = 1; id = 0; discs = []; scores = [0, 0]; used = [0, 0];
+  mode = 'duel'; format = CLASSIC; player = 0; game = 1; gamesWon = [0, 0]; round = 1; id = 0; discs = []; scores = [0, 0]; used = [0, 0];
   review = null; roundResult = null; shot = null; practiceLog = null; staged = null; roundBoardFocus = false; winnerDismissed = false; deadline = null;
   practicePanel.reset(); pass();
 }
@@ -394,6 +401,12 @@ $('show-winner').addEventListener('click', () => {
 });
 $('winner-new-game').addEventListener('click', start);
 $('settings-button').addEventListener('click', () => settings.showModal());
+// Mode and scoring only apply through Start a new game; closing Settings
+// otherwise puts them back to the current match.
+settings.addEventListener('close', () => {
+  if (practice) return;
+  $<HTMLSelectElement>('mode').value = mode; scoringSelect.value = formatKey(format); syncScoringOptions();
+});
 $('enter-practice').addEventListener('click', enterPractice);
 $('new-game').addEventListener('click', start);
 const skin = $<HTMLSelectElement>('skin');
@@ -627,7 +640,7 @@ function reviewMessage() {
   banner.textContent = verdict.valid ? 'Shot complete' : 'Foul';
   const reason = verdict.reason === 'opponent-missed' ? 'No opponent disc hit.' : verdict.reason === 'inner-ring-missed' ? 'No involved disc finished in the inner ring or twenty hole.' : '';
   const removal = removed.length ? `${removed.length} disc${removed.length === 1 ? '' : 's'} ${removed.length === 1 ? 'moves' : 'move'} to the ditch.` : 'Take a moment to see where everything landed.';
-  const revoked = verdict.revokedTwenties ? ` ${verdict.revokedTwenties} twenty${verdict.revokedTwenties === 1 ? '' : ' scores'} cancelled.` : '';
+  const revoked = verdict.revokedTwenties ? ` ${verdict.revokedTwenties} ${verdict.revokedTwenties === 1 ? 'twenty' : 'twenties'} cancelled.` : '';
   hint.textContent = `${reason} ${removal}${revoked}`.trim();
 }
 // A valid 20 is cleared from the hole into its tube at handover. While it falls
@@ -670,6 +683,20 @@ function finishReview() {
 const seatBadge = $('seat-badge'), cameraToggle = $<HTMLButtonElement>('camera-toggle');
 const stopNames: Record<CameraStop, string> = { overview: 'Overview', table: 'Table', shooter: 'Shooter' };
 cameraToggle.addEventListener('click', resetView);
+// Fullscreen covers the whole app, so scores and turn guidance stay visible.
+// Hidden where the browser offers no Fullscreen API (iPhone Safari).
+const fullscreenToggle = $<HTMLButtonElement>('fullscreen-toggle');
+fullscreenToggle.hidden = !document.fullscreenEnabled;
+fullscreenToggle.addEventListener('click', () => {
+  if (document.fullscreenElement) void document.exitFullscreen();
+  else void document.documentElement.requestFullscreen().catch(() => {});
+});
+document.addEventListener('fullscreenchange', () => {
+  const on = !!document.fullscreenElement;
+  fullscreenToggle.dataset.on = String(on);
+  fullscreenToggle.setAttribute('aria-label', on ? 'Exit full screen' : 'Full screen');
+  fullscreenToggle.title = on ? 'Exit full screen' : 'Full screen';
+});
 let shownStop = '', shownSeat = '', shownCheek = '';
 function cameraControls(locked: boolean, seated: boolean) {
   const stop = nearestStop(scene.getTargetLevel());
@@ -708,6 +735,8 @@ function tick(now: number) {
     : 'Standing to look · touch your disc to sit down and shoot';
   if ($('board-guidance').textContent !== guidance) $('board-guidance').textContent = guidance;
   const awaitingShot = phase === 'pass';
+  // The shot clock stands still while Settings is open; shooting is blocked there too.
+  if (awaitingShot && deadline !== null && settings.open) deadline += now - last;
   if (awaitingShot && deadline !== null && Date.now() >= deadline) expireShot();
   clockLabel.hidden = !awaitingShot || practice;
   const remaining = deadline === null ? null : Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
@@ -777,7 +806,7 @@ if (restored) {
   else if (phase === 'round' || phase === 'won') {
     banner.textContent = phase === 'won' ? `${label(roundResult?.winner ?? scores.indexOf(Math.max(...scores)))} wins!` : isGameOver(roundResult) ? 'Game complete' : 'Round complete';
     hint.textContent = 'Your table has been restored.';
-    next.textContent = phase === 'won' ? 'Start a new game' : isGameOver(roundResult) ? 'Next game' : 'Next round'; next.setAttribute('aria-label', next.textContent); next.dataset.mode = 'result';
+    next.textContent = phase === 'won' ? 'Start a new game' : isGameOver(roundResult) ? 'Next game' : 'Next round'; next.setAttribute('aria-label', next.textContent); next.dataset.mode = 'result'; next.hidden = false;
   } else {
     pass('', true);
   }

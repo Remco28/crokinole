@@ -133,12 +133,13 @@ try {
   assert.deepEqual((await state()).scores, before.scores);
   await reload();
   assert.equal(await evaluate('document.getElementById("winner-overlay").hidden'), true, 'Dismissal survives reload');
+  assert.equal(await evaluate('document.getElementById("continue").hidden'), false, 'A restored result keeps its Start a new game button');
   await evaluate('document.getElementById("show-winner").click()');
   assert.equal(await evaluate('document.getElementById("winner-overlay").hidden'), false, 'Winner can be reopened');
   const teams = await state(); teams.mode='teams'; teams.used=[6,6,6,6]; teams.winnerDismissed=false;
   await restoreMatch(teams);
   assert.equal(await evaluate('document.getElementById("winner-title").textContent'), 'Red + Yellow Win!');
-  const ffa = await state(); ffa.mode='ffa'; ffa.scores=[15,30,70,110]; ffa.roundResult={before:ffa.scores,after:ffa.scores,winner:3,sides:Array.from({length:4},()=>({twenties:0,fifteens:0,tens:0,fives:0,total:0,awarded:0}))}; ffa.winnerDismissed=false;
+  const ffa = await state(); ffa.mode='ffa'; ffa.scores=[15,30,70,110]; ffa.roundResult={before:ffa.scores,after:ffa.scores,winner:3,sides:Array.from({length:4},()=>({twenties:0,fifteens:0,tens:0,fives:0,total:0,awarded:0}))}; ffa.winnerDismissed=false; ffa.gamesWon=[0,0,0,0];
   await restoreMatch(ffa);
   assert.equal(await evaluate('document.getElementById("winner-title").textContent'), 'Green Wins!');
   await evaluate('document.getElementById("winner-new-game").click()');
@@ -150,7 +151,7 @@ try {
   for (const mode of ['duel', 'teams', 'ffa']) {
     for (const [width, height] of [[320, 568], [360, 640], [390, 664], [844, 390], [899, 500]]) {
       await call('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true });
-      const roundEnd = { ...finalShot, mode, scores: Array(mode === 'ffa' ? 4 : 2).fill(0), used: Array(mode === 'duel' ? 2 : 4).fill(mode === 'duel' ? 12 : 6) };
+      const roundEnd = { ...finalShot, mode, scores: Array(mode === 'ffa' ? 4 : 2).fill(0), gamesWon: Array(mode === 'ffa' ? 4 : 2).fill(0), used: Array(mode === 'duel' ? 2 : 4).fill(mode === 'duel' ? 12 : 6) };
       await restoreMatch(roundEnd);
       await until('document.getElementById("continue").textContent === "Next round" && !document.getElementById("continue").hidden');
       if (mode === 'ffa') await evaluate('document.getElementById("score-details").click()');

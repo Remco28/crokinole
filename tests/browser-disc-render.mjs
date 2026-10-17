@@ -26,6 +26,8 @@ try {
   await call('Page.enable');await call('Runtime.enable'); await call('Page.setInterceptFileChooserDialog',{enabled:true});
 
   await call('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
+  // Skip the first-run tutorial, whose modal would cover the fixture.
+  await until('document.readyState==="complete"');await evaluate("localStorage.setItem('crokinole-tutorial','1')");await call('Page.reload');await sleep(300);
   await until('!!document.getElementById("disc-design-note") && !document.querySelector("[data-disc-style=wood]").disabled');
   await evaluate(`(async()=>{
     document.getElementById('pause-button').click();
