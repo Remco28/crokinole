@@ -1,6 +1,7 @@
 {
   "name": "crokinole",
   "private": true,
+  "license": "SEE LICENSE IN LICENSE.md",
   "version": "0.3.0-preview.9",
   "type": "module",
   "scripts": {
